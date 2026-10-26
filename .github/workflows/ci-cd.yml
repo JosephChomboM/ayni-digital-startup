@@ -1,0 +1,135 @@
+# Pipeline de Ayni Digital
+#
+# En cada Pull Request a main:  build + tests + seguridad
+# Al mergear a main:            lo mismo, luego deploy a stage y,
+#                               cuando alguien lo aprueba, deploy a producción.
+
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------- BUILD + TESTS ----------
+
+  backend:
+    name: Backend (build y tests)
+    runs-on: ubuntu-latest
+    environment: localhost
+    # Base de datos temporal para los tests de integración
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ayni
+          POSTGRES_PASSWORD: ayni
+          POSTGRES_DB: ayni_test
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U ayni" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ayni:ayni@localhost:5432/ayni_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --frozen
+      - name: Lint (ruff)
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Tests unitarios
+        run: uv run pytest tests/unit
+      - name: Migraciones
+        run: uv run alembic upgrade head
+      - name: Tests de integración
+        run: uv run pytest tests/integration
+
+  frontend:
+    name: Frontend (build y tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  # ---------- SEGURIDAD ----------
+
+  security:
+    name: Seguridad
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Buscar contraseñas o claves subidas por error
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Librerías de Python con vulnerabilidades conocidas
+        working-directory: backend
+        run: |
+          uv export --frozen --no-hashes --format requirements-txt > requirements.txt
+          uvx pip-audit -r requirements.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Librerías de npm con vulnerabilidades conocidas
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+  # ---------- DEPLOY (solo al mergear a main) ----------
+
+  deploy-stage:
+    name: Deploy a stage
+    if: github.event_name == 'push'
+    needs: [backend, frontend, security]
+    runs-on: ubuntu-latest
+    environment: stage
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm install -g @railway/cli
+      - name: Deploy API
+        run: railway up ./backend --path-as-root --service api --ci
+      - name: Deploy web
+        run: railway up ./frontend --path-as-root --service web --ci
+
+  deploy-production:
+    name: Deploy a producción
+    needs: deploy-stage
+    runs-on: ubuntu-latest
+    # Este ambiente pide aprobación manual en GitHub antes de correr
+    environment: production
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm install -g @railway/cli
+      - name: Deploy API
+        run: railway up ./backend --path-as-root --service api --ci
+      - name: Deploy web
+        run: railway up ./frontend --path-as-root --service web --ci
