@@ -1,0 +1,81 @@
+# Despliega backend y frontend a un ambiente de Railway y verifica que respondan.
+# Configuración por ambiente de GitHub (Settings → Environments):
+#   secret RAILWAY_TOKEN          token de proyecto de Railway para ese ambiente
+#   var    RAILWAY_ENVIRONMENT    nombre del ambiente en Railway (ej. staging, production)
+#   var    RAILWAY_API_SERVICE    nombre del servicio de la API
+#   var    RAILWAY_WEB_SERVICE    nombre del servicio web estático
+#   var    API_URL / WEB_URL      URLs públicas (sin "/" al final)
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy a ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.WEB_URL }}
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT }}
+      API_SERVICE: ${{ vars.RAILWAY_API_SERVICE }}
+      WEB_SERVICE: ${{ vars.RAILWAY_WEB_SERVICE }}
+      API_URL: ${{ vars.API_URL }}
+      WEB_URL: ${{ vars.WEB_URL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verificar configuración del ambiente
+        run: |
+          missing=0
+          for name in RAILWAY_TOKEN RAILWAY_ENVIRONMENT API_SERVICE WEB_SERVICE API_URL WEB_URL; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Falta $name en el ambiente '${{ inputs.environment }}' de GitHub"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Marcar la versión desplegada
+        run: |
+          echo "$GITHUB_SHA" > backend/VERSION
+          echo "$GITHUB_SHA" > frontend/public/version.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install -g @railway/cli@5
+
+      - name: Deploy API (las migraciones corren en el preDeployCommand)
+        run: railway up ./backend --path-as-root --service "$API_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --ci
+
+      - name: Smoke test API
+        run: |
+          scripts/smoke_test.sh "$API_URL/health" "$GITHUB_SHA"
+          scripts/smoke_test.sh "$API_URL/health/db"
+
+      - name: Deploy web
+        run: railway up ./frontend --path-as-root --service "$WEB_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --ci
+
+      - name: Smoke test web
+        run: scripts/smoke_test.sh "$WEB_URL/version.txt" "$GITHUB_SHA"
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### ${{ inputs.environment }}: ${{ job.status }}"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- API: $API_URL"
+            echo "- Web: $WEB_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,34 @@
+# GitHub pide revisión automáticamente al dueño de cada área.
+# Las invitaciones pendientes deben aceptarse para que la revisión automática funcione.
+
+# Por defecto: DevOps y QA
+*                                   @Gonzzzalo3
+
+# Líder de Producto y Frontend (UI/UX) — Damarys
+/frontend/                          @dahyesCM
+/scripts/check_clinical_language.py @dahyesCM @Gonzzzalo3
+
+# Backend y Base de Datos — Hats
+/backend/                           @Hats41
+/backend/migrations/                @Hats41
+/backend/app/modules/families/      @Hats41
+/backend/app/modules/memories/      @Hats41
+/backend/app/modules/sessions/      @Hats41
+/backend/app/modules/responses/     @Hats41
+/backend/app/modules/billing/       @Hats41
+
+# IA y Datos — Joseph
+/backend/app/modules/nlp/           @JosephChomboM
+/backend/app/modules/recommender/   @JosephChomboM
+/backend/app/modules/insights/      @JosephChomboM
+
+# DevOps y QA — Gonzalo
+/.github/                           @Gonzzzalo3
+/scripts/                           @Gonzzzalo3
+/backend/tests/                     @Gonzzzalo3 @Hats41
+/docker-compose.yml                 @Gonzzzalo3
+**/Dockerfile                       @Gonzzzalo3
+**/railway.json                     @Gonzzzalo3
+
+# Reglas del proyecto: las revisa todo el equipo
+/CLAUDE.md                          @JosephChomboM @dahyesCM @Hats41 @Gonzzzalo3

@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Written by the deploy pipeline
+backend/VERSION
+frontend/public/version.txt
+
+.DS_Store
