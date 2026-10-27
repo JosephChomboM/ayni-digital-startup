@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     environment: str = "localhost"
     database_url: str = "postgresql+psycopg://ayni:ayni@localhost:5432/ayni"
 
+    # LLM for the nlp module. Without a key, entity extraction uses spaCy only.
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-20b"
+    llm_timeout_seconds: float = 5.0
+
     @field_validator("database_url")
     @classmethod
     def use_psycopg_driver(cls, value: str) -> str:
