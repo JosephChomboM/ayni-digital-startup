@@ -6,6 +6,34 @@ Hola Gonzalo. Esta guía tiene dos partes: cómo trabajar con Git como todos, y 
 
 ---
 
+## Tu plan: qué ramas crear, con quién y dónde
+
+Tu primera tarea no lleva rama, porque es configuración y no código. Después, tu trabajo va acompañando lo que entregan Hats y Joseph: cuando ellos terminan un módulo, tú aseguras que esté bien probado.
+
+| # | Rama | Qué haces | Coordinas con | Espera a |
+|---|---|---|---|---|
+| 0 | *(sin rama)* | **Configurar Railway** y los `RAILWAY_TOKEN` (Parte 4). Luego compartir con el equipo las URLs de stage | **Joseph** (es admin del repo) | — Empieza ya |
+| 1 | `gonzalo/datos-de-prueba` | Script que crea una familia de ejemplo con recuerdos positivos y sensibles, para que todos prueben en `localhost` sin cargar datos a mano. **Solo datos inventados**, nunca datos reales | **Hats** (usa sus tablas) | `hats/modulo-families` y `hats/modulo-memories` |
+| 2 | `gonzalo/tests-reglas-sessions` | Tests de que una sesión **nunca** incluye recuerdos sensibles y **solo** incluye positivos | **Hats** | `hats/modulo-sessions` |
+| 3 | `gonzalo/tests-alerta-pausa` | Tests de la alerta: 3 sesiones seguidas "agitado", o ≥50 % negativas en las últimas 5 | **Joseph** | `joseph/insights-alerta-pausa` |
+| 4 | `gonzalo/tests-eliminar-cuenta` | Test de que al borrar la cuenta no queda nada: ni perfil, ni recuerdos, ni fotos, ni respuestas | **Hats** | `hats/eliminar-cuenta` |
+| 5 | `gonzalo/cron-nocturno` | Tarea nocturna en Railway (por ejemplo, recalcular patrones). **Después del MVP** | **Joseph** | — |
+
+**Tareas de todos los días (sin rama):**
+- revisar PRs, priorizando los de Hats, porque bloquean a los demás;
+- probar en stage cada merge antes de aprobar producción;
+- si el pipeline falla por algo que no es culpa del código, por ejemplo Railway caído, avisar al equipo.
+
+### Los ambientes son tu responsabilidad
+
+| Ambiente | Qué cuidas |
+|---|---|
+| `localhost` | Que `docker compose up -d db` + los comandos de las guías funcionen en la compu de todos. Si alguien no puede levantar el proyecto, lo ayudas tú |
+| `stage` | Que cada merge se despliegue solo. Que la base de stage tenga **solo datos de prueba**. Que el equipo tenga la URL |
+| `production` | Aprobar cada deploy (tú o Joseph) **después de probar en stage**. Que sus claves sean distintas a las de stage |
+
+---
+
 ## Parte 1: preparar tu compu (solo una vez)
 
 Tú ya eres colaborador del repo (**Gonzzzalo3**), así que no tienes que aceptar ninguna invitación.

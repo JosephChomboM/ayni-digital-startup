@@ -6,6 +6,35 @@ Hola Hats. Esta guía te lleva desde cero hasta tener tu código en GitHub. Copi
 
 ---
 
+## Tu plan: qué ramas crear, con quién y dónde
+
+Eres quien más bloquea a los demás: casi todas las pantallas de Damarys y las alertas de Joseph dependen de tus módulos. Por eso, **antes de programar cada módulo, comparte en el grupo el "contrato"**: qué endpoints habrá, qué datos reciben y qué devuelven. Puede ser un mensaje o una foto de `/docs`. Así los demás avanzan sin esperarte.
+
+Crea **una rama a la vez**, en este orden:
+
+| # | Rama | Qué haces | Coordinas con | Te espera |
+|---|---|---|---|---|
+| 1 | `hats/modulo-families` | Usuarios, familias, roles (`cuidador_principal`, `familiar`), invitaciones, login con JWT y guardar el **consentimiento** del registro | **Damarys** (pantalla de registro), **Gonzalo** (tests) | Damarys y Gonzalo |
+| 2 | `hats/modulo-memories` | Fotos (guardadas en el volumen de Railway, servidas con URL firmada), anécdotas, canciones (solo enlaces de YouTube/Spotify) y las marcas **positivo** y **sensible** | **Damarys** (subir recuerdos), **Joseph** (al guardar una anécdota se llama a `nlp.service`) | Damarys y Joseph |
+| 3 | `hats/modulo-sessions` | Generar la guía de sesión **con reglas y plantillas, sin IA**. Solo usa recuerdos positivos y nunca sensibles | **Joseph** (más adelante su recomendador ordenará el contenido), **Gonzalo** (tests de reglas éticas), **Damarys** (pantalla de la guía) | Damarys |
+| 4 | `hats/modulo-responses` | Registrar cómo reaccionó el adulto mayor después de cada sesión | **Damarys** (pantalla de respuesta), **Joseph** (sus alertas leen esto) | Joseph |
+| 5 | `hats/eliminar-cuenta` | Borrar de verdad la cuenta: perfil, recuerdos, fotos y respuestas | **Gonzalo** (test de que no queda nada) | — |
+| — | `hats/modulo-billing` | Plan gratis / Plan Familia con Mercado Pago. **Después del MVP** | **Joseph** | — |
+
+Si una tarea te toma más de 3 días, divídela. Por ejemplo, `hats/families-modelos` (tablas y migración) y luego `hats/families-endpoints`.
+
+### En qué ambiente pruebas
+
+| Ambiente | Cuándo lo usas | Cómo |
+|---|---|---|
+| `localhost` | Mientras programas | Docker + `uv run uvicorn app.main:app --reload`, y pruebas en http://localhost:8000/docs |
+| `stage` | Después de que tu PR se mergea | En la URL de stage (Gonzalo la comparte) + `/docs`. Revisa que la migración haya corrido bien |
+| `production` | Nunca lo tocas directamente | Gonzalo o Joseph aprueban el paso desde stage |
+
+**Nunca** te conectes a la base de datos de stage o de producción desde tu compu para "arreglar algo a mano". Todo cambio de tablas va por una migración en un PR.
+
+---
+
 ## Parte 1: preparar tu compu (solo una vez)
 
 ### 1. Acepta la invitación al repositorio

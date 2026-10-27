@@ -6,6 +6,36 @@ Hola Damarys. Esta guía te lleva paso a paso desde cero hasta tener tu código 
 
 ---
 
+## Tu plan: qué ramas crear, con quién y dónde
+
+Crea **una rama a la vez**, en este orden. Cuando una se mergea, empiezas la siguiente. No crees todas de golpe: cada una nace el día que empiezas esa tarea.
+
+| # | Rama | Qué haces | Coordinas con | Espera a |
+|---|---|---|---|---|
+| 1 | `damarys/estructura-y-navegacion` | Layout para celular, navegación entre pantallas, botón grande reutilizable y carpeta `api/` para hablar con el backend | Nadie, puedes empezar ya | — |
+| 2 | `damarys/pantalla-registro` | Registro e inicio de sesión. Incluye el **consentimiento** ("tus datos se guardan fuera del Perú") y el aviso: *"Ayni no es un servicio de salud. Si tu familiar tiene un diagnóstico de demencia, consulta con su médico antes de empezar."* | **Hats**: él hace el login en `hats/modulo-families` | Que Hats te diga qué datos pide y devuelve el login |
+| 3 | `damarys/pantalla-perfil` | Perfil del adulto mayor: nombre, década en que nació, gustos | **Hats** | `hats/modulo-families` |
+| 4 | `damarys/pantalla-subir-recuerdos` | Subir foto, escribir anécdota o pegar un enlace de YouTube/Spotify. Marcar cada recuerdo como **positivo** o **sensible** | **Hats** (`memories`), **Joseph** (qué pasa con las anécdotas) | `hats/modulo-memories` |
+| 5 | `damarys/pantalla-guia-sesion` | Mostrar la guía de la sesión paso a paso; empezarla en máximo 3 toques | **Hats** (`sessions`) | `hats/modulo-sessions` |
+| 6 | `damarys/pantalla-registro-respuesta` | Después de la sesión: ¿cómo le fue? (receptivo, emocionado, indiferente, agitado) | **Hats** (`responses`) | `hats/modulo-responses` |
+| 7 | `damarys/dashboard` | Resumen de sesiones y la **alerta de pausa**. Siempre con el texto: *"Esto no es un diagnóstico. Es un registro de actividades familiares."* | **Joseph** (`insights`) | `joseph/insights-alerta-pausa` |
+
+**Si el backend aún no está listo**, no te detengas. Pídele a Hats el "contrato" del endpoint (qué envías y qué recibes) y arma la pantalla con datos falsos dentro de `api/`. Cuando el endpoint esté listo, cambias los datos falsos por la llamada real.
+
+**Como líder de producto**, además:
+- revisas que todo texto nuevo, también los del backend, use tuteo y nada de lenguaje clínico;
+- decides el orden de las tareas si algo se atrasa.
+
+### En qué ambiente pruebas
+
+| Ambiente | Cuándo lo usas | Cómo |
+|---|---|---|
+| `localhost` | Mientras programas | `npm run dev` y abres http://localhost:5173. Si necesitas el backend, pídele a Hats que te enseñe a levantarlo o usa datos falsos |
+| `stage` | Después de que tu PR se mergea | Abres la URL de stage (Gonzalo la comparte) **en tu celular Android** y pruebas como si fueras la cuidadora |
+| `production` | Nunca lo tocas directamente | Gonzalo o Joseph aprueban el paso de stage a producción cuando tú confirmas que en stage se ve bien |
+
+---
+
 ## Parte 1: preparar tu compu (solo una vez)
 
 ### 1. Acepta la invitación al repositorio
