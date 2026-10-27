@@ -5,9 +5,11 @@ description = "API de Ayni Digital"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.13",
+    "es-core-news-sm",
     "fastapi>=0.115",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.4",
+    "spacy>=3.8,<3.9",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",
 ]
@@ -22,6 +24,9 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+es-core-news-sm = { url = "https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.8.0/es_core_news_sm-3.8.0-py3-none-any.whl" }
 
 [tool.ruff]
 target-version = "py312"
