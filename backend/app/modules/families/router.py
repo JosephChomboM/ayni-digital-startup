@@ -1,7 +1,7 @@
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,9 @@ from app.modules.families.schemas import (
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
+    InvitationCreatedResponse,
+    InvitationCreateRequest,
+    InvitationListResponse,
     LoginRequest,
     MemberListResponse,
     RegisterRequest,
@@ -97,3 +100,25 @@ def save_elder_profile(
     data: ElderProfileRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
 ) -> ElderProfileResponse:
     return service.save_elder_profile(user_id, **data.model_dump())
+
+
+@router.post("/families/me/invitations", response_model=InvitationCreatedResponse, status_code=201)
+def create_invitation(
+    data: InvitationCreateRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> InvitationCreatedResponse:
+    return service.create_invitation(user_id, email=data.email)
+
+
+@router.get("/families/me/invitations", response_model=InvitationListResponse)
+def list_invitations(
+    user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> InvitationListResponse:
+    return service.list_invitations(user_id)
+
+
+@router.delete("/families/me/invitations/{invitation_id}", status_code=204, response_class=Response)
+def revoke_invitation(
+    invitation_id: UUID, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> Response:
+    service.revoke_invitation(user_id, invitation_id)
+    return Response(status_code=204)
