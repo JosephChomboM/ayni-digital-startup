@@ -5,6 +5,7 @@ description = "API de Ayni Digital"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.13",
+    "email-validator>=2.3.0",
     "es-core-news-sm",
     "fastapi>=0.115",
     "httpx>=0.28.1",
