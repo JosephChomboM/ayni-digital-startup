@@ -9,6 +9,17 @@ import pytest
 os.environ["JWT_SECRET"] = secrets.token_hex(32)
 
 
+@pytest.fixture(autouse=True)
+def fast_argon2(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argon2 import PasswordHasher
+
+    from app.core import security
+
+    monkeypatch.setattr(
+        security, "_password_hasher", PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1)
+    )
+
+
 @pytest.fixture
 def isolated_security_environment(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

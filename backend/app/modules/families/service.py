@@ -9,6 +9,7 @@ from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApplicationError
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.security_settings import get_security_settings
 from app.modules.families.consent import CONSENT_TEXT, CONSENT_TEXT_VERSION, ONBOARDING_NOTICE
@@ -46,12 +47,8 @@ def _invitation_digest(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-class FamiliesError(Exception):
-    def __init__(self, *, code: str, message: str, status_code: int) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
+class FamiliesError(ApplicationError):
+    """A public error raised by the families module."""
 
 
 class FamiliesService:
