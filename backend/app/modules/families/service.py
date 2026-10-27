@@ -1,14 +1,27 @@
+import secrets
+from functools import lru_cache
 from typing import cast
 
 from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security_settings import get_security_settings
 from app.modules.families.consent import CONSENT_TEXT, CONSENT_TEXT_VERSION
 from app.modules.families.models import UserRole
 from app.modules.families.repository import FamiliesRepository
-from app.modules.families.schemas import RegisterRequest, RegisterResponse
+from app.modules.families.schemas import (
+    AuthenticationResponse,
+    LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
+)
+
+
+@lru_cache(maxsize=1)
+def _dummy_password_hash() -> str:
+    return hash_password(secrets.token_urlsafe(32))
 
 
 class FamiliesError(Exception):
@@ -25,6 +38,26 @@ class FamiliesService:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.repository = FamiliesRepository(session)
+
+    def login(self, *, email: str, password: SecretStr | str) -> AuthenticationResponse:
+        request = LoginRequest(email=email, password=password)
+        with self.session.begin():
+            user = self.repository.get_user_by_email(request.email)
+            encoded = user.password_hash if user is not None else _dummy_password_hash()
+            matches = verify_password(request.password.get_secret_value(), encoded)
+            if user is None or not matches:
+                raise FamiliesError(
+                    code="invalid_credentials",
+                    message="El correo o la contraseña no son correctos.",
+                    status_code=401,
+                )
+            return AuthenticationResponse.model_validate(
+                {
+                    "access_token": create_access_token(user.id),
+                    "expires_in": get_security_settings().jwt_access_token_expire_minutes * 60,
+                    "user": user,
+                }
+            )
 
     def register_caregiver(
         self,
