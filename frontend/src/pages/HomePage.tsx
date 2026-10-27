@@ -1,53 +1,110 @@
-﻿import React from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Button } from "../components/Button";
+import { getElderProfile, getMyFamily } from "../api/families";
+import type { ElderProfile, Family } from "../api/families";
+import { ApiError } from "../api/client";
 
 interface HomePageProps {
-  elderName?: string;
   onStartSession: () => void;
   onViewMemories: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
-  elderName = "Mamá María",
   onStartSession,
   onViewMemories,
 }) => {
+  const [elderProfile, setElderProfile] = useState<ElderProfile | null>(null);
+  const [family, setFamily] = useState<Family | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      setLoading(true);
+      try {
+        const familyData = await getMyFamily();
+        setFamily(familyData);
+      } catch {
+        // Manejo silencioso
+      }
+
+      try {
+        const profileData = await getElderProfile();
+        setElderProfile(profileData);
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "elder_profile_not_found") {
+          setElderProfile(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
+
+  const elderDisplayName = elderProfile?.name || "tu familiar";
+  const familyDisplayName = family?.name || "Familia";
+
   const handleShareWhatsApp = () => {
     const mensaje = encodeURIComponent(
-      `¡Hola! 👋 Hoy estuve compartiendo una sesión de recuerdos alegres con ${elderName} en Ayni Digital. 💚`
+      `¡Hola! 👋 Hoy estuve compartiendo una sesión de recuerdos alegres con ${elderDisplayName} en Ayni Digital. 💚`
     );
     window.open(`https://wa.me/?text=${mensaje}`, "_blank");
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-3">
+        <div className="w-10 h-10 border-4 border-[#0D7A5F] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-gray-500 font-medium">Cargando información del día...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* Saludo principal y estado del día */}
+      {/* Saludo principal */}
       <div className="bg-[#E8F5E9] p-5 rounded-3xl border border-[#0D7A5F]/20 flex items-center justify-between shadow-sm">
         <div className="space-y-1">
-          <span className="text-xs font-bold text-[#0D7A5F] uppercase tracking-wider">Dashboard Familiar</span>
-          <h2 className="text-xl font-extrabold text-[#1F2937]">Hoy cuidamos a {elderName} 💚</h2>
-          <p className="text-xs text-gray-600">Reminiscencia sugerida: 15 minutos</p>
+          <span className="text-xs font-bold text-[#0D7A5F] uppercase tracking-wider">
+            {familyDisplayName}
+          </span>
+          <h2 className="text-xl font-extrabold text-[#1F2937]">
+            Hoy cuidamos a {elderDisplayName} 💚
+          </h2>
+          <p className="text-xs text-gray-600">
+            {elderProfile?.birth_decade
+              ? `Década de nacimiento: ${elderProfile.birth_decade}s`
+              : "Perfil pendiente de completar"}
+          </p>
         </div>
         <div className="w-12 h-12 rounded-full bg-white border-2 border-[#0D7A5F] flex items-center justify-center text-2xl shadow-inner">
           👵
         </div>
       </div>
 
-      {/* Racha y Logros Rápidos estilo Duolingo */}
+      {/* Texto de deslinde médico obligatorio */}
+      <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-center">
+        <p className="text-[11px] text-gray-600 font-medium">
+          Esto no es un diagnóstico. Es un registro de actividades familiares.
+        </p>
+      </div>
+
+      {/* Racha y Actividades (Estado disponible pronto) */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white p-3 rounded-2xl border border-gray-200 text-center shadow-sm">
-          <span className="text-xl">🔥</span>
-          <p className="text-xs font-bold text-gray-800">3 días seguidos</p>
-          <p className="text-[10px] text-gray-500">Racha de recuerdos</p>
+          <span className="text-xl">📊</span>
+          <p className="text-xs font-bold text-gray-800">Próximamente</p>
+          <p className="text-[10px] text-gray-500">Racha de actividades</p>
         </div>
         <div className="bg-white p-3 rounded-2xl border border-gray-200 text-center shadow-sm">
           <span className="text-xl">⭐</span>
-          <p className="text-xs font-bold text-gray-800">5 Actividades</p>
-          <p className="text-[10px] text-gray-500">Completadas este mes</p>
+          <p className="text-xs font-bold text-gray-800">Sin registros</p>
+          <p className="text-[10px] text-gray-500">Actividades del mes</p>
         </div>
       </div>
 
-      {/* Acción Principal: Iniciar Actividad de Recuerdos */}
+      {/* Acción Principal */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3 text-center">
         <div className="w-12 h-12 mx-auto rounded-full bg-[#E8F5E9] text-[#0D7A5F] flex items-center justify-center text-2xl">
           🧠
@@ -55,64 +112,58 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="space-y-1">
           <h3 className="text-base font-bold text-[#0D7A5F]">Sesión de Estimulación Cognitiva</h3>
           <p className="text-xs text-gray-600 leading-relaxed">
-            Una guía paso a paso con canciones y preguntas sobre recuerdos felices para ejercitar la memoria.
+            Una guía paso a paso con preguntas sobre recuerdos felices para ejercitar la memoria.
           </p>
         </div>
         
         <div className="space-y-2 pt-1">
           <Button onClick={onStartSession}>
-            Comenzar actividad de hoy
+            Comenzar actividad
           </Button>
 
-          {/* Botón de Compartir por WhatsApp */}
           <button
             onClick={handleShareWhatsApp}
             className="w-full py-2 px-3 bg-[#25D366]/10 text-[#075E54] hover:bg-[#25D366]/20 font-semibold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors border border-[#25D366]/30"
           >
             <span>💬</span>
-            <span>Compartir avance con la familia por WhatsApp</span>
+            <span>Compartir avance por WhatsApp</span>
           </button>
         </div>
       </div>
 
-      {/* Acceso Rápido a Recuerdos y Spotify */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-        <div className="flex justify-between items-center">
-          <h3 className="text-xs font-bold text-[#0D7A5F] uppercase tracking-wider flex items-center gap-1">
-            <span>🖼️</span> Recuerdos destacados
-          </h3>
-          <button
-            onClick={onViewMemories}
-            className="text-xs text-[#0D7A5F] font-semibold hover:underline"
-          >
-            Ver todos
-          </button>
-        </div>
-
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          <div className="min-w-[130px] bg-[#F4FBF7] p-3 rounded-xl border border-[#0D7A5F]/10 text-center space-y-1">
-            <span className="text-2xl">🎶</span>
-            <p className="text-xs font-bold text-gray-800 truncate">Boleros preferidos</p>
-            <p className="text-[10px] text-[#0D7A5F] font-semibold">Spotify 🟢</p>
-          </div>
-
-          <div className="min-w-[130px] bg-[#F4FBF7] p-3 rounded-xl border border-[#0D7A5F]/10 text-center space-y-1">
-            <span className="text-2xl">📷</span>
-            <p className="text-xs font-bold text-gray-800 truncate">Paseo a Lachay</p>
-            <p className="text-[10px] text-gray-500">Álbum familiar</p>
+      {/* Gustos preferidos reales */}
+      {elderProfile?.interests && elderProfile.interests.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 space-y-2">
+          <h4 className="text-xs font-bold text-[#0D7A5F] uppercase tracking-wider">
+            💡 Gustos preferidos
+          </h4>
+          <div className="flex flex-wrap gap-1.5">
+            {elderProfile.interests.map((interest, idx) => (
+              <span
+                key={idx}
+                className="bg-[#E8F5E9] text-[#0D7A5F] text-[11px] px-2.5 py-1 rounded-full font-medium"
+              >
+                {interest}
+              </span>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Impacto ODS 3 / Autocuidado */}
-      <div className="bg-[#FEF3C7] border border-[#D97706]/30 p-4 rounded-2xl flex items-start space-x-3">
-        <span className="text-xl mt-0.5">🌱</span>
-        <div className="space-y-1">
-          <p className="text-xs font-bold text-[#92400E]">Cuidar también es cuidar de ti</p>
-          <p className="text-[11px] text-[#92400E]/90 leading-relaxed">
-            Recuerda tomarte un descanso. Ayni promueve el bienestar emocional tanto del adulto mayor como de la cuidadora.
-          </p>
-        </div>
+      {/* Sección Recuerdos (Estado informativo) */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-2 text-center">
+        <h3 className="text-xs font-bold text-[#0D7A5F] uppercase tracking-wider">
+          🖼️ Banco de Recuerdos
+        </h3>
+        <p className="text-xs text-gray-500">
+          Todavía no hay actividades o recuerdos registrados.
+        </p>
+        <button
+          onClick={onViewMemories}
+          className="text-xs text-[#0D7A5F] font-semibold hover:underline"
+        >
+          Ir a Recuerdos
+        </button>
       </div>
     </div>
   );

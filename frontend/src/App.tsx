@@ -1,23 +1,71 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { MobileLayout } from "./components/MobileLayout";
-import { Button } from "./components/Button";
 import { WelcomePage } from "./pages/WelcomePage";
 import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { getMe } from "./api/auth";
+import type { User } from "./api/auth";
 
 export default function App() {
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState<"home" | "memories" | "session" | "profile">("home");
 
-  if (showWelcome) {
-    return <WelcomePage onLoginSuccess={() => setShowWelcome(false)} />;
+  const checkSession = async () => {
+    const token = localStorage.getItem("ayni_token");
+    if (!token) {
+      setCurrentUser(null);
+      setLoadingAuth(false);
+      return;
+    }
+
+    try {
+      const res = await getMe();
+      setCurrentUser(res.user);
+    } catch {
+      localStorage.removeItem("ayni_token");
+      setCurrentUser(null);
+    } finally {
+      setLoadingAuth(false);
+    }
+  };
+
+  useEffect(() => {
+    checkSession();
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("ayni_token");
+    setCurrentUser(null);
+    setActiveTab("home");
+  };
+
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#F4FBF7] flex flex-col items-center justify-center p-6 text-center space-y-3">
+        <div className="w-10 h-10 border-4 border-[#0D7A5F] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-gray-600 font-medium">Verificando sesión...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <WelcomePage onLoginSuccess={(user) => setCurrentUser(user)} />;
   }
 
   return (
     <MobileLayout activeTab={activeTab} onTabChange={setActiveTab} title="Ayni Digital">
+      <div className="flex justify-end pb-2">
+        <button
+          onClick={handleLogout}
+          className="text-[11px] text-red-600 font-semibold hover:underline bg-red-50 px-2.5 py-1 rounded-lg border border-red-200"
+        >
+          Cerrar sesión ({currentUser.name})
+        </button>
+      </div>
+
       {activeTab === "home" && (
         <HomePage
-          elderName="Mamá María"
           onStartSession={() => setActiveTab("session")}
           onViewMemories={() => setActiveTab("memories")}
         />
@@ -27,29 +75,23 @@ export default function App() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#0D7A5F]/10 space-y-4 text-center">
           <span className="text-4xl">🖼️</span>
           <h2 className="text-lg font-bold text-[#0D7A5F]">Galería de Recuerdos</h2>
-          <p className="text-sm text-gray-600">
-            Aquí podrás subir fotos, anécdotas y canciones especiales para tu familiar.
+          <p className="text-xs text-gray-600">
+            Esta función estará disponible pronto para subir fotos, anécdotas y canciones familiares.
           </p>
-          <Button variant="secondary" onClick={() => alert("Próximamente: subir recuerdos")}>
-            + Agregar recuerdo
-          </Button>
         </div>
       )}
 
       {activeTab === "session" && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#0D7A5F]/10 space-y-4 text-center">
           <span className="text-4xl">💚</span>
-          <h2 className="text-lg font-bold text-[#0D7A5F]">Guía de Sesión de Reminiscencia</h2>
-          <p className="text-sm text-gray-600">
-            Guía paso a paso para conversar sobre recuerdos positivos de manera cálida y natural.
+          <h2 className="text-lg font-bold text-[#0D7A5F]">Sesión de Estimulación</h2>
+          <p className="text-xs text-gray-600">
+            Esta función estará disponible pronto para guiar las actividades de 15 minutos.
           </p>
-          <Button onClick={() => alert("Próximamente: iniciar actividad de 15 minutos")}>
-            Comenzar guía de 15 minutos
-          </Button>
         </div>
       )}
 
-      {activeTab === "profile" && <ProfilePage />}
+      {activeTab === "profile" && <ProfilePage currentUser={currentUser} />}
     </MobileLayout>
   );
 }
