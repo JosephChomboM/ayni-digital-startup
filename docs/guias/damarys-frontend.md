@@ -31,7 +31,7 @@ Crea **una rama a la vez**, en este orden. Cuando una se mergea, empiezas la sig
 | Ambiente | Cuándo lo usas | Cómo |
 |---|---|---|
 | `localhost` | Mientras programas | `npm run dev` y abres http://localhost:5173. Si necesitas el backend, pídele a Hats que te enseñe a levantarlo o usa datos falsos |
-| `stage` | Después de que tu PR se mergea | Abres la URL de stage (Gonzalo la comparte) **en tu celular Android** y pruebas como si fueras la cuidadora |
+| `stage` | Después de que tu PR se mergea | Abres la URL de stage (Gonzalo la comparte) **en tu celular Android** y pruebas como si fueras la cuidadora. Si la primera carga de datos demora ~1 minuto, es la API gratis despertando; después va normal |
 | `production` | Nunca lo tocas directamente | Gonzalo o Joseph aprueban el paso de stage a producción cuando tú confirmas que en stage se ve bien |
 
 ---

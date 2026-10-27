@@ -1,8 +1,8 @@
 # Guía para Gonzalo: cómo subir tu parte (DevOps y QA)
 
-Hola Gonzalo. Esta guía tiene dos partes: cómo trabajar con Git como todos, y lo que te toca a ti como DevOps y QA (Railway, aprobar producción y cuidar los tests).
+Hola Gonzalo. Esta guía tiene dos partes: cómo trabajar con Git como todos, y lo que te toca a ti como DevOps y QA (Render y Supabase, aprobar producción y cuidar los tests).
 
-**Tu área:** `.github/` (el pipeline), los `Dockerfile`, `docker-compose.yml`, Railway y la calidad de los tests.
+**Tu área:** `.github/` (el pipeline), los `Dockerfile`, `docker-compose.yml`, `render.yaml`, el hosting (Render + Supabase) y la calidad de los tests.
 
 ---
 
@@ -12,17 +12,17 @@ Tu primera tarea no lleva rama, porque es configuración y no código. Después,
 
 | # | Rama | Qué haces | Coordinas con | Espera a |
 |---|---|---|---|---|
-| 0 | *(sin rama)* | **Configurar Railway** y los `RAILWAY_TOKEN` (Parte 4). Luego compartir con el equipo las URLs de stage | **Joseph** (es admin del repo) | — Empieza ya |
+| 0 | *(sin rama)* | **Configurar Supabase y Render** y los deploy hooks (Parte 4). Luego compartir con el equipo las URLs de stage | **Joseph** (es admin del repo) | — Empieza ya |
 | 1 | `gonzalo/datos-de-prueba` | Script que crea una familia de ejemplo con recuerdos positivos y sensibles, para que todos prueben en `localhost` sin cargar datos a mano. **Solo datos inventados**, nunca datos reales | **Hats** (usa sus tablas) | `hats/modulo-families` y `hats/modulo-memories` |
 | 2 | `gonzalo/tests-reglas-sessions` | Tests de que una sesión **nunca** incluye recuerdos sensibles y **solo** incluye positivos | **Hats** | `hats/modulo-sessions` |
 | 3 | `gonzalo/tests-alerta-pausa` | Tests de la alerta: 3 sesiones seguidas "agitado", o ≥50 % negativas en las últimas 5 | **Joseph** | `joseph/insights-alerta-pausa` |
 | 4 | `gonzalo/tests-eliminar-cuenta` | Test de que al borrar la cuenta no queda nada: ni perfil, ni recuerdos, ni fotos, ni respuestas | **Hats** | `hats/eliminar-cuenta` |
-| 5 | `gonzalo/cron-nocturno` | Tarea nocturna en Railway (por ejemplo, recalcular patrones). **Después del MVP** | **Joseph** | — |
+| 5 | `gonzalo/cron-nocturno` | Tarea nocturna con un `schedule` de GitHub Actions, porque el plan gratis de Render no tiene cron (por ejemplo, recalcular patrones). **Después del MVP** | **Joseph** | — |
 
 **Tareas de todos los días (sin rama):**
 - revisar PRs, priorizando los de Hats, porque bloquean a los demás;
 - probar en stage cada merge antes de aprobar producción;
-- si el pipeline falla por algo que no es culpa del código, por ejemplo Railway caído, avisar al equipo.
+- si el pipeline falla por algo que no es culpa del código, por ejemplo Render o Supabase caídos, avisar al equipo.
 
 ### Los ambientes son tu responsabilidad
 
@@ -117,47 +117,67 @@ Merge a main ─────────► Backend ─┐
 | **Backend (build y tests)** | Ruff (estilo y errores), tests unitarios, migraciones y tests de integración con un PostgreSQL temporal |
 | **Frontend (build y tests)** | Lint, tests con Vitest y build |
 | **Seguridad** | Gitleaks (claves subidas por error), pip-audit y npm audit (librerías vulnerables) |
-| **Deploy a stage** | Sube la API y la web al ambiente `staging` de Railway |
-| **Deploy a producción** | Lo mismo en `production`, **después de que alguien lo apruebe** |
+| **Deploy a stage** | Le pide a Render que despliegue ese commit exacto en `ayni-api-stage` y `ayni-web-stage` |
+| **Deploy a producción** | Lo mismo en `ayni-api-prod` y `ayni-web-prod`, **después de que alguien lo apruebe** |
 
 `main` está protegida: para mergear hacen falta los 3 primeros checks en verde y 1 aprobación.
+
+Los jobs de deploy quedan en verde apenas Render **acepta** el pedido; el build en sí lo ves en el panel de Render (pestaña *Events* del servicio). Por eso, antes de aprobar producción, revisa que stage ya tenga la versión nueva.
 
 ### Los 3 ambientes
 
 | Ambiente en GitHub | Dónde corre | Cuándo |
 |---|---|---|
 | `localhost` | La compu de cada uno, y el job Backend en GitHub | Siempre |
-| `stage` | Railway, ambiente `staging` | Automático en cada merge a `main` |
-| `production` | Railway, ambiente `production` | Cuando tú o Joseph lo aprueban |
+| `stage` | Render (`ayni-api-stage`, `ayni-web-stage`) + Supabase (`ayni-stage`) | Automático en cada merge a `main` |
+| `production` | Render (`ayni-api-prod`, `ayni-web-prod`) + Supabase (`ayni-prod`) | Cuando tú o Joseph lo aprueban |
 
 ---
 
-## Parte 4: tu primera tarea, configurar Railway
+## Parte 4: tu primera tarea, configurar el hosting (todo gratis)
 
-Hasta que hagas esto, el job **Deploy a stage** va a salir en rojo con `Invalid RAILWAY_TOKEN`. Es normal mientras falte el token.
+| Pieza | Servicio |
+|---|---|
+| Base de datos y fotos | **Supabase**: un proyecto para stage y otro para producción |
+| API (FastAPI con Docker) | **Render**: se duerme tras 15 min sin uso y tarda ~1 min en despertar |
+| Frontend (React) | **Render**, sitio estático: no se duerme |
+| Pagos | **Simulados**: Mercado Pago en modo de prueba, sin cobros reales |
 
-1. **Crea el proyecto** en https://railway.com y agrega dos ambientes: `staging` y `production`.
-2. **En cada ambiente crea:**
-   - una base **PostgreSQL**;
-   - un servicio vacío llamado exactamente **`api`**;
-   - un servicio vacío llamado exactamente **`web`**.
+Hasta que termines esta parte, el job **Deploy a stage** sale en rojo porque faltan los deploy hooks. Es normal.
 
-   **No** conectes el repo de GitHub a los servicios. El deploy lo hace GitHub; si lo conectas, se despliega dos veces y sin pasar los tests.
-3. **Variables en Railway** (pestaña *Variables* de cada servicio):
-   - En `api`:
-     - `DATABASE_URL` → usa *Add Reference* y elige la de Postgres;
-     - `ENVIRONMENT` → `stage` o `production`;
-     - `JWT_SECRET` → un texto largo al azar, que puedes generar con `openssl rand -hex 32`.
-   - En `web`:
-     - `VITE_API_URL` → la URL pública del servicio `api`.
-   - En ambos servicios, en *Settings → Networking*, genera un dominio público.
-4. **Crea un token por ambiente:** en *Project Settings → Tokens*, crea un *Project Token* para `staging` y otro para `production`.
-5. **Guarda los tokens en GitHub:** en el repo, ve a *Settings → Environments*:
-   - `stage` → *Add environment secret* → nombre `RAILWAY_TOKEN`, valor el token de staging;
-   - `production` → igual, con el token de production.
-6. **Prueba:** en GitHub, ve a *Actions → CI/CD → la última corrida en main → Re-run all jobs*.
+### A. Supabase (base de datos y fotos)
 
-Las claves de LLM y de Mercado Pago se agregan después como variables del servicio `api`, cuando se usen. **Nunca** en el código.
+1. Crea una cuenta en https://supabase.com y **dos proyectos**: `ayni-stage` y `ayni-prod`. Elige la región **East US (North Virginia)**, que queda cerca de Render. Guarda la contraseña de la base de cada proyecto en un lugar seguro, **nunca en el repo**.
+2. En cada proyecto:
+   - **Cadena de conexión:** botón **Connect** → **Session pooler** → copia la URI y reemplaza `[YOUR-PASSWORD]` por la contraseña. Esa es la `DATABASE_URL`. Usa el *Session pooler*, no la *Direct connection* (Render no se conecta por IPv6) ni el *Transaction pooler*.
+   - **Bucket para fotos:** *Storage → New bucket* → nombre `fotos`, **sin** marcar *Public bucket*.
+   - **Claves:** en *Project Settings → API*, copia la *Project URL* (`SUPABASE_URL`) y la clave **service_role** (`SUPABASE_SERVICE_ROLE_KEY`). Esa clave da acceso total, así que solo va en Render.
+3. Supabase **pausa los proyectos gratis tras 1 semana sin actividad**. Si stage deja de responder, entra al proyecto y dale **Restore**.
+
+### B. Render (API y web)
+
+1. Crea una cuenta en https://render.com **entrando con GitHub** y dale acceso al repo `ayni-digital-startup`.
+2. **New → Blueprint** → elige el repo. Render lee `render.yaml` y te muestra 4 servicios: `ayni-api-stage`, `ayni-web-stage`, `ayni-api-prod` y `ayni-web-prod`.
+3. Llena los valores que te pide:
+   - **APIs:** `DATABASE_URL`, `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`. Usa los de `ayni-stage` en `ayni-api-stage` y los de `ayni-prod` en `ayni-api-prod`. `JWT_SECRET` se genera solo.
+   - **Webs:** `VITE_API_URL` = `https://ayni-api-stage.onrender.com` o `https://ayni-api-prod.onrender.com`. Si Render le asigna otra URL a la API (la ves arriba en el servicio), corrige esta variable después.
+4. Dale a **Apply**. Render crea los servicios y hace un primer deploy.
+5. Para comprobarlo, abre `https://<url-de-ayni-api-stage>/health/db`. Debe responder `{"status":"ok"}`; la primera vez tarda ~1 minuto.
+
+### C. Conectar GitHub con Render (deploy hooks)
+
+1. En **cada uno de los 4 servicios** de Render: *Settings → Deploy Hook* → copia la URL. Es secreta: cualquiera que la tenga puede desplegar.
+2. En GitHub: *Settings → Environments*:
+   - `stage` → *Add environment secret*: `RENDER_DEPLOY_HOOK_API` (hook de `ayni-api-stage`) y `RENDER_DEPLOY_HOOK_WEB` (hook de `ayni-web-stage`).
+   - `production` → los **mismos nombres**, con los hooks de `ayni-api-prod` y `ayni-web-prod`.
+3. Para probar: *Actions → CI/CD → la última corrida en main → Re-run all jobs*.
+4. Comparte con el equipo las URLs de `ayni-web-stage` y de `ayni-api-stage` (con `/docs` al final, para ver la API).
+
+**Más adelante**, cuando se usen, se agregan como variables de los servicios de API en Render (*Environment*):
+- las claves de LLM (`GROQ_API_KEY`);
+- las credenciales **de prueba** de Mercado Pago (las que empiezan con `TEST-`, en *Tus integraciones → Credenciales de prueba*). **Nunca** credenciales de producción: los pagos de Ayni son simulados.
+
+Nada de esto va en el código.
 
 ---
 
@@ -174,7 +194,7 @@ Si tú hiciste el merge, **no puedes aprobar tu propio deploy**; en ese caso lo 
 
 ### Si algo sale mal en producción
 
-- **Rápido:** en Railway, ve al servicio, entra a *Deployments*, elige el deploy anterior y usa **Rollback**.
+- **Rápido:** en Render, entra al servicio → *Events* → elige el deploy anterior → **Rollback**.
 - **Ordenado:** crea una rama con `git revert <id-del-commit>`, abre un PR y vuelve a pasar por stage y luego producción.
 
 ---
@@ -187,7 +207,7 @@ Si tú hiciste el merge, **no puedes aprobar tu propio deploy**; en ese caso lo 
   - `sessions`: nunca usa recuerdos marcados como sensibles y solo usa los marcados como positivos.
   - `insights`: la alerta de pausa se dispara con 3 sesiones seguidas "agitado", o con ≥50 % de respuestas negativas en las últimas 5.
 - **Revisa los textos:** que la UI no diga "diagnóstico", "terapia", "tratamiento" ni "mejora su memoria".
-- **Cuida los secretos:** si el job Seguridad avisa que se subió una clave, hay que **cambiar esa clave** en Railway o en el servicio que la generó. Borrarla del código no basta, porque queda en el historial.
+- **Cuida los secretos:** si el job Seguridad avisa que se subió una clave, hay que **cambiar esa clave** en Supabase, Render o el servicio que la generó. Borrarla del código no basta, porque queda en el historial.
 
 ---
 
@@ -195,9 +215,13 @@ Si tú hiciste el merge, **no puedes aprobar tu propio deploy**; en ese caso lo 
 
 | Mensaje | Qué pasa | Qué hacer |
 |---|---|---|
-| `Invalid RAILWAY_TOKEN` | Falta el token o está mal | Revisa la Parte 4, paso 5 |
-| `Service not found` | El servicio no se llama `api` o `web` | Renómbralo en Railway |
-| Deploy en verde pero la web no abre | El healthcheck de Railway falló | Revisa los logs del servicio en Railway |
+| Deploy falla con `curl: (3)` | Falta el secret del deploy hook en ese ambiente | Revisa la Parte 4, sección C |
+| Deploy falla con `401` o `404` | El hook está mal copiado o es de otro servicio | Cópialo otra vez desde Render |
+| Deploy en verde pero no cambia nada | Render falló al construir | Mira *Events* y *Logs* del servicio en Render |
+| La API tarda ~1 min en responder | Estaba dormida (plan gratis) | Normal. Ábrela un rato antes de una demo |
+| Logs de la API: `Network is unreachable` o `could not translate host name` | Usaste la *Direct connection* de Supabase | Cambia `DATABASE_URL` por la del *Session pooler* |
+| Stage no responde y Supabase dice *Paused* | Pasó 1 semana sin uso | En Supabase, dale **Restore** |
+| Render avisa de horas gratis agotadas | Se usaron las 750 h del mes | Avisa al equipo; se reinicia el mes siguiente |
 | `rejected ... main (protected branch)` | Intentaste subir directo a `main` | Usa una rama y un PR |
 | El PR no deja mergear | Falta un check en verde o la aprobación | Revisa la sección *Checks* del PR |
 
