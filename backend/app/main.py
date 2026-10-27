@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.cors import configure_cors
 from app.core.db import get_db
 from app.core.error_handlers import register_error_handlers
 from app.core.security_settings import lifespan
@@ -14,6 +15,7 @@ from app.modules.families.router import router as families_router
 app = FastAPI(title="Ayni Digital API", lifespan=lifespan)
 register_error_handlers(app)
 app.include_router(families_router)
+configure_cors(app)
 
 
 @app.get("/health")
