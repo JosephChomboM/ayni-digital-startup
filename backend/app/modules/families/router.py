@@ -12,7 +12,11 @@ from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
     CurrentUserResponse,
+    ElderProfileRequest,
+    ElderProfileResponse,
+    FamilyResponse,
     LoginRequest,
+    MemberListResponse,
     RegisterRequest,
     RegisterResponse,
 )
@@ -69,3 +73,27 @@ def get_current_user(
     user_id: AuthenticatedUserId, service: FamiliesServiceDep
 ) -> CurrentUserResponse:
     return service.get_current_user(user_id)
+
+
+@router.get("/families/me", response_model=FamilyResponse)
+def get_family(user_id: AuthenticatedUserId, service: FamiliesServiceDep) -> FamilyResponse:
+    return service.get_family(user_id)
+
+
+@router.get("/families/me/members", response_model=MemberListResponse)
+def list_members(user_id: AuthenticatedUserId, service: FamiliesServiceDep) -> MemberListResponse:
+    return service.list_members(user_id)
+
+
+@router.get("/families/me/elder-profile", response_model=ElderProfileResponse)
+def get_elder_profile(
+    user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> ElderProfileResponse:
+    return service.get_elder_profile(user_id)
+
+
+@router.put("/families/me/elder-profile", response_model=ElderProfileResponse)
+def save_elder_profile(
+    data: ElderProfileRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> ElderProfileResponse:
+    return service.save_elder_profile(user_id, **data.model_dump())
