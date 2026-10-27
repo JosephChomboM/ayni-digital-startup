@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
+from app.core.security_settings import lifespan
 
-app = FastAPI(title="Ayni Digital API")
+app = FastAPI(title="Ayni Digital API", lifespan=lifespan)
 
 
 @app.get("/health")
