@@ -40,7 +40,7 @@ def extract_entities(text: str) -> list[Entity]:
 - **Logs:** nunca registres el contenido de la anécdota, las entidades extraídas ni nombres. Registra solo métricas: proveedor usado, latencia y si hubo fallback.
 - **Nunca bloquees al usuario:** si el LLM falla, se agota la cuota o hay timeout, pasa a spaCy; si spaCy falla, devuelve `[]`. Todo envuelto y con test.
 - **Límites entre módulos:** `insights` lee respuestas solo con `responses.service`; `recommender` lee recuerdos solo con `memories.service`. Nunca importes `models` ni `repository` de otro módulo.
-- **Alerta de pausa:** los valores por defecto son 3 sesiones seguidas con `agitado`, o ≥50 % de respuestas negativas en las últimas 5. Van en `Settings`, no hardcodeados, y **no se cambian sin avisar**: están pendientes de validar con el asesor clínico. Ojo, "negativa" no está definida en CLAUDE.md (¿`agitado` y `indiferente`?). Defínelo con el equipo y documéntalo.
+- **Alerta de pausa:** los valores por defecto son 3 sesiones seguidas con `agitado`, o ≥50 % de respuestas negativas en las últimas 5. Van en `Settings`, no hardcodeados, y **no se cambian sin avisar**: están pendientes de validar con el asesor clínico. Solo `agitado` cuenta como negativa; `indiferente` no indica por sí sola malestar. Esta definición provisional está documentada en CLAUDE.md y también requiere validación del asesor clínico.
 - **Disclaimer:** todo reporte de patrones incluye *"Esto no es un diagnóstico. Es un registro de actividades familiares."*
 - **Tests obligatorios:** alerta disparada y no disparada en los bordes (2 contra 3 seguidas, 49 % contra 50 %), y fallback del extractor. Mockea el LLM; los tests nunca llaman a la API real.
 

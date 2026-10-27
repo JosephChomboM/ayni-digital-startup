@@ -17,6 +17,7 @@ Ayni **no es un servicio de salud**. Facilita actividades de reminiscencia *info
 - El onboarding muestra: *"Ayni no es un servicio de salud. Si tu familiar tiene un diagnóstico de demencia, consulta con su médico antes de empezar."*
 - Las sesiones solo usan contenido que la familia subió **y marcó como positivo**. Nunca se sugieren temas de duelo, pérdidas ni recuerdos marcados como sensibles.
 - Alerta de pausa: si se acumulan respuestas negativas, la app sugiere pausar y consultar a un profesional. Valores por defecto: 3 sesiones seguidas con "agitado", o ≥50% de respuestas negativas en las últimas 5 sesiones. Son configurables y están **pendientes de validar con el asesor clínico**; no cambiarlos sin avisar.
+- Para la alerta, una respuesta **negativa** es únicamente `agitado`. `Indiferente` no se interpreta por sí sola como malestar; `receptivo` y `emocionado` tampoco cuentan como negativas. Esta definición de producto es provisional y también está pendiente de validar con el asesor clínico.
 - Fuera de alcance, aunque alguien lo pida: clonación de voz, video generado con IA, chat terapéutico, cualquier función pensada para demencia severa.
 
 ## Datos personales (Ley N.° 29733)
