@@ -111,8 +111,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: stage
     env:
-      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+      API_HOOK: ${{ secrets.RENDER_API_STAGE_HOOK }}
+      WEB_HOOK: ${{ secrets.RENDER_WEB_STAGE_HOOK }}
     steps:
       - name: Deploy API
         run: curl -fsS -X POST "$API_HOOK&ref=$GITHUB_SHA"
@@ -126,8 +126,8 @@ jobs:
     # Este ambiente pide aprobación manual en GitHub antes de correr
     environment: production
     env:
-      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+      API_HOOK: ${{ secrets.RENDER_API_PROD_HOOK }}
+      WEB_HOOK: ${{ secrets.RENDER_WEB_PROD_HOOK }}
     steps:
       - name: Deploy API
         run: curl -fsS -X POST "$API_HOOK&ref=$GITHUB_SHA"
