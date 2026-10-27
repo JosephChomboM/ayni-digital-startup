@@ -1,12 +1,4 @@
-﻿import { apiFetch } from "./client";
-
-export interface ConsentResponse {
-  text_version: string;
-  text: string;
-  onboarding_notice: string;
-}
-
-export interface User {
+﻿export interface User {
   id: string;
   email: string;
   name: string;
@@ -15,50 +7,49 @@ export interface User {
   created_at: string;
 }
 
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-  family_name?: string;
-  invitation_token?: string;
-  consent: {
-    accepted: boolean;
+export interface AuthResponse {
+  user: User;
+  token?: string;
+  consent?: {
     text_version: string;
+    accepted_at: string;
   };
 }
 
-export interface RegisterResponse {
-  user: User;
-  family: { id: string; name: string; created_at: string };
-  consent: { text_version: string; accepted_at: string };
-}
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  user: User;
-}
-
-export async function getConsent(): Promise<ConsentResponse> {
-  return apiFetch<ConsentResponse>("/auth/consent");
-}
-
-export async function registerUser(payload: RegisterPayload): Promise<RegisterResponse> {
-  return apiFetch<RegisterResponse>("/auth/register", {
+export async function login(credentials: { email: string; password: string }): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials),
   });
+  if (!res.ok) throw new Error("Error en las credenciales");
+  return res.json();
 }
 
-export async function loginUser(email: string, password: string): Promise<LoginResponse> {
-  return apiFetch<LoginResponse>("/auth/login", {
+export async function register(data: {
+  email: string;
+  password: string;
+  name: string;
+  family_name: string;
+}): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
   });
+  if (!res.ok) throw new Error("Error al registrar el usuario");
+  return res.json();
 }
 
-export async function getMe(): Promise<{ user: User; consent: { text_version: string; accepted_at: string } }> {
-  return apiFetch<{ user: User; consent: { text_version: string; accepted_at: string } }>("/users/me");
+export const loginCaregiver = login;
+export const registerCaregiver = register;
+
+export async function getMe(): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/me`);
+  if (!res.ok) throw new Error("No autenticado");
+  return res.json();
 }
 
+export const getCaregiverProfile = getMe;
