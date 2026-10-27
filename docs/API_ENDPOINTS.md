@@ -1,63 +1,54 @@
 # Módulos y Endpoints del Backend - Ayni Digital
 
-Este documento detalla la estructura de la API (FastAPI) que soporta la plataforma. Sirve como guía de referencia para el equipo de Frontend y como checklist para las pruebas de QA en el ambiente de staging (`/docs`).
+Este documento detalla la estructura de la API (FastAPI) que soporta la plataforma, alineada con los contratos ya implementados y las reglas de negocio del proyecto. Sirve como guía para el Frontend y como checklist para las pruebas de QA en el ambiente de staging.
 
-La API está protegida con JWT (excepto el registro y login). Cada petición debe validar que el usuario pertenezca a la familia dueña del perfil para evitar fugas de información.
+**Nota:** Las rutas no llevan prefijo `/api`. La API se monta directamente en la raíz del dominio.
 
-## 1. Autenticación y Familia
-Módulo encargado de gestionar el acceso y la red de apoyo del adulto mayor.
+## 1. Autenticación, Familia y Perfil (Implementado en `main`)
+Módulo encargado de gestionar el acceso y la red de apoyo. El consentimiento legal se guarda durante el registro.
 
-*   **`POST /api/auth/register`**
-    Registra al usuario principal (cuidador). Recibe nombre, correo y contraseña. Devuelve el token JWT inicial.
-*   **`POST /api/auth/login`**
-    Valida credenciales y devuelve el token de acceso.
-*   **`POST /api/auth/consent`**
-    Guarda la aceptación de los términos y el aviso legal ("Ayni no es un servicio de salud"). Se requiere antes de usar la app por temas de responsabilidad civil.
-*   **`POST /api/families/invite`**
-    Genera un token o enlace para que el cuidador invite a otros familiares a colaborar en el perfil (ej. la tía que tiene las fotos).
+*   **`GET /auth/consent`**: Devuelve el texto de consentimiento, su versión y el aviso de onboarding ("Ayni no es un servicio de salud").
+*   **`POST /auth/register`**: Registra al usuario (cuidador o familiar invitado). Requiere `family_name` (para crear una nueva familia) o `invitation_token` (para unirse a una existente). No devuelve JWT; el usuario debe iniciar sesión después.
+*   **`POST /auth/login`**: Valida credenciales y devuelve el token JWT y datos del usuario.
+*   **`GET /users/me`**: Consulta los datos del usuario autenticado.
+*   **`GET /families/me`**: Consulta la familia del usuario autenticado.
+*   **`GET /families/me/members`**: Lista los miembros de la familia.
+*   **`GET /families/me/elder-profile`**: Consulta el perfil del adulto mayor (campos actuales: `name`, `birth_decade`, `interests`).
+*   **`PUT /families/me/elder-profile`**: Crea o actualiza el perfil del adulto mayor.
+*   **`POST /families/me/invitations`**: Crea una invitación para un nuevo familiar.
+*   **`GET /families/me/invitations`**: Lista las invitaciones activas.
+*   **`DELETE /families/me/invitations/{invitation_id}`**: Revoca una invitación.
 
-## 2. Perfil del Adulto Mayor
-Los datos básicos para personalizar las sesiones.
+## 2. Baúl de Recuerdos (Propuesto)
+Rutas para la gestión del contenido emocional. Aún pendientes de implementación.
 
-*   **`POST /api/elders`**
-    Crea el perfil del adulto mayor. Requiere nombre, año de nacimiento, ciudad de origen y horario preferido para las sesiones (mañana/tarde).
-*   **`GET /api/elders/{id}`**
-    Devuelve los datos del perfil para mostrarlos en el dashboard. Solo accesible para los miembros de esa familia.
+*   **`POST /memories/photo`**: Sube una foto a un bucket privado. Devuelve el ID del recuerdo. Para visualizarla, se debe generar una URL firmada de corta duración.
+*   **`POST /memories/anecdote`**: Guarda una anécdota y dispara la extracción de entidades (si falla la IA, la anécdota se guarda igual).
+*   **`POST /memories/song`**: Guarda un enlace de YouTube/Spotify.
+*   **`GET /memories`**: Lista los recuerdos de la familia autenticada. No debe incluir los `is_sensitive=true` en la galería general.
+*   **`PATCH /memories/{id}`**: Edita el contenido y las marcas de `is_positive` / `is_sensitive`.
+*   **`DELETE /memories/{id}`**: Elimina el recuerdo y su archivo asociado (si corresponde).
 
-## 3. Baúl de Recuerdos (Memories)
-El corazón del sistema. Aquí se ingesta el contenido que luego alimentará a la IA.
+## 3. Sesiones y Respuestas (Propuesto)
+Módulo de generación de las guías de 15 a 20 minutos.
 
-*   **`POST /api/memories/photo`**
-    Recibe la imagen, la sube a Supabase Storage (bucket privado) y guarda la referencia. Requiere el flag `is_sensitive` si la foto es delicada.
-*   **`POST /api/memories/anecdote`**
-    Recibe el texto libre. Aquí se dispara el servicio de NLP (Groq o spaCy) para extraer entidades (lugares, personas) y guardarlas en la tabla `MEMORY_ENTITIES`.
-*   **`POST /api/memories/song`**
-    Registra el enlace de YouTube o Spotify. No se descarga el audio, solo se guarda la URL.
-*   **`GET /api/memories`**
-    Lista los recuerdos. **Importante:** Por defecto, este endpoint debe ignorar los recuerdos marcados como `is_sensitive` para evitar que aparezcan en la galería general de la familia.
+*   **`POST /sessions/generate`**: Genera una sesión usando reglas y plantillas (sin depender del LLM o recomendador en esta fase). **Regla estricta:** solo usa recuerdos con `is_positive=true` e `is_sensitive=false`.
+*   **`GET /sessions`**: Lista el historial de sesiones de la familia.
+*   **`GET /sessions/{id}`**: Devuelve el contenido detallado de la sesión.
+*   **`POST /sessions/{id}/response`**: Registra cómo reaccionó el adulto mayor (receptivo, emocionado, indiferente, agitado). Cada sesión admite una sola respuesta; si se envía una segunda, debe manejarse sin duplicar.
 
-## 4. Generación de Sesiones
-Módulo de lógica pura. No requiere intervención del usuario más allá de pedir la sesión del día.
+## 4. Insights y Alertas (Propuesto)
+Generación de patrones descriptivos a partir de las respuestas.
 
-*   **`POST /api/sessions/generate`**
-    El endpoint más importante. Consulta los recuerdos positivos (`is_positive=true`) y arma una guía de 15 minutos. **Regla estricta:** Bajo ninguna circunstancia debe incluir recuerdos `is_sensitive`.
-*   **`GET /api/sessions/{id}`**
-    Devuelve el contenido exacto de la sesión para que el Frontend lo renderice paso a paso (foto 1, pregunta 1, canción 1).
+*   **`GET /insights/dashboard`**: Devuelve datos agregados para los gráficos (sesiones completadas, tendencia). No debe afirmar mejora o deterioro clínico.
+*   **`GET /insights/alerts`**: Devuelve una alerta si se cumple alguna condición:
+    *   3 sesiones consecutivas con respuesta `agitado`.
+    *   ≥50% de respuestas negativas (solo `agitado` cuenta como negativa) en las últimas 5 sesiones.
+    *   *La alerta debe sugerir pausar y consultar a un profesional, e incluir el disclaimer: "Esto no es un diagnóstico. Es un registro de actividades familiares".*
 
-## 5. Registro de Respuestas e Insights
-Cierre del ciclo. Aquí el cuidador registra cómo le fue y el sistema saca estadísticas.
+## 5. Billing (Post-MVP)
+*   **`GET /billing/status`**: Devuelve el plan actual (Free / Plan Familia).
+*   **`POST /billing/checkout`**: Genera un link de pago (Mercado Pago en modo test). Se requerirá un webhook para sincronizar estados en el futuro.
 
-*   **`POST /api/sessions/{id}/response`**
-    Registra cómo reaccionó el adulto mayor (receptivo, emocionado, indiferente, agitado). Alimenta al recomendador.
-*   **`GET /api/insights/dashboard`**
-    Devuelve datos agregados para los gráficos: sesiones completadas, tendencia de respuestas positivas.
-*   **`GET /api/insights/alerts`**
-    Evalúa las reglas éticas. Si detecta 3 respuestas "agitadas" seguidas o un alto porcentaje de negativas en las últimas 5, devuelve una alerta recomendando pausar las actividades y consultar a un médico.
-
-## 6. Pagos (Simulados)
-Para la gestión del plan Free vs. Plan Familia.
-
-*   **`GET /api/billing/status`**
-    Devuelve si la familia está en plan gratuito o de pago.
-*   **`POST /api/billing/checkout`**
-    Genera un link de pago (Mercado Pago en modo test).
+## 6. Eliminación de Cuenta (Pendiente de definición)
+*   **`DELETE /users/me`**: Elimina de forma real la cuenta, sus recuerdos, fotos y respuestas. Falta definir el comportamiento si quien elimina es un familiar o la cuidadora principal.
