@@ -1,24 +1,47 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+﻿const API_BASE_URL = import.meta.env.VITE_API_URL || "https://ayni-api-stage.onrender.com";
 
-export async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+export interface ApiErrorDetail {
+  code: string;
+  message: string;
+}
+
+export interface ApiResponseError {
+  detail: ApiErrorDetail;
+}
+
+export async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
   const token = localStorage.getItem("ayni_token");
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options?.headers,
+    ...(options.headers as Record<string, string>),
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `Error en la solicitud: ${response.statusText}`);
+  if (response.status === 204) {
+    return {} as T;
   }
 
-  return response.json();
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorData = data as ApiResponseError;
+    throw new Error(
+      errorData.detail?.message || `Error ${response.status}: Ocurrió un problema`
+    );
+  }
+
+  return data as T;
 }
 
