@@ -15,11 +15,11 @@ Crea **una rama a la vez**, en este orden:
 | # | Rama | Qué haces | Coordinas con | Te espera |
 |---|---|---|---|---|
 | 1 | `hats/modulo-families` | Usuarios, familias, roles (`cuidador_principal`, `familiar`), invitaciones, login con JWT y guardar el **consentimiento** del registro | **Damarys** (pantalla de registro), **Gonzalo** (tests) | Damarys y Gonzalo |
-| 2 | `hats/modulo-memories` | Fotos (guardadas en el volumen de Railway, servidas con URL firmada), anécdotas, canciones (solo enlaces de YouTube/Spotify) y las marcas **positivo** y **sensible** | **Damarys** (subir recuerdos), **Joseph** (al guardar una anécdota se llama a `nlp.service`) | Damarys y Joseph |
+| 2 | `hats/modulo-memories` | Fotos (en un bucket privado de Supabase Storage, servidas con URL firmada; **nunca** en el disco del contenedor, porque Render lo borra al reiniciar), anécdotas, canciones (solo enlaces de YouTube/Spotify) y las marcas **positivo** y **sensible** | **Damarys** (subir recuerdos), **Joseph** (al guardar una anécdota se llama a `nlp.service`) | Damarys y Joseph |
 | 3 | `hats/modulo-sessions` | Generar la guía de sesión **con reglas y plantillas, sin IA**. Solo usa recuerdos positivos y nunca sensibles | **Joseph** (más adelante su recomendador ordenará el contenido), **Gonzalo** (tests de reglas éticas), **Damarys** (pantalla de la guía) | Damarys |
 | 4 | `hats/modulo-responses` | Registrar cómo reaccionó el adulto mayor después de cada sesión | **Damarys** (pantalla de respuesta), **Joseph** (sus alertas leen esto) | Joseph |
 | 5 | `hats/eliminar-cuenta` | Borrar de verdad la cuenta: perfil, recuerdos, fotos y respuestas | **Gonzalo** (test de que no queda nada) | — |
-| — | `hats/modulo-billing` | Plan gratis / Plan Familia con Mercado Pago. **Después del MVP** | **Joseph** | — |
+| — | `hats/modulo-billing` | Plan gratis / Plan Familia con pagos **simulados** (Mercado Pago en modo de prueba, sin cobros reales). **Después del MVP** | **Joseph** | — |
 
 Si una tarea te toma más de 3 días, divídela. Por ejemplo, `hats/families-modelos` (tablas y migración) y luego `hats/families-endpoints`.
 
@@ -28,7 +28,7 @@ Si una tarea te toma más de 3 días, divídela. Por ejemplo, `hats/families-mod
 | Ambiente | Cuándo lo usas | Cómo |
 |---|---|---|
 | `localhost` | Mientras programas | Docker + `uv run uvicorn app.main:app --reload`, y pruebas en http://localhost:8000/docs |
-| `stage` | Después de que tu PR se mergea | En la URL de stage (Gonzalo la comparte) + `/docs`. Revisa que la migración haya corrido bien |
+| `stage` | Después de que tu PR se mergea | En la URL de stage (Gonzalo la comparte) + `/docs`. La primera vez puede tardar ~1 minuto en responder porque la API gratis estaba dormida. Revisa que la migración haya corrido bien |
 | `production` | Nunca lo tocas directamente | Gonzalo o Joseph aprueban el paso desde stage |
 
 **Nunca** te conectes a la base de datos de stage o de producción desde tu compu para "arreglar algo a mano". Todo cambio de tablas va por una migración en un PR.
@@ -201,7 +201,7 @@ uv run alembic revision --autogenerate -m "create families tables"
 uv run alembic upgrade head
 ```
 
-**Revisa el archivo que se creó** en `backend/migrations/versions/` antes de hacer commit, porque a veces Alembic no detecta todo. Ese archivo se sube junto con tu código. En Railway las migraciones corren solas al desplegar.
+**Revisa el archivo que se creó** en `backend/migrations/versions/` antes de hacer commit, porque a veces Alembic no detecta todo. Ese archivo se sube junto con tu código. En stage y producción las migraciones corren solas cuando arranca la API en Render.
 
 ---
 

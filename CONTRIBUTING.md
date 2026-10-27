@@ -35,15 +35,19 @@ git push -u origin joseph/extractor-nlp
 | Ambiente | Dónde | Para qué |
 |---|---|---|
 | `localhost` | Tu compu (`docker compose up -d db`) | Desarrollar y probar |
-| `stage` | Railway (staging) | Probar con el equipo antes de publicar |
-| `production` | Railway (production) | Lo que usan las familias |
+| `stage` | Render (`ayni-web-stage`, `ayni-api-stage`) + Supabase (proyecto stage) | Probar con el equipo antes de publicar |
+| `production` | Render (`ayni-web-prod`, `ayni-api-prod`) + Supabase (proyecto producción) | La versión que se presenta |
 
-## Configurar Railway (una vez)
+## Hosting (todo gratis)
 
-1. Crear un proyecto con dos ambientes, `staging` y `production`, cada uno con un servicio `api`, un servicio `web` y una base Postgres.
-2. En cada ambiente crear un *Project Token* y guardarlo en GitHub → Settings → Environments → `stage` / `production` → secret `RAILWAY_TOKEN`.
-3. Variables en Railway: en `api` → `DATABASE_URL`, `JWT_SECRET`, `ENVIRONMENT`; en `web` → `VITE_API_URL`.
-4. No conectar el repo para auto-deploy en Railway (el deploy lo hace GitHub).
+| Pieza | Servicio |
+|---|---|
+| Frontend | Render, sitio estático |
+| API | Render, servicio Docker (se duerme tras 15 min sin uso; tarda ~1 min en despertar) |
+| Base de datos y fotos | Supabase (un proyecto para stage y otro para producción) |
+| Pagos | Simulados: Mercado Pago en modo de prueba |
+
+Los 4 servicios de Render están definidos en `render.yaml`. La configuración paso a paso está en `docs/guias/gonzalo-devops-qa.md` (Parte 4).
 
 ## Correr en local
 

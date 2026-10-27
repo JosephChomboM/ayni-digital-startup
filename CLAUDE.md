@@ -23,9 +23,9 @@ Ayni **no es un servicio de salud**. Facilita actividades de reminiscencia *info
 
 Se guardan datos de salud de adultos mayores, que son datos sensibles en Perú.
 
-- Consentimiento explícito al registrarse, que informe que los datos se almacenan fuera del Perú (Railway).
+- Consentimiento explícito al registrarse, que informe que los datos se almacenan fuera del Perú (Supabase y Render, en Estados Unidos).
 - Minimizar lo que se envía al LLM: solo el texto de la anécdota. Nunca correos, IDs, teléfonos ni datos de la cuenta.
-- Las fotos se sirven con URLs firmadas o autenticadas, nunca públicas.
+- Las fotos se guardan en un bucket **privado** de Supabase Storage y se sirven con URLs firmadas de corta duración, nunca públicas. La `SUPABASE_SERVICE_ROLE_KEY` solo vive en el backend.
 - Eliminar la cuenta borra de verdad el perfil, los recuerdos, las fotos y las respuestas (hard delete, sin soft delete).
 - Nunca registrar en logs el contenido de anécdotas ni nombres.
 
@@ -46,7 +46,7 @@ Capas: presentación (React) → servicios (API REST FastAPI) → negocio (módu
 | `responses` | Registra cómo reaccionó el adulto mayor después de cada sesión |
 | `insights` | Patrones descriptivos y alertas de pausa |
 | `recommender` | Ordena el contenido según las respuestas acumuladas |
-| `billing` | Plan gratis / Plan Familia, integración con Mercado Pago |
+| `billing` | Plan gratis / Plan Familia, con pagos **simulados** (Mercado Pago en modo de prueba) |
 
 **Regla de límites:** un módulo solo importa la interfaz pública de otro (`modules/<x>/service.py`), nunca sus modelos, repositorios ni internals. Cada módulo tiene `router.py`, `schemas.py` (Pydantic), `service.py`, `repository.py` y `models.py`. Si necesitas cruzar esa regla, detente y pregunta.
 
@@ -54,7 +54,7 @@ Capas: presentación (React) → servicios (API REST FastAPI) → negocio (módu
 
 Imprescindible primero, en este orden: `families` → `memories` → `sessions` (con **reglas y plantillas, sin ML**) → `responses` → dashboard familiar → alertas de `insights`.
 
-Después, como valor agregado: `nlp` con LLM, `recommender` con scikit-learn, gráficos de patrones, `billing`.
+Después, como valor agregado: `nlp` con LLM, `recommender` con scikit-learn, gráficos de patrones, `billing` (simulado).
 
 El generador de sesiones tiene que funcionar sin el recomendador y sin el LLM. Si el LLM falla o se agota el free tier, se usa spaCy (`es_core_news_sm`) como respaldo, y si eso también falla, la anécdota se guarda sin entidades. Nunca se bloquea al usuario.
 
@@ -63,9 +63,9 @@ El generador de sesiones tiene que funcionar sin el recomendador y sin el LLM. S
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, auth con JWT
 - **IA:** spaCy (español), API de LLM en free tier (Groq o Gemini) detrás de la interfaz `EntityExtractor`, scikit-learn, pandas
 - **Frontend:** React + Vite + TypeScript, mobile-first, español (Perú)
-- **Datos:** PostgreSQL 16; fotos en el volumen persistente de Railway
-- **Infra:** Docker, Railway (servicio web estático + contenedor API + Postgres + cron nocturno), deploy automático desde GitHub
-- **Pagos:** Mercado Pago (suscripciones + webhook). Revisar la documentación actual antes de implementar.
+- **Datos:** PostgreSQL en Supabase (un proyecto para stage y otro para producción; 16 en local y CI); fotos en Supabase Storage
+- **Infra (todo en planes gratis):** Render (sitio estático para el frontend + servicio Docker para la API, configurados en `render.yaml`), Supabase (Postgres + Storage), GitHub Actions (CI/CD y tareas programadas, que reemplazan al cron). El pipeline despliega a stage en cada merge a `main` y a producción tras aprobación manual. La API gratis de Render se duerme tras 15 min sin uso (~1 min en despertar) y no tiene disco persistente: nada se guarda en el filesystem del contenedor
+- **Pagos (simulados):** el proyecto no cobra de verdad. Se usa Mercado Pago en modo de prueba (credenciales `TEST-…` y tarjetas de prueba); Stripe en test mode es una alternativa aceptable. Nunca credenciales de producción ni cobros reales. Revisar la documentación actual antes de implementar.
 - **Música:** solo enlaces embebidos de YouTube/Spotify. Nunca se alojan ni se descargan archivos de audio.
 
 No agregar servicios pagados, colas de mensajes, Redis, Kubernetes ni otra base de datos sin preguntar primero.
@@ -114,7 +114,7 @@ cd frontend && npm install && npm run dev         # web en :5173
 - Type hints en todo el backend; los endpoints validan con Pydantic.
 - Cada endpoint nuevo lleva al menos un test feliz y uno de error. Los módulos `sessions` e `insights` llevan tests de las reglas éticas (contenido sensible excluido, alerta disparada).
 - Las migraciones siempre van con Alembic, nunca con `create_all` en producción.
-- Los secretos (claves de LLM y de Mercado Pago, `DATABASE_URL`, `JWT_SECRET`) van solo en variables de entorno. Nunca en el código ni en el repo. Mantener `.env.example` actualizado.
+- Los secretos (claves de LLM, de Supabase y de Mercado Pago, `DATABASE_URL`, `JWT_SECRET`) van solo en variables de entorno. Nunca en el código ni en el repo. Mantener `.env.example` actualizado.
 - La UI se diseña para un celular de gama media: botones grandes, una acción principal por pantalla, una sesión completa en máximo 3 toques.
 
 ## Antes de terminar una tarea

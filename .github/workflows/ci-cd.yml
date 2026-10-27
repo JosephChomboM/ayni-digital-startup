@@ -101,6 +101,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   # ---------- DEPLOY (solo al mergear a main) ----------
+  # Render despliega el commit exacto (?ref=) que pasó los tests.
+  # Cada ambiente de GitHub guarda sus dos deploy hooks como secretos.
 
   deploy-stage:
     name: Deploy a stage
@@ -109,14 +111,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: stage
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
     steps:
-      - uses: actions/checkout@v7
-      - run: npm install -g @railway/cli
       - name: Deploy API
-        run: railway up ./backend --path-as-root --service api --ci
+        run: curl -fsS -X POST "$API_HOOK&ref=$GITHUB_SHA"
       - name: Deploy web
-        run: railway up ./frontend --path-as-root --service web --ci
+        run: curl -fsS -X POST "$WEB_HOOK&ref=$GITHUB_SHA"
 
   deploy-production:
     name: Deploy a producción
@@ -125,11 +126,10 @@ jobs:
     # Este ambiente pide aprobación manual en GitHub antes de correr
     environment: production
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
     steps:
-      - uses: actions/checkout@v7
-      - run: npm install -g @railway/cli
       - name: Deploy API
-        run: railway up ./backend --path-as-root --service api --ci
+        run: curl -fsS -X POST "$API_HOOK&ref=$GITHUB_SHA"
       - name: Deploy web
-        run: railway up ./frontend --path-as-root --service web --ci
+        run: curl -fsS -X POST "$WEB_HOOK&ref=$GITHUB_SHA"

@@ -9,7 +9,7 @@
 | # | Rama | Alcance | Coordinas con | Depende de |
 |---|---|---|---|---|
 | 1 | `joseph/nlp-entity-extractor` | Interfaz `EntityExtractor` y dos implementaciones: `SpacyExtractor` (`es_core_news_sm`) y `NullExtractor`. La función `nlp.service.extract_entities(text)` **nunca lanza excepción** | **Hats**: `memories` la llama al guardar una anécdota y persiste las `MemoryEntity` | — Empieza ya |
-| 2 | `joseph/nlp-llm` | `LlmExtractor` (Groq o Gemini, free tier) con cadena de respaldo: LLM → spaCy → sin entidades. Timeout corto y salida validada con Pydantic | **Gonzalo**: la clave va como secreto del hosting | #1 |
+| 2 | `joseph/nlp-llm` | `LlmExtractor` (Groq o Gemini, free tier) con cadena de respaldo: LLM → spaCy → sin entidades. Timeout corto y salida validada con Pydantic | **Gonzalo**: la clave va como variable del servicio API en Render | #1 |
 | 3 | `joseph/insights-alerta-pausa` | Reglas de la alerta de pausa con umbrales configurables y el disclaimer en la respuesta | **Hats** (`responses.service`), **Damarys** (dashboard), **Gonzalo** (tests) | `hats/modulo-responses` |
 | — | `joseph/recommender` | Ranking de contenido con scikit-learn según respuestas acumuladas. **Después del MVP** | **Hats**: `sessions` lo consume de forma opcional | #3 |
 | — | `joseph/insights-patrones` | Patrones descriptivos para los gráficos. **Después del MVP** | **Damarys** | #3 |
@@ -54,7 +54,7 @@ uv add spacy
 uv add "es-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-<versión>/es_core_news_sm-<versión>-py3-none-any.whl"
 ```
 
-Usa la versión del modelo compatible con tu spaCy. Carga el modelo una sola vez, de forma perezosa (`functools.lru_cache`), no en cada request: la instancia gratuita tiene unos 512 MB de RAM.
+Usa la versión del modelo compatible con tu spaCy. Carga el modelo una sola vez, de forma perezosa (`functools.lru_cache`), no en cada request: la instancia gratis de Render tiene 512 MB de RAM y se duerme tras 15 min, así que cada arranque en frío vuelve a cargar el modelo.
 
 ---
 
@@ -141,8 +141,8 @@ gh pr edit --base main
 | Ambiente | Para qué | LLM |
 |---|---|---|
 | `localhost` | Desarrollo. `docker compose up -d db` + `uv run uvicorn app.main:app --reload` | `GROQ_API_KEY` o `GEMINI_API_KEY` en `backend/.env`. Si no la pones, el extractor cae a spaCy y todo sigue funcionando |
-| `stage` | Se despliega solo al mergear a `main` | Clave propia de stage, como variable del servicio API en el hosting |
-| `production` | Se despliega tras tu aprobación o la de Gonzalo | Clave **distinta** a la de stage |
+| `stage` | Se despliega solo al mergear a `main` (Render `ayni-api-stage` + Supabase stage) | Clave propia de stage, como variable de `ayni-api-stage` en Render |
+| `production` | Se despliega tras tu aprobación o la de Gonzalo (Render `ayni-api-prod` + Supabase producción) | Clave **distinta** a la de stage, en `ayni-api-prod` |
 
 Cada clave nueva se agrega vacía a `.env.example`. Nunca va en el código: el job **Seguridad** (gitleaks) bloquea el PR si encuentra una.
 
@@ -156,5 +156,6 @@ En *Actions → CI/CD → la corrida → Review deployments → production → A
 
 - **Protección de `main`** (*Settings → Rules → main*): PR obligatorio, 1 aprobación, squash y 3 checks requeridos (`Backend (build y tests)`, `Frontend (build y tests)`, `Seguridad`). Si renombras un job en `ci-cd.yml`, actualiza también los checks requeridos; si no, ningún PR podrá mergearse.
 - **Ambientes** (*Settings → Environments*): `production` exige aprobación de Gonzalo o tuya, solo desde `main`.
-- No desactives la protección para "avanzar rápido". Si hay una emergencia en producción, usa el rollback del hosting y luego un PR con `git revert`.
+- No desactives la protección para "avanzar rápido". Si hay una emergencia en producción, usa el *Rollback* de Render y luego un PR con `git revert`.
 - **CLAUDE.md** es la fuente de verdad del proyecto. Cualquier cambio de reglas (umbrales de la alerta, hosting, límites del plan) se hace por PR y con todo el equipo como revisor.
+- **Infra:** `render.yaml` define los 4 servicios; los secretos viven en Render (variables de cada servicio) y en GitHub (deploy hooks por ambiente). Supabase pausa los proyectos gratis tras 1 semana sin actividad: si stage no responde, revisa el panel de Supabase.
