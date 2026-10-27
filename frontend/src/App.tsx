@@ -1,98 +1,156 @@
 ﻿import { useEffect, useState } from "react";
-import { MobileLayout } from "./components/MobileLayout";
-import { WelcomePage } from "./pages/WelcomePage";
-import { HomePage } from "./pages/HomePage";
-import { ProfilePage } from "./pages/ProfilePage";
 import { getMe } from "./api/auth";
 import type { User } from "./api/auth";
 
-export default function App() {
+import { WelcomePage } from "./pages/WelcomePage";
+import { HomePage } from "./pages/HomePage";
+import { AuthPage } from "./pages/AuthPage";
+import { SessionGuide } from "./components/SessionGuide";
+import { UploadModule } from "./components/UploadModule";
+import { FamilyDashboard } from "./components/FamilyDashboard";
+
+export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState<"home" | "memories" | "session" | "profile">("home");
-
-  const checkSession = async () => {
-    const token = localStorage.getItem("ayni_token");
-    if (!token) {
-      setCurrentUser(null);
-      setLoadingAuth(false);
-      return;
-    }
-
-    try {
-      const res = await getMe();
-      setCurrentUser(res.user);
-    } catch {
-      localStorage.removeItem("ayni_token");
-      setCurrentUser(null);
-    } finally {
-      setLoadingAuth(false);
-    }
-  };
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "session" | "memories" | "dashboard">("welcome");
 
   useEffect(() => {
+    async function checkSession() {
+      try {
+        const sessionData = await getMe();
+        setCurrentUser(sessionData.user);
+        setView("home");
+      } catch {
+        setCurrentUser(null);
+        setView("welcome");
+      } finally {
+        setLoading(false);
+      }
+    }
     checkSession();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("ayni_token");
-    setCurrentUser(null);
-    setActiveTab("home");
-  };
-
-  if (loadingAuth) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4FBF7] flex flex-col items-center justify-center p-6 text-center space-y-3">
-        <div className="w-10 h-10 border-4 border-[#0D7A5F] border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs text-gray-600 font-medium">Verificando sesión...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#f1faee]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-10 rounded-full border-4 border-[#2c5f7c] border-t-transparent animate-spin" />
+          <p className="text-xs font-semibold text-[#264653]">Cargando Ayni Digital...</p>
+        </div>
       </div>
     );
   }
 
-  if (!currentUser) {
-    return <WelcomePage onLoginSuccess={(user) => setCurrentUser(user)} />;
+  // 1. LANDING PÚBLICA DE BIENVENIDA
+  if (!currentUser && view === "welcome") {
+    return (
+      <WelcomePage
+        onLoginClick={() => setView("auth_login")}
+        onRegisterClick={() => setView("auth_register")}
+      />
+    );
   }
 
+  // 2. PÁGINA DEDICADA DE REGISTRO / INICIO DE SESIÓN
+  if (!currentUser && (view === "auth_login" || view === "auth_register")) {
+    return (
+      <AuthPage
+        initialMode={view === "auth_login" ? "login" : "register"}
+        onBack={() => setView("welcome")}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          setView("home");
+        }}
+      />
+    );
+  }
+
+  // 3. NAVEGACIÓN Y APLICACIÓN PRINCIPAL
   return (
-    <MobileLayout activeTab={activeTab} onTabChange={setActiveTab} title="Ayni Digital">
-      <div className="flex justify-end pb-2">
-        <button
-          onClick={handleLogout}
-          className="text-[11px] text-red-600 font-semibold hover:underline bg-red-50 px-2.5 py-1 rounded-lg border border-red-200"
-        >
-          Cerrar sesión ({currentUser.name})
-        </button>
-      </div>
-
-      {activeTab === "home" && (
-        <HomePage
-          onStartSession={() => setActiveTab("session")}
-          onViewMemories={() => setActiveTab("memories")}
-        />
-      )}
-
-      {activeTab === "memories" && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#0D7A5F]/10 space-y-4 text-center">
-          <span className="text-4xl">🖼️</span>
-          <h2 className="text-lg font-bold text-[#0D7A5F]">Galería de Recuerdos</h2>
-          <p className="text-xs text-gray-600">
-            Esta función estará disponible pronto para subir fotos, anécdotas y canciones familiares.
-          </p>
+    <div className="min-h-screen bg-[#f1faee] text-[#264653]">
+      <header className="sticky top-0 z-30 border-b border-[#2c5f7c]/10 bg-[#f1faee]/90 backdrop-blur-md px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <button
+            onClick={() => setView("home")}
+            className="flex items-center gap-3 font-extrabold text-[#2c5f7c] text-lg hover:opacity-80 transition-opacity"
+          >
+            Ayni Digital
+          </button>
+          
+          <nav className="flex items-center gap-2 sm:gap-4 text-xs font-bold">
+            <button
+              onClick={() => setView("home")}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                view === "home" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
+              }`}
+            >
+              Inicio
+            </button>
+            <button
+              onClick={() => setView("memories")}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                view === "memories" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
+              }`}
+            >
+              Subir recuerdos
+            </button>
+            <button
+              onClick={() => setView("session")}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                view === "session" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
+              }`}
+            >
+              Guía de Sesión
+            </button>
+            <button
+              onClick={() => setView("dashboard")}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                view === "dashboard" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => {
+                setCurrentUser(null);
+                setView("welcome");
+              }}
+              className="text-[#e76f51] hover:underline text-xs font-semibold ml-2"
+            >
+              Cerrar sesión
+            </button>
+          </nav>
         </div>
-      )}
+      </header>
 
-      {activeTab === "session" && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#0D7A5F]/10 space-y-4 text-center">
-          <span className="text-4xl">💚</span>
-          <h2 className="text-lg font-bold text-[#0D7A5F]">Sesión de Estimulación</h2>
-          <p className="text-xs text-gray-600">
-            Esta función estará disponible pronto para guiar las actividades de 15 minutos.
-          </p>
-        </div>
-      )}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
+        {view === "home" && (
+          <HomePage
+            onStartSession={() => setView("session")}
+            onViewMemories={() => setView("memories")}
+          />
+        )}
 
-      {activeTab === "profile" && <ProfilePage currentUser={currentUser} />}
-    </MobileLayout>
+        {view === "session" && (
+          <div className="max-w-2xl mx-auto">
+            <SessionGuide />
+          </div>
+        )}
+
+        {view === "memories" && (
+          <div className="max-w-2xl mx-auto">
+            <UploadModule />
+          </div>
+        )}
+
+        {view === "dashboard" && (
+          <div className="max-w-5xl mx-auto">
+            <FamilyDashboard />
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
 
+export default App;
