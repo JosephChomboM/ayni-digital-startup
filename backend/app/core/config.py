@@ -1,6 +1,7 @@
+from decimal import Decimal
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,11 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-20b"
     llm_timeout_seconds: float = 5.0
+
+    # Pending validation with the clinical adviser; preserve CLAUDE.md defaults.
+    pause_agitated_streak: int = Field(default=3, ge=1)
+    pause_negative_window: int = Field(default=5, ge=1)
+    pause_negative_ratio: Decimal = Field(default=Decimal("0.5"), gt=0, le=1)
 
     @field_validator("database_url")
     @classmethod
