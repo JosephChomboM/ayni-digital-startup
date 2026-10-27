@@ -17,6 +17,7 @@ def isolated_security_environment(
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", raising=False)
+    monkeypatch.delenv("INVITATION_EXPIRE_HOURS", raising=False)
     get_security_settings.cache_clear()
     yield
     get_security_settings.cache_clear()

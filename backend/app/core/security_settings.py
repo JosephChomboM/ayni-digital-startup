@@ -15,6 +15,7 @@ class SecuritySettings(BaseSettings):
 
     jwt_secret: SecretStr = Field(repr=False)
     jwt_access_token_expire_minutes: int = Field(default=30, gt=0)
+    invitation_expire_hours: int = Field(default=72, gt=0)
 
     @field_validator("jwt_secret")
     @classmethod
@@ -28,6 +29,11 @@ class SecuritySettings(BaseSettings):
     def use_default_expiration(cls, value: object) -> object:
         return 30 if isinstance(value, str) and not value.strip() else value
 
+    @field_validator("invitation_expire_hours", mode="before")
+    @classmethod
+    def use_default_invitation_expiration(cls, value: object) -> object:
+        return 72 if isinstance(value, str) and not value.strip() else value
+
 
 @lru_cache
 def get_security_settings() -> SecuritySettings:
@@ -36,6 +42,13 @@ def get_security_settings() -> SecuritySettings:
     except ValidationError as exc:
         if any(error["loc"] == ("jwt_secret",) for error in exc.errors(include_input=False)):
             raise RuntimeError("JWT_SECRET es obligatorio y no puede estar vacío.") from None
+        if any(
+            error["loc"] == ("invitation_expire_hours",)
+            for error in exc.errors(include_input=False)
+        ):
+            raise RuntimeError(
+                "INVITATION_EXPIRE_HOURS debe ser un entero mayor que cero."
+            ) from None
         raise RuntimeError(
             "JWT_ACCESS_TOKEN_EXPIRE_MINUTES debe ser un entero mayor que cero."
         ) from None

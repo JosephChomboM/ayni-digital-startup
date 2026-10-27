@@ -79,3 +79,24 @@ def test_nonblank_secret_is_preserved_without_trimming(monkeypatch: pytest.Monke
     monkeypatch.setenv("JWT_SECRET", key_value)
 
     assert get_security_settings().jwt_secret.get_secret_value() == key_value
+
+
+@pytest.mark.parametrize(("value", "expected"), [(None, 72), ("", 72), (" \t ", 72), ("24", 24)])
+def test_invitation_expiration_uses_seventy_two_hours_by_default(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, expected: int
+) -> None:
+    if value is not None:
+        monkeypatch.setenv("INVITATION_EXPIRE_HOURS", value)
+    assert get_security_settings().invitation_expire_hours == expected
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "invalid", "1.5"])
+def test_app_startup_rejects_invalid_invitation_duration(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("INVITATION_EXPIRE_HOURS", value)
+    with (
+        pytest.raises(RuntimeError, match="INVITATION_EXPIRE_HOURS debe ser un entero"),
+        TestClient(app),
+    ):
+        pass

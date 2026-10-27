@@ -30,8 +30,7 @@ def require_database() -> None:
         pytest.skip("PostgreSQL no disponible: corre `docker compose up -d db`")
 
 
-@pytest.fixture
-def caregiver_account() -> Iterator[SimpleNamespace]:
+def _registered_caregiver() -> Iterator[SimpleNamespace]:
     password_value = SecretStr(secrets.token_urlsafe(24))
     with Session(engine, autoflush=False) as session:
         response = FamiliesService(session).register_caregiver(
@@ -52,6 +51,39 @@ def caregiver_account() -> Iterator[SimpleNamespace]:
     finally:
         with engine.begin() as connection:
             connection.execute(delete(Family).where(Family.id == response.family.id))
+
+
+@pytest.fixture
+def caregiver_account() -> Iterator[SimpleNamespace]:
+    yield from _registered_caregiver()
+
+
+@pytest.fixture
+def other_caregiver_account() -> Iterator[SimpleNamespace]:
+    yield from _registered_caregiver()
+
+
+@pytest.fixture
+def family_member(caregiver_account: SimpleNamespace) -> SimpleNamespace:
+    password_value = SecretStr(secrets.token_urlsafe(24))
+    email = f"familiar-{uuid4().hex}@example.com"
+    with Session(engine) as session:
+        service = FamiliesService(session)
+        created = service.create_invitation(caregiver_account.user_id, email=email)
+        response = service.register_invited(
+            email=email,
+            name="Familiar de prueba",
+            password=password_value,
+            invitation_token=SecretStr(created.invitation_token),
+            accepted=True,
+            text_version="1.0",
+        )
+    return SimpleNamespace(
+        user_id=response.user.id,
+        family_id=response.family.id,
+        email=email,
+        password=password_value,
+    )
 
 
 @pytest.fixture
