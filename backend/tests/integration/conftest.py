@@ -1,6 +1,8 @@
+import hashlib
 import os
 import secrets
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -12,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import engine
 from app.modules.families.models import Family
+from app.modules.families.repository import FamiliesRepository
 from app.modules.families.service import FamiliesService
 
 
@@ -49,3 +52,25 @@ def caregiver_account() -> Iterator[SimpleNamespace]:
     finally:
         with engine.begin() as connection:
             connection.execute(delete(Family).where(Family.id == response.family.id))
+
+
+@pytest.fixture
+def pending_invitation(caregiver_account: SimpleNamespace) -> SimpleNamespace:
+    value = secrets.token_urlsafe(32)
+    now = datetime.now(UTC)
+    with Session(engine) as session, session.begin():
+        invitation = FamiliesRepository(session).create_invitation(
+            family_id=caregiver_account.family_id,
+            email=f"invitado-{uuid4().hex}@example.com",
+            token_hash=hashlib.sha256(value.encode()).hexdigest(),
+            created_at=now,
+            expires_at=now + timedelta(hours=72),
+        )
+        return SimpleNamespace(
+            id=invitation.id,
+            family_id=invitation.family_id,
+            email=invitation.email,
+            token=SecretStr(value),
+            created_at=now,
+            expires_at=invitation.expires_at,
+        )
