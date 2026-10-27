@@ -13,9 +13,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY . .
 
-# Non-root user. If the Railway photo volume is not writable, set RAILWAY_RUN_UID=0 on the service.
+# Non-root user. Photos live in Supabase Storage, so the container needs no writable disk.
 RUN useradd --create-home --uid 1000 ayni && chown -R ayni /app
 USER ayni
 
-# Migrations run as Railway's preDeployCommand (railway.json), not here.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Render's free plan has no pre-deploy step, so migrations run on startup.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def use_psycopg_driver(cls, value: str) -> str:
-        # Railway exposes DATABASE_URL as postgresql://; SQLAlchemy needs the driver.
+        # Supabase gives DATABASE_URL as postgresql://; SQLAlchemy needs the driver.
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
