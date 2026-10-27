@@ -9,9 +9,11 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.error_handlers import register_error_handlers
 from app.core.security_settings import lifespan
+from app.modules.families.router import router as families_router
 
 app = FastAPI(title="Ayni Digital API", lifespan=lifespan)
 register_error_handlers(app)
+app.include_router(families_router)
 
 
 @app.get("/health")
