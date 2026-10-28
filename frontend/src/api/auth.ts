@@ -27,6 +27,16 @@ export interface RegisterResponse extends CurrentUserResponse {
   family: { id: string; name: string; created_at: string };
 }
 
+export type RegisterPayload = {
+  email: string;
+  password: string;
+  name: string;
+  consent: { accepted: true; text_version: string };
+} & (
+  | { family_name: string; invitation_token?: never }
+  | { invitation_token: string; family_name?: never }
+);
+
 export interface LoginResponse {
   access_token: string;
   token_type: "bearer";
@@ -58,12 +68,7 @@ export async function login(credentials: { email: string; password: string }): P
   return response;
 }
 
-export async function register(data: {
-  email: string;
-  password: string;
-  name: string;
-  family_name: string;
-}): Promise<RegisterResponse> {
+export async function register(data: RegisterPayload): Promise<RegisterResponse> {
   return apiFetch<RegisterResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ ...data, email: data.email.trim().toLowerCase() }),
