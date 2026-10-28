@@ -10,6 +10,8 @@
   }
 }
 
+export const SESSION_EXPIRED_EVENT = "ayni:session-expired";
+
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -47,6 +49,11 @@ export async function apiFetch<T>(
       "network_error",
       0
     );
+  }
+
+  if (response.status === 401) {
+    localStorage.removeItem("ayni_token");
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
 
   if (response.status === 204) {
