@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { getMe, logout } from "./api/auth";
+import { SESSION_EXPIRED_EVENT } from "./api/client";
 import type { User } from "./api/auth";
 
 import { WelcomePage } from "./pages/WelcomePage";
@@ -15,19 +16,34 @@ export function App() {
   const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "session" | "memories" | "dashboard">("welcome");
 
   useEffect(() => {
+    let active = true;
+    let sessionExpired = false;
+    const requireLogin = () => {
+      sessionExpired = true;
+      setCurrentUser(null);
+      setView("auth_login");
+      setLoading(false);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, requireLogin);
     async function checkSession() {
       try {
         const sessionData = await getMe();
+        if (!active || sessionExpired) return;
         setCurrentUser(sessionData.user);
         setView("home");
       } catch {
+        if (!active) return;
         setCurrentUser(null);
-        setView("welcome");
+        setView(sessionExpired ? "auth_login" : "welcome");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     checkSession();
+    return () => {
+      active = false;
+      window.removeEventListener(SESSION_EXPIRED_EVENT, requireLogin);
+    };
   }, []);
 
   if (loading) {
@@ -55,6 +71,7 @@ export function App() {
   if (!currentUser && (view === "auth_login" || view === "auth_register")) {
     return (
       <AuthPage
+        key={view}
         initialMode={view === "auth_login" ? "login" : "register"}
         onBack={() => setView("welcome")}
         onSuccess={(user) => {
