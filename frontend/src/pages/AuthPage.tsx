@@ -1,5 +1,5 @@
 ﻿import React, { useState } from "react";
-import { Heart, ArrowLeft, Mail, Lock, User, ShieldCheck, Sparkles, Loader2, ArrowRight } from "lucide-react";
+import { Heart, ArrowLeft, Mail, Lock, User, ShieldCheck, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
@@ -11,15 +11,6 @@ interface AuthPageProps {
   onBack: () => void;
   onSuccess: (user: UserType) => void;
 }
-
-const DEMO_USER: UserType = {
-  id: "demo-user-1",
-  email: "demo@ayni.pe",
-  name: "Cuidador Ayni",
-  family_id: "demo-family-1",
-  role: "cuidador_principal",
-  created_at: "2026-10-27T00:00:00.000Z",
-};
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   initialMode = "register",
@@ -101,12 +92,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
       const response = await login({ email, password });
 
-      if (response && response.user) {
-        onSuccess(response.user);
-      } else {
-        // Fallback de demostración si el backend backend no retorna usuario
-        onSuccess(DEMO_USER);
-      }
+      setPassword("");
+      onSuccess(response.user);
     } catch (err) {
       if (err instanceof ApiError && err.code === "consent_version_invalid") {
         reloadConsent();
@@ -114,15 +101,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("No se pudo conectar con el servidor. Puedes ingresar con el modo demostración.");
+        setError("No pudimos iniciar sesión. Inténtalo de nuevo.");
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoAccess = () => {
-    onSuccess(DEMO_USER);
   };
 
   return (
@@ -186,13 +169,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {error && (
           <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 space-y-2">
             <p className="font-semibold">{error}</p>
-            <button
-              type="button"
-              onClick={handleDemoAccess}
-              className="text-[#2c5f7c] font-bold underline hover:text-[#224a61]"
-            >
-              Hacer clic aquí para entrar en modo vista previa ➔
-            </button>
           </div>
         )}
 
@@ -327,15 +303,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </form>
 
         <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleDemoAccess}
-            className="w-full border-[#2c5f7c]/30 text-[#2c5f7c] hover:bg-[#2c5f7c]/10 font-bold text-xs py-2.5 rounded-xl"
-          >
-            Ingresar directo (Vista Previa) <ArrowRight className="size-3.5 ml-1" />
-          </Button>
-
           <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
             <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
             <span>Tus datos y archivos familiares están protegidos de forma privada.</span>
