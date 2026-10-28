@@ -1,4 +1,6 @@
-﻿export interface User {
+import { apiFetch, ApiError } from "./client";
+
+export interface User {
   id: string;
   email: string;
   name: string;
@@ -7,49 +9,89 @@
   created_at: string;
 }
 
-export interface AuthResponse {
+export interface ConsentText {
+  text_version: string;
+  text: string;
+  onboarding_notice: string;
+}
+
+export interface CurrentUserResponse {
   user: User;
-  token?: string;
-  consent?: {
+  consent: {
     text_version: string;
     accepted_at: string;
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-
-export async function login(credentials: { email: string; password: string }): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(credentials),
-  });
-  if (!res.ok) throw new Error("Error en las credenciales");
-  return res.json();
+export interface RegisterResponse extends CurrentUserResponse {
+  family: { id: string; name: string; created_at: string };
 }
 
-export async function register(data: {
+export type RegisterPayload = {
   email: string;
   password: string;
   name: string;
-  family_name: string;
-}): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+  consent: { accepted: true; text_version: string };
+} & (
+  | { family_name: string; invitation_token?: never }
+  | { invitation_token: string; family_name?: never }
+);
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: User;
+}
+
+export function getConsent(): Promise<ConsentText> {
+  return apiFetch<ConsentText>("/auth/consent");
+}
+
+export function logout(): void {
+  localStorage.removeItem("ayni_token");
+}
+
+export async function login(credentials: { email: string; password: string }): Promise<LoginResponse> {
+  logout();
+  const response = await apiFetch<LoginResponse>("/auth/login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...credentials, email: credentials.email.trim().toLowerCase() }),
   });
-  if (!res.ok) throw new Error("Error al registrar el usuario");
-  return res.json();
+  if (
+    typeof response.access_token !== "string" || !response.access_token.trim() ||
+    response.token_type !== "bearer" || !response.user?.id
+  ) {
+    throw new ApiError("No pudimos iniciar tu sesión. Inténtalo de nuevo.", "invalid_response", 200);
+  }
+  localStorage.setItem("ayni_token", response.access_token);
+  return response;
+}
+
+export async function register(data: RegisterPayload): Promise<RegisterResponse> {
+  return apiFetch<RegisterResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ ...data, email: data.email.trim().toLowerCase() }),
+  });
 }
 
 export const loginCaregiver = login;
 export const registerCaregiver = register;
 
-export async function getMe(): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/me`);
-  if (!res.ok) throw new Error("No autenticado");
-  return res.json();
+export async function getMe(): Promise<CurrentUserResponse> {
+  if (!localStorage.getItem("ayni_token")) {
+    throw new ApiError("Inicia sesión para continuar.", "unauthorized", 401);
+  }
+  try {
+    const response = await apiFetch<CurrentUserResponse>("/users/me");
+    if (!response.user?.id) {
+      throw new ApiError("No pudimos comprobar tu sesión.", "invalid_response", 200);
+    }
+    return response;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) logout();
+    throw error;
+  }
 }
 
 export const getCaregiverProfile = getMe;

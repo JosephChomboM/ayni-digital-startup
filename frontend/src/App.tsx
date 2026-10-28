@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { getMe } from "./api/auth";
+import { getMe, logout } from "./api/auth";
 import type { User } from "./api/auth";
 
 import { WelcomePage } from "./pages/WelcomePage";
@@ -112,6 +112,7 @@ export function App() {
             </button>
             <button
               onClick={() => {
+                logout();
                 setCurrentUser(null);
                 setView("welcome");
               }}
