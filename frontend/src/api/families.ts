@@ -35,8 +35,8 @@ export interface Invitation {
   status: string;
   created_at: string;
   expires_at: string;
-  accepted_at?: string;
-  revoked_at?: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
 }
 
 export async function getMyFamily(): Promise<Family> {

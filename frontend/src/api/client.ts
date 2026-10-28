@@ -14,7 +14,7 @@ export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const baseUrl = import.meta.env.VITE_API_URL;
+  const baseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
 
   if (!baseUrl) {
     throw new ApiError(
