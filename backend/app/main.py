@@ -11,10 +11,12 @@ from app.core.db import get_db
 from app.core.error_handlers import register_error_handlers
 from app.core.security_settings import lifespan
 from app.modules.families.router import router as families_router
+from app.modules.memories.router import router as memories_router
 
 app = FastAPI(title="Ayni Digital API", lifespan=lifespan)
 register_error_handlers(app)
 app.include_router(families_router)
+app.include_router(memories_router)
 configure_cors(app)
 
 

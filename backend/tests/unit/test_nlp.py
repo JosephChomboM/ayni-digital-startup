@@ -79,3 +79,22 @@ def test_duplicates_are_removed_ignoring_case(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(service, "EXTRACTORS", [FixedExtractor(entities)])
 
     assert extract_entities("Lima") == [entities[0], entities[2]]
+
+
+@pytest.mark.parametrize("succeeded", [True, False])
+def test_status_distinguishes_empty_success_from_total_failure(
+    monkeypatch: pytest.MonkeyPatch, succeeded: bool
+) -> None:
+    extractor = FixedExtractor([]) if succeeded else BrokenExtractor()
+    monkeypatch.setattr(service, "EXTRACTORS", [extractor])
+    result = service.extract_entities_with_status(ANECDOTE)
+    assert result.entities == []
+    assert result.succeeded is succeeded
+
+
+def test_status_reports_success_when_fallback_works(monkeypatch: pytest.MonkeyPatch) -> None:
+    entity = Entity(kind=EntityKind.PLACE, text="Lima")
+    monkeypatch.setattr(service, "EXTRACTORS", [BrokenExtractor(), FixedExtractor([entity])])
+    result = service.extract_entities_with_status("Paseamos por Lima.")
+    assert result.succeeded
+    assert result.entities == [entity]

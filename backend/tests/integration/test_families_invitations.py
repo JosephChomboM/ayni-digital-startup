@@ -113,7 +113,9 @@ def test_finished_or_expired_invitation_does_not_prevent_a_new_invitation(
         elif state == "revoked":
             old.revoked_at = datetime.now(UTC)
         else:
-            old.expires_at = datetime.now(UTC)
+            expired_at = datetime.now(UTC) - timedelta(hours=1)
+            old.created_at = expired_at - timedelta(hours=72)
+            old.expires_at = expired_at
     created = service.create_invitation(caregiver_account.user_id, email=pending_invitation.email)
 
     assert created.invitation.id != pending_invitation.id
@@ -166,7 +168,9 @@ def test_revoke_rejects_inactive_invitation(
         elif state == "revoked":
             invitation.revoked_at = datetime.now(UTC)
         else:
-            invitation.expires_at = datetime.now(UTC)
+            expired_at = datetime.now(UTC) - timedelta(hours=1)
+            invitation.created_at = expired_at - timedelta(hours=72)
+            invitation.expires_at = expired_at
     with pytest.raises(FamiliesError) as error:
         service.revoke_invitation(caregiver_account.user_id, pending_invitation.id)
 

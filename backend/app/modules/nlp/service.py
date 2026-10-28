@@ -1,12 +1,19 @@
 import logging
 import time
+from dataclasses import dataclass, field
 
 from app.core.config import Settings, get_settings
 from app.modules.nlp.extractors import EntityExtractor, SpacyExtractor
 from app.modules.nlp.llm import LlmExtractor
 from app.modules.nlp.schemas import Entity, EntityKind
 
-__all__ = ["Entity", "EntityKind", "extract_entities"]
+__all__ = [
+    "Entity",
+    "EntityKind",
+    "ExtractionResult",
+    "extract_entities",
+    "extract_entities_with_status",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +37,26 @@ def build_extractors(settings: Settings) -> list[EntityExtractor]:
 EXTRACTORS: list[EntityExtractor] = build_extractors(get_settings())
 
 
+@dataclass(frozen=True)
+class ExtractionResult:
+    entities: list[Entity] = field(repr=False)
+    succeeded: bool
+
+
 def extract_entities(text: str) -> list[Entity]:
     """Never raises. LLM → spaCy → []"""
+    return extract_entities_with_status(text).entities
+
+
+def extract_entities_with_status(text: str) -> ExtractionResult:
+    """Report total failure separately from a successful extraction with no entities."""
     if not text.strip():
-        return []
+        return ExtractionResult(entities=[], succeeded=True)
 
     for extractor in EXTRACTORS:
         start = time.perf_counter()
         try:
-            entities = extractor.extract(text)
+            entities = _dedupe(extractor.extract(text))
         except Exception as exc:
             # Only the error type: the message could quote the anecdote.
             logger.warning(
@@ -54,9 +72,9 @@ def extract_entities(text: str) -> list[Entity]:
                 "entity_count": len(entities),
             },
         )
-        return _dedupe(entities)
+        return ExtractionResult(entities=entities, succeeded=True)
 
-    return []
+    return ExtractionResult(entities=[], succeeded=False)
 
 
 def _dedupe(entities: list[Entity]) -> list[Entity]:

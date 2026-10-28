@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -72,6 +72,7 @@ def test_family_data_and_consent_snapshot_are_persisted(
     db_session: Session, family: Family
 ) -> None:
     user = add_user(db_session, family)
+    expected_accepted_at = db_session.scalar(select(func.now()))
     consent_text = (
         "Acepto que Ayni guarde y use los datos que comparto para organizar "
         "actividades familiares. Entiendo que estos datos se almacenan fuera del "
@@ -91,7 +92,8 @@ def test_family_data_and_consent_snapshot_are_persisted(
     assert user.consent is not None
     assert user.consent.text == consent_text
     assert user.consent.text_version == "1.0"
-    assert user.consent.accepted_at.utcoffset() == timedelta(0)
+    assert user.consent.accepted_at.utcoffset() is not None
+    assert user.consent.accepted_at.astimezone(UTC) == expected_accepted_at.astimezone(UTC)
     assert family.elder_profile is not None
     assert family.elder_profile.interests == []
     assert family.invitations[0].role == UserRole.FAMILY_MEMBER.value
