@@ -59,6 +59,12 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
                 "consent_version_invalid",
                 "Revisa y acepta la versión actual del consentimiento.",
             )
+        if error["type"] == "song_url_invalid":
+            return error_response(
+                422,
+                "song_url_invalid",
+                "Pega un enlace de video de YouTube o de una canción de Spotify.",
+            )
     return error_response(422, *HTTP_ERRORS[422])
 
 
