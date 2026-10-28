@@ -4,7 +4,7 @@ import secrets
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import SecretStr
@@ -61,6 +61,18 @@ def caregiver_account() -> Iterator[SimpleNamespace]:
 @pytest.fixture
 def other_caregiver_account() -> Iterator[SimpleNamespace]:
     yield from _registered_caregiver()
+
+
+@pytest.fixture
+def memory_profile_id(caregiver_account: SimpleNamespace) -> UUID:
+    with Session(engine) as session:
+        return (
+            FamiliesService(session)
+            .save_elder_profile(
+                caregiver_account.user_id, name="Perfil de prueba", birth_decade=1940, interests=[]
+            )
+            .id
+        )
 
 
 @pytest.fixture
