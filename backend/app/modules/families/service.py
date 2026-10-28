@@ -2,15 +2,22 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from typing import cast
+from typing import Annotated, cast
 from uuid import UUID
 
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApplicationError
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 from app.core.security_settings import get_security_settings
 from app.modules.families.consent import CONSENT_TEXT, CONSENT_TEXT_VERSION, ONBOARDING_NOTICE
 from app.modules.families.models import Family, Invitation, User, UserRole
@@ -32,6 +39,19 @@ from app.modules.families.schemas import (
     RegisterRequest,
     RegisterResponse,
 )
+
+_bearer = HTTPBearer(auto_error=False, bearerFormat="JWT")
+
+
+def get_authenticated_user_id(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> UUID:
+    """Shared Bearer dependency; account and family access are checked by services."""
+    if credentials is None:
+        raise ApplicationError(
+            code="unauthorized", message="Vuelve a iniciar sesión para continuar.", status_code=401
+        )
+    return decode_access_token(credentials.credentials)
 
 
 @lru_cache(maxsize=1)

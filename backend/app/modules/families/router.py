@@ -2,12 +2,9 @@ from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.errors import ApplicationError
-from app.core.security import decode_access_token
 from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
@@ -23,24 +20,13 @@ from app.modules.families.schemas import (
     RegisterRequest,
     RegisterResponse,
 )
-from app.modules.families.service import FamiliesService
+from app.modules.families.service import FamiliesService, get_authenticated_user_id
 
 router = APIRouter(tags=["families"])
-bearer = HTTPBearer(auto_error=False, bearerFormat="JWT")
 
 
 def get_families_service(db: Annotated[Session, Depends(get_db)]) -> FamiliesService:
     return FamiliesService(db)
-
-
-def get_authenticated_user_id(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-) -> UUID:
-    if credentials is None:
-        raise ApplicationError(
-            code="unauthorized", message="Vuelve a iniciar sesión para continuar.", status_code=401
-        )
-    return decode_access_token(credentials.credentials)
 
 
 FamiliesServiceDep = Annotated[FamiliesService, Depends(get_families_service)]
