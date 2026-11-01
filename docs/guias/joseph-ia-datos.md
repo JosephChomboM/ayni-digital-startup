@@ -14,6 +14,10 @@
 | — | `joseph/recommender` | Ranking de contenido con scikit-learn según respuestas acumuladas. **Después del MVP** | **Hats**: `sessions` lo consume de forma opcional | #3 |
 | — | `joseph/insights-patrones` | Patrones descriptivos para los gráficos. **Después del MVP** | **Damarys** | #3 |
 
+El contrato inicial del recomendador y los pendientes con Hats están en
+[recommender-integracion.md](recommender-integracion.md). Puede desarrollarse de
+forma independiente; su activación en sesiones requiere la integración posterior.
+
 ### Contratos que debes publicar pronto
 
 Hats necesita la firma de `nlp.service` para integrarla en `memories`. Publícala en el PR #1 aunque solo exista el `NullExtractor`:
