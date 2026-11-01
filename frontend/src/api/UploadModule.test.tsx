@@ -72,6 +72,18 @@ function postCalls() {
   return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
 }
 
+it("refreshes persisted extraction results without creating another memory", async () => {
+  records = [memory({ title: "Recuerdo procesado", entities_status: "pending" })];
+  render(<UploadModule />);
+  await screen.findByText("Recuerdo procesado");
+  expect(screen.getByText(/Estamos identificando los detalles/)).toBeInTheDocument();
+  records[0] = { ...records[0], entities_status: "completed", entities: [{ kind: "place", text: "Cusco" }] };
+  fireEvent.click(screen.getByRole("button", { name: "Actualizar recuerdos" }));
+  await screen.findByText("Cusco");
+  expect(screen.queryByText(/Estamos identificando los detalles/)).toBeNull();
+  expect(postCalls()).toHaveLength(0);
+});
+
 it("searches through the API, resets pagination and can clear the search", async () => {
   records = Array.from({ length: 21 }, (_, index) => memory({ title: `Recuerdo ${index}` }));
   records[0] = memory({ title: "Vacaciones", entities: [{ kind: "place", text: "Lima" }] });

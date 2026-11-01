@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { MemoryEntities } from "./MemoryEntities"
 import { Camera, Check, FileText, Link2, Music2, Upload, Users, Heart } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
@@ -270,6 +271,10 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <Button type="button" size="sm" variant="outline" disabled={loading || busy}
+          onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>
+          Actualizar recuerdos
+        </Button>
         <form className="flex flex-col gap-2" onSubmit={(event) => {
           event.preventDefault(); setPage(0); setQuery(searchText.trim())
         }}>
@@ -303,6 +308,7 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
               {memory.is_positive && <Badge variant="outline">Recuerdo bonito</Badge>}
               {memory.is_sensitive && <Badge variant="outline">Tema delicado</Badge>}
             </div>
+            <MemoryEntities memory={memory} />
             {user && (user.role === "cuidador_principal" || user.id === memory.created_by) && (
               <div className="flex gap-2">
                 {onEdit && <Button size="sm" variant="outline" disabled={busy} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}>Editar</Button>}
