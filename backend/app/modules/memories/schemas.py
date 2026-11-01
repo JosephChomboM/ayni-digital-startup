@@ -116,6 +116,7 @@ class MemoryPatchRequest(RequestSchema):
 
 
 class MemoryListRequest(RequestSchema):
+    q: ShortText | None = Field(default=None, repr=False)
     type: MemoryType | None = None
     include_sensitive: bool = False
     limit: int = Field(default=20, ge=1, le=100)

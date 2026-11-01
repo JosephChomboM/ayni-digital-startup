@@ -40,7 +40,11 @@ async function backend(input: RequestInfo | URL, options?: RequestInit): Promise
     return json(created, 201);
   }
   if (url.pathname === "/memories") {
-    const items = records.filter((item) => url.searchParams.get("include_sensitive") === "true" || !item.is_sensitive);
+    const query = (url.searchParams.get("q") ?? "").toLocaleLowerCase();
+    const items = records.filter((item) =>
+      (url.searchParams.get("include_sensitive") === "true" || !item.is_sensitive) &&
+      [item.title, item.text ?? "", ...item.entities.map((entity) => entity.text)]
+        .some((text) => text.toLocaleLowerCase().includes(query)));
     const offset = Number(url.searchParams.get("offset") ?? 0);
     return json({ items: items.slice(offset, offset + 20), total: items.length, limit: 20, offset });
   }
@@ -67,6 +71,40 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 function postCalls() {
   return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
 }
+
+it("searches through the API, resets pagination and can clear the search", async () => {
+  records = Array.from({ length: 21 }, (_, index) => memory({ title: `Recuerdo ${index}` }));
+  records[0] = memory({ title: "Vacaciones", entities: [{ kind: "place", text: "Lima" }] });
+  render(<UploadModule />);
+  fireEvent.click(await screen.findByRole("button", { name: "Siguiente" }));
+  await screen.findByText("Recuerdo 20");
+  fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: " Lima " } });
+  fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+  await screen.findByText("Vacaciones");
+  expect(screen.queryByText("Recuerdo 20")).toBeNull();
+  expect(fetchMock.mock.calls.some(([url]) => {
+    const parsed = new URL(String(url));
+    return parsed.searchParams.get("q") === "Lima" && parsed.searchParams.get("offset") === "0";
+  })).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+  await screen.findByText("Recuerdo 1");
+  expect(screen.getByLabelText("Buscar recuerdos")).toHaveValue("");
+});
+
+it("distinguishes no search results from an API failure", async () => {
+  render(<UploadModule />);
+  await screen.findByText("Todavía no hay recuerdos para mostrar.");
+  fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: "Ausente" } });
+  fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+  await screen.findByText("No encontramos recuerdos con esa búsqueda.");
+  fetchMock.mockImplementation(async (input, options) => new URL(String(input)).searchParams.has("q")
+    ? json({ detail: { code: "unavailable", message: "No pudimos buscar." } }, 503)
+    : backend(input, options));
+  fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: "Otro" } });
+  fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos buscar.");
+  expect(screen.queryByText("No encontramos recuerdos con esa búsqueda.")).toBeNull();
+});
 
 it("saves an anecdote with title, text and both explicit marks", async () => {
   render(<UploadModule />);

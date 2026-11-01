@@ -78,7 +78,7 @@ export function createMemory(input: MemoryInput): Promise<Memory> {
   return apiFetch<Memory>("/memories", { method: "POST", body: JSON.stringify({ ...fields, ...content }) });
 }
 
-export function listMemories(query: { type?: MemoryType; include_sensitive?: boolean; limit?: number; offset?: number } = {}): Promise<MemoryList> {
+export function listMemories(query: { q?: string; type?: MemoryType; include_sensitive?: boolean; limit?: number; offset?: number } = {}): Promise<MemoryList> {
   const params = new URLSearchParams();
   for (const [name, value] of Object.entries(query)) {
     if (value !== undefined) params.set(name, String(value));
