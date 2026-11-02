@@ -28,29 +28,29 @@ def test_family_isolation_access():
     """
     # 1. Se genera un UUID falso para simular al Usuario B (intruso)
     fake_user_b_id = uuid4()
-    
+
     # 2. Se sobrescribe la dependencia de autenticación de FastAPI.
     app.dependency_overrides[get_authenticated_user_id] = lambda: fake_user_b_id
-    
+
     # 3. Se genera un UUID de memoria aleatorio (que pertenece al Usuario A)
     memory_id = uuid4()
-    
+
     print(f"Probando acceso a memoria {memory_id} con usuario falso {fake_user_b_id}...")
-    
+
     # 4. Se ejecuta la petición HTTP real al endpoint protegido
     response = client.get(f"/memories/{memory_id}")
-    
+
     # 5. Se valida que el sistema rechace el acceso
     assert response.status_code in [403, 404], (
         f"FALLO DE AISLAMIENTO: El servidor devolvió {response.status_code}. "
         "Se permitió o se procesó incorrectamente el acceso a datos ajenos."
     )
-    
+
     # 6. Se imprime el resultado dividiendo la línea larga
     print(
         f"AYNI-35: Aislamiento familiar validado. "
         f"Acceso denegado correctamente (HTTP {response.status_code})."
     )
-    
+
     # 7. Se limpia la sobrescritura para no afectar otras pruebas globales
     app.dependency_overrides.clear()

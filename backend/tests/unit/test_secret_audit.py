@@ -19,31 +19,31 @@ def test_no_hardcoded_secrets():
     asignaciones directas de contraseñas o tokens.
     """
     # Se obtiene la ruta absoluta a la carpeta 'app'
-    app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'app'))
-    
+    app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "app"))
+
     # Patrones regulares para detectar posibles secretos hardcodeados
     patterns = [
         r'password\s*=\s*["\'][^"\']+["\']',
         r'api_key\s*=\s*["\'][^"\']+["\']',
         r'secret\s*=\s*["\'][^"\']+["\']',
-        r'supabase_key\s*=\s*["\'][^"\']+["\']'
+        r'supabase_key\s*=\s*["\'][^"\']+["\']',
     ]
-    
+
     found_secrets = []
-    
+
     # Recorrido recursivo de los archivos Python
     for root, _, files in os.walk(app_dir):
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith(".py"):
                 filepath = os.path.join(root, file)
                 # Se eliminó el 'r' de open() por recomendación de ruff
-                with open(filepath, encoding='utf-8') as f:
+                with open(filepath, encoding="utf-8") as f:
                     content = f.read()
                     for pattern in patterns:
                         matches = re.findall(pattern, content, re.IGNORECASE)
                         if matches:
                             found_secrets.append((filepath, matches))
-                            
+
     # La prueba falla si se encuentra al menos un secreto (Línea dividida)
     assert not found_secrets, (
         f"ALERTA DE SEGURIDAD: Se encontraron secretos hardcodeados en: {found_secrets}"
