@@ -36,13 +36,16 @@ def test_no_hardcoded_secrets():
         for file in files:
             if file.endswith('.py'):
                 filepath = os.path.join(root, file)
-                with open(filepath, 'r', encoding='utf-8') as f:
+                # Se eliminó el 'r' de open() por recomendación de ruff
+                with open(filepath, encoding='utf-8') as f:
                     content = f.read()
                     for pattern in patterns:
                         matches = re.findall(pattern, content, re.IGNORECASE)
                         if matches:
                             found_secrets.append((filepath, matches))
                             
-    # La prueba falla si se encuentra al menos un secreto
-    assert not found_secrets, f"ALERTA DE SEGURIDAD: Se encontraron secretos hardcodeados en: {found_secrets}"
+    # La prueba falla si se encuentra al menos un secreto (Línea dividida)
+    assert not found_secrets, (
+        f"ALERTA DE SEGURIDAD: Se encontraron secretos hardcodeados en: {found_secrets}"
+    )
     print("AYNI-35: No se encontraron secretos hardcodeados en el código.")

@@ -11,6 +11,7 @@ Criterio de aceptación validado:
 """
 
 from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -29,7 +30,6 @@ def test_family_isolation_access():
     fake_user_b_id = uuid4()
     
     # 2. Se sobrescribe la dependencia de autenticación de FastAPI.
-    # Esto permite simular que la petición viene autenticada con el token del Usuario B.
     app.dependency_overrides[get_authenticated_user_id] = lambda: fake_user_b_id
     
     # 3. Se genera un UUID de memoria aleatorio (que pertenece al Usuario A)
@@ -46,7 +46,11 @@ def test_family_isolation_access():
         "Se permitió o se procesó incorrectamente el acceso a datos ajenos."
     )
     
-    print(f"AYNI-35: Aislamiento familiar validado. Acceso denegado correctamente (HTTP {response.status_code}).")
+    # 6. Se imprime el resultado dividiendo la línea larga
+    print(
+        f"AYNI-35: Aislamiento familiar validado. "
+        f"Acceso denegado correctamente (HTTP {response.status_code})."
+    )
     
-    # 6. Se limpia la sobrescritura para no afectar otras pruebas globales
+    # 7. Se limpia la sobrescritura para no afectar otras pruebas globales
     app.dependency_overrides.clear()
