@@ -1,16 +1,13 @@
 ﻿import React, { useState, useEffect } from "react";
 import {
   Heart,
-  Sparkles,
   ArrowRight,
-  Image,
-  Smile,
   ShieldCheck,
   CheckCircle2,
-  Clock,
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import type { User } from "../api/auth";
@@ -38,9 +35,10 @@ const CAROUSEL_ITEMS = [
     subtitle: "Recordando paseos y vivencias familiares en Lima",
   },
   {
-    type: "quote",
-    quote: "“Recordar juntos sus canciones preferidas ha devuelto las sonrisas de los domingos a nuestra casa.”",
-    author: "María T. · Cuidadora en Lima",
+    type: "image",
+    url: "https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&q=80&w=800",
+    title: "Un recuerdo compartido en familia",
+    subtitle: "Cada quien puede aportar una historia",
   },
   {
     type: "image",
@@ -49,10 +47,17 @@ const CAROUSEL_ITEMS = [
     subtitle: "Reconociendo fotos de su primer trabajo",
   },
   {
-    type: "quote",
-    quote: "“Ayni Digital nos dio una forma sencilla y llena de cariño para conectar en familia sin presiones.”",
-    author: "Jorge L. · Familiar en Surco",
+    type: "image",
+    url: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&q=80&w=800",
+    title: "Momentos cotidianos que nos acercan",
+    subtitle: "Conversar juntos, con calma y a su ritmo",
   },
+];
+
+const FEATURE_CARDS = [
+  { title: "Suben sus recuerdos", text: "Fotos, anécdotas y canciones que la familia puede compartir.", image: "/images/recuerdos.jpg", reference: "https://share.google/4Ip3kmdz6MNbJy2uC" },
+  { title: "Guía de 15 minutos", text: "Una conversación breve, con preguntas sencillas y sin apuro.", image: "/images/guia-sesion.jpg", reference: "https://share.google/9jnMSEko9CTGM8v4k" },
+  { title: "Registro de emociones", text: "Anota cómo se sintió la persona y comparte el momento con la familia.", image: "/images/emociones.jpg", reference: "https://share.google/Vngw6tBYzuFA40i9p" },
 ];
 
 export const WelcomePage: React.FC<WelcomePageProps> = ({
@@ -61,6 +66,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
   onLoginSuccess,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [benefitSlide, setBenefitSlide] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -76,6 +82,11 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
   const handlePrev = () => {
     setCurrentSlide((prev) => (prev - 1 + CAROUSEL_ITEMS.length) % CAROUSEL_ITEMS.length);
   };
+  const benefits = [
+    ["Cero sobrecarga", "Pantallas sencillas y palabras claras para acompañar sin complicaciones."],
+    ["Toda la familia participa", "Tus familiares pueden aportar recuerdos aunque estén lejos."],
+    ["A su propio ritmo", "Si la persona se siente incómoda, hagan una pausa o cambien de tema."],
+  ];
 
   const handleLogin = () => {
     if (onLoginClick) onLoginClick();
@@ -128,7 +139,6 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
         <div className="grid gap-10 rounded-3xl bg-[#f7f9fa] p-6 sm:p-10 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a]/30 border border-[#e9c46a]/50 px-3.5 py-1 text-xs font-bold text-[#264653]">
-              <Sparkles className="size-3.5 text-[#e76f51]" />
               <span>Estimulación cognitiva por reminiscencia en casa</span>
             </div>
 
@@ -176,12 +186,11 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </div>
 
             <div className="relative my-auto flex-1 flex items-center justify-center text-center px-2 transition-all duration-500">
-              {CAROUSEL_ITEMS[currentSlide].type === "image" ? (
-                <div className="space-y-3 animate-fade-in w-full">
+              <div className="space-y-3 animate-fade-in w-full">
                   <div className="relative h-44 w-full overflow-hidden rounded-2xl border-2 border-white/20 shadow-lg">
                     <img
                       src={CAROUSEL_ITEMS[currentSlide].url}
-                      alt="Familia en Lima"
+                      alt={CAROUSEL_ITEMS[currentSlide].title}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -189,17 +198,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
                     <p className="text-sm font-bold text-white">{CAROUSEL_ITEMS[currentSlide].title}</p>
                     <p className="text-xs text-white/80">{CAROUSEL_ITEMS[currentSlide].subtitle}</p>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4 animate-fade-in my-auto">
-                  <p className="text-xl sm:text-2xl font-serif italic text-white/95 leading-relaxed">
-                    {CAROUSEL_ITEMS[currentSlide].quote}
-                  </p>
-                  <p className="text-xs font-bold text-[#e9c46a] uppercase tracking-wide">
-                    {CAROUSEL_ITEMS[currentSlide].author}
-                  </p>
-                </div>
-              )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between border-t border-white/20 pt-3 z-10">
@@ -257,63 +256,24 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-              <div className="size-10 rounded-xl bg-[#2c5f7c]/10 text-[#2c5f7c] flex items-center justify-center font-bold">
-                1
-              </div>
-              <h3 className="font-bold text-base text-[#264653] flex items-center gap-2">
-                <Image className="size-4 text-[#e76f51]" /> Suben sus recuerdos
-              </h3>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Nietos e hijos comparten fotos de la juventud, notas escritas y música mediante enlaces sencillos.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-              <div className="size-10 rounded-xl bg-[#e9c46a]/30 text-[#264653] flex items-center justify-center font-bold">
-                2
-              </div>
-              <h3 className="font-bold text-base text-[#264653] flex items-center gap-2">
-                <Clock className="size-4 text-[#2c5f7c]" /> Guía de 15 minutos
-              </h3>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Genera automáticamente una sesión guiada con preguntas disparadoras fáciles para entablar una conversación amena.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-              <div className="size-10 rounded-xl bg-[#e76f51]/10 text-[#e76f51] flex items-center justify-center font-bold">
-                3
-              </div>
-              <h3 className="font-bold text-base text-[#264653] flex items-center gap-2">
-                <Smile className="size-4 text-[#e76f51]" /> Registro de emociones
-              </h3>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Anota con un clic si la persona estuvo receptiva o emocionada, compartiendo los avances con el resto de la familia.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+            {FEATURE_CARDS.map((item, index) => <a key={item.title} href={item.reference} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl bg-white transition hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2c5f7c]">
+              <div className="relative h-52 overflow-hidden rounded-2xl bg-[#f1faee]"><img src={item.image} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy"/><span className="absolute left-4 top-4 grid size-9 place-items-center rounded-full bg-white text-sm font-bold text-[#2c5f7c] shadow">0{index + 1}</span></div>
+              <div className="space-y-2 py-4"><h3 className="text-lg font-bold text-[#264653]">{item.title}</h3><p className="text-sm leading-relaxed text-gray-600">{item.text}</p><span className="text-sm font-semibold text-[#2c5f7c]">Ver idea <ArrowRight className="ml-1 inline size-4"/></span></div>
+            </a>)}
           </div>
         </section>
 
         {/* BENEFICIOS */}
-        <section className="bg-white rounded-3xl border border-gray-200 p-8 sm:p-10 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        <section className="bg-[#f8fafb] rounded-3xl p-8 sm:p-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           <div className="space-y-4">
-            <p className="text-xs font-extrabold uppercase tracking-wider text-[#e76f51]">Pensado para ti</p>
+            <p className="text-sm font-semibold text-[#e76f51]">Pensado para ti</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-[#2c5f7c]">¿Por qué acompañar con Ayni Digital?</h2>
-            <div className="space-y-3 text-xs text-gray-600">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="size-4 text-[#2c5f7c] shrink-0 mt-0.5" />
-                <p><strong>Cero sobrecarga para el cuidador:</strong> Pantallas muy simples, texto claro sin términos médicos complicados.</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="size-4 text-[#2c5f7c] shrink-0 mt-0.5" />
-                <p><strong>Involucra a toda la familia:</strong> Los familiares pueden unirse a distancia para aportar recuerdos comunitarios.</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="size-4 text-[#2c5f7c] shrink-0 mt-0.5" />
-                <p><strong>Respeto y pausado ético:</strong> La app detecta si la persona no se siente bien y te recomienda pausar la actividad.</p>
-              </div>
+            <div aria-live="polite" className="min-h-32 space-y-3 py-3">
+              <CheckCircle2 className="size-6 text-[#2c5f7c]" />
+              <h3 className="text-xl font-bold text-[#264653]">{benefits[benefitSlide][0]}</h3>
+              <p className="text-sm leading-relaxed text-gray-600">{benefits[benefitSlide][1]}</p>
+              <div className="flex items-center gap-3 pt-2"><button aria-label="Beneficio anterior" onClick={() => setBenefitSlide((benefitSlide + benefits.length - 1) % benefits.length)} className="rounded-full border border-gray-300 p-2 hover:bg-gray-100"><ChevronLeft className="size-4"/></button><span className="text-xs text-gray-500">{benefitSlide + 1} de {benefits.length}</span><button aria-label="Siguiente beneficio" onClick={() => setBenefitSlide((benefitSlide + 1) % benefits.length)} className="rounded-full border border-gray-300 p-2 hover:bg-gray-100"><ChevronRight className="size-4"/></button></div>
             </div>
 
             <Button
@@ -324,7 +284,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </Button>
           </div>
 
-          <div className="bg-[#f1faee] p-6 rounded-2xl border border-[#2c5f7c]/20 space-y-4 text-center">
+          <div className="relative overflow-hidden rounded-2xl bg-white p-7 text-center shadow-sm">
             <div className="inline-flex p-3 bg-white rounded-2xl shadow-sm text-[#e76f51]">
               <Heart className="size-8 fill-current" />
             </div>
@@ -332,6 +292,19 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             <p className="text-xs text-gray-500 italic">
               Diseñado en Lima para acompañar con cariño a quienes cuidamos en casa.
             </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="faq-heading" className="space-y-6 py-4">
+          <div><p className="text-sm font-semibold text-[#e76f51]">Resolvemos tus dudas</p><h2 id="faq-heading" className="mt-1 text-2xl font-bold text-[#2c5f7c]">Preguntas frecuentes</h2></div>
+          <div className="divide-y divide-gray-200 border-y border-gray-200">
+            {[
+              ["¿Ayni reemplaza una atención médica?", "No. Ayni es una herramienta familiar para compartir recuerdos; no diagnostica ni sustituye atención profesional."],
+              ["¿Quién puede aportar recuerdos?", "La persona cuidadora puede invitar a familiares para sumar fotos, anécdotas y canciones."],
+              ["¿Cuánto dura una sesión?", "La guía propone alrededor de 15 minutos. Pueden hacer pausas o terminar cuando quieran."],
+              ["¿Qué hacemos si un recuerdo incomoda?", "Pueden cambiar de tema, guardar el recuerdo para después o detener la sesión. El bienestar de la persona es lo primero."],
+              ["¿Cómo funciona el pago?", "El acceso se ofrece por un pago único de S/ 19.90. El cobro se habilitará cuando esté conectada la pasarela de pago."],
+            ].map(([question, answer]) => <details key={question} className="group py-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-[#264653]">{question}<ChevronDown className="size-5 shrink-0 transition group-open:rotate-180"/></summary><p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-600">{answer}</p></details>)}
           </div>
         </section>
 
@@ -347,13 +320,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#4C9F38]/30 flex flex-col sm:flex-row items-start gap-4">
-              <div className="size-20 bg-[#4C9F38] text-white rounded-xl shrink-0 p-2 flex flex-col justify-between shadow-sm border border-[#4C9F38]">
-                <span className="text-[10px] font-black uppercase tracking-wider">ODS 3</span>
-                <div className="space-y-0.5">
-                  <p className="text-xs font-black leading-none">SALUD</p>
-                  <p className="text-[9px] font-semibold leading-none opacity-90">& BIENESTAR</p>
-                </div>
-              </div>
+              <a href="https://share.google/LoRB2g9gJcjAWnr6i" target="_blank" rel="noreferrer" aria-label="Abrir imagen de referencia del ODS 3" className="relative size-20 overflow-hidden rounded-xl shrink-0 bg-[#4C9F38]"><img src="/images/ods-3.jpg" alt="Imagen del Objetivo de Desarrollo Sostenible 3" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1 text-center text-[10px] font-bold text-white">ODS 3</span></a>
               <div className="space-y-1.5 flex-1">
                 <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
                   Salud y Bienestar
@@ -365,13 +332,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </div>
 
             <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#DD1367]/30 flex flex-col sm:flex-row items-start gap-4">
-              <div className="size-20 bg-[#DD1367] text-white rounded-xl shrink-0 p-2 flex flex-col justify-between shadow-sm border border-[#DD1367]">
-                <span className="text-[10px] font-black uppercase tracking-wider">ODS 10</span>
-                <div className="space-y-0.5">
-                  <p className="text-xs font-black leading-none">REDUCCIÓN DE</p>
-                  <p className="text-[9px] font-semibold leading-none opacity-90">DESIGUALDADES</p>
-                </div>
-              </div>
+              <a href="https://share.google/hYJiBco3nknXAqCKk" target="_blank" rel="noreferrer" aria-label="Abrir imagen de referencia del ODS 10" className="relative size-20 overflow-hidden rounded-xl shrink-0 bg-[#DD1367]"><img src="/images/ods-10.jpg" alt="Imagen del Objetivo de Desarrollo Sostenible 10" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#DD1367]/90 p-1 text-center text-[10px] font-bold text-white">ODS 10</span></a>
               <div className="space-y-1.5 flex-1">
                 <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
                   Reducción de las Desigualdades
