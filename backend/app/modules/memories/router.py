@@ -81,3 +81,15 @@ def delete_memory(
 ) -> Response:
     service.delete_memory(user_id, memory_id)
     return Response(status_code=204)
+
+
+@router.post("/{memory_id}/entities/retry", response_model=MemoryResponse, status_code=202)
+def retry_entities(
+    memory_id: UUID,
+    background_tasks: BackgroundTasks,
+    user_id: AuthenticatedUserId,
+    service: MemoriesServiceDep,
+) -> MemoryResponse:
+    memory = service.retry_entities(user_id, memory_id)
+    _schedule_extraction(background_tasks, memory)
+    return memory
