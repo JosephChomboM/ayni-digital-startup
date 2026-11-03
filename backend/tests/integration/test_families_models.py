@@ -178,6 +178,20 @@ def test_database_limits_profile_interests(db_session: Session, family: Family) 
         db_session.flush()
 
 
+def test_database_rejects_null_profile_interest(db_session: Session, family: Family) -> None:
+    db_session.add(
+        ElderProfile(
+            family_id=family.id,
+            name="Perfil de prueba",
+            birth_decade=1940,
+            interests=["Música", None],  # type: ignore[list-item]
+        )
+    )
+
+    with pytest.raises(IntegrityError, match="ck_elder_profiles_interests_not_null"):
+        db_session.flush()
+
+
 @pytest.mark.parametrize("outcome", ["accepted_at", "revoked_at"])
 def test_invitation_records_a_single_outcome(
     db_session: Session, family: Family, outcome: str
