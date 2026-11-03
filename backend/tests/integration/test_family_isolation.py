@@ -10,47 +10,69 @@ Criterio de aceptación validado:
 - Probar lectura con dos familias y roles distintos.
 """
 
-from uuid import uuid4
+from types import SimpleNamespace
+from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from app.core.db import engine
+from app.core.security import create_access_token
 from app.main import app
-from app.modules.families.service import get_authenticated_user_id
+from app.modules.families.service import FamiliesService
+from app.modules.memories.schemas import AnecdoteCreateRequest
+from app.modules.memories.service import MemoriesService
 
-client = TestClient(app)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.usefixtures("isolated_security_environment"),
+]
 
 
-def test_family_isolation_access():
-    """
-    Simula una petición HTTP al endpoint de memorias utilizando un UUID
-    de usuario que no es el dueño del recurso. Se espera que la API
-    deniegue el acceso con un código 403 (Forbidden) o 404 (Not Found).
-    """
-    # 1. Se genera un UUID falso para simular al Usuario B (intruso)
-    fake_user_b_id = uuid4()
+def test_family_isolation_access(
+    family_member: SimpleNamespace,
+    other_caregiver_account: SimpleNamespace,
+    memory_profile_id: UUID,
+) -> None:
+    # Give family B its own profile so a missing profile cannot explain the 404.
+    with Session(engine) as session:
+        FamiliesService(session).save_elder_profile(
+            other_caregiver_account.user_id,
+            name="Perfil de prueba",
+            birth_decade=1950,
+            interests=[],
+        )
 
-    # 2. Se sobrescribe la dependencia de autenticación de FastAPI.
-    app.dependency_overrides[get_authenticated_user_id] = lambda: fake_user_b_id
+    # Create an existing memory authored by a family member from family A.
+    with Session(engine) as session:
+        memory = MemoriesService(session).create_memory(
+            family_member.user_id,
+            AnecdoteCreateRequest(
+                type="anecdote",
+                title="Recuerdo de prueba",
+                text="Compartimos una actividad en familia.",
+            ),
+        )
 
-    # 3. Se genera un UUID de memoria aleatorio (que pertenece al Usuario A)
-    memory_id = uuid4()
+    assert memory.elder_profile_id == memory_profile_id
+    assert family_member.family_id != other_caregiver_account.family_id
 
-    print(f"Probando acceso a memoria {memory_id} con usuario falso {fake_user_b_id}...")
+    with TestClient(app) as client:
+        # The author from family A can read the existing memory.
+        own_response = client.get(
+            f"/memories/{memory.id}",
+            headers={"Authorization": (f"Bearer {create_access_token(family_member.user_id)}")},
+        )
+        assert own_response.status_code == 200
+        assert own_response.json()["id"] == str(memory.id)
 
-    # 4. Se ejecuta la petición HTTP real al endpoint protegido
-    response = client.get(f"/memories/{memory_id}")
-
-    # 5. Se valida que el sistema rechace el acceso
-    assert response.status_code in [403, 404], (
-        f"FALLO DE AISLAMIENTO: El servidor devolvió {response.status_code}. "
-        "Se permitió o se procesó incorrectamente el acceso a datos ajenos."
-    )
-
-    # 6. Se imprime el resultado dividiendo la línea larga
-    print(
-        f"AYNI-35: Aislamiento familiar validado. "
-        f"Acceso denegado correctamente (HTTP {response.status_code})."
-    )
-
-    # 7. Se limpia la sobrescritura para no afectar otras pruebas globales
-    app.dependency_overrides.clear()
+        # A primary caregiver from family B cannot read family A's memory.
+        foreign_response = client.get(
+            f"/memories/{memory.id}",
+            headers={
+                "Authorization": (f"Bearer {create_access_token(other_caregiver_account.user_id)}")
+            },
+        )
+        assert foreign_response.status_code == 404
+        assert foreign_response.json()["detail"]["code"] == "memory_not_found"

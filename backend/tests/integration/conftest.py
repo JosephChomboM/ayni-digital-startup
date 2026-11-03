@@ -3,12 +3,13 @@ import os
 import secrets
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import delete
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -18,14 +19,51 @@ from app.modules.families.repository import FamiliesRepository
 from app.modules.families.service import FamiliesService
 
 
+def _prepare_local_test_database() -> None:
+    """Create/migrate only the dedicated local test DB, never the dev DB."""
+    database_url = engine.url
+    if database_url.database != "ayni_test" or database_url.host not in {"localhost", "127.0.0.1"}:
+        return
+
+    maintenance_engine = create_engine(database_url.set(database="postgres"))
+    try:
+        with maintenance_engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as connection:
+            exists = connection.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname = 'ayni_test'")
+            )
+            if not exists:
+                connection.exec_driver_sql("CREATE DATABASE ayni_test")
+    finally:
+        maintenance_engine.dispose()
+
+    from alembic import command
+    from alembic.config import Config
+
+    backend_dir = Path(__file__).resolve().parents[2]
+    command.upgrade(Config(str(backend_dir / "alembic.ini")), "head")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def require_database() -> None:
     """Skip locally when Postgres is not running; in CI a missing database is a failure."""
     try:
+        _prepare_local_test_database()
         with engine.connect():
             pass
-    except OperationalError:
-        if os.getenv("CI"):
+    except OperationalError as exc:
+        error = str(exc.orig).lower()
+        database_unavailable = any(
+            message in error
+            for message in (
+                "connection refused",
+                "connection timed out",
+                "network is unreachable",
+                "no route to host",
+            )
+        )
+        if os.getenv("CI") or not database_unavailable:
             raise
         pytest.skip("PostgreSQL no disponible: corre `docker compose up -d db`")
 
