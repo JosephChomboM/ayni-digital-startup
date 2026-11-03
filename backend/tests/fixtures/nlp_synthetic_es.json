@@ -1,0 +1,21 @@
+[
+  {"id":"person-place-year","text":"Ana visitó Lima en 1965.","expected":[
+    {"kind":"person","text":"Ana"},{"kind":"place","text":"Lima"},{"kind":"period","text":"1965"}]},
+  {"id":"two-people","text":"Rosa y Pedro preparaban pan.","expected":[
+    {"kind":"person","text":"Rosa"},{"kind":"person","text":"Pedro"},{"kind":"activity","text":"preparaban pan"}]},
+  {"id":"decade","text":"En los años 60 vivíamos en Cusco.","expected":[
+    {"kind":"period","text":"los años 60"},{"kind":"place","text":"Cusco"}]},
+  {"id":"activity","text":"Nos gustaba bailar marinera.","expected":[
+    {"kind":"activity","text":"bailar marinera"}]},
+  {"id":"kinship","text":"Mi papá cantaba con la tía Rosa.","expected":[
+    {"kind":"person","text":"Mi papá"},{"kind":"person","text":"la tía Rosa"},{"kind":"activity","text":"cantaba"}]},
+  {"id":"repeat-place","text":"Fuimos a Lima y volvimos a Lima.","expected":[
+    {"kind":"place","text":"Lima"}]},
+  {"id":"year-activity","text":"En 1980 aprendimos a cocinar.","expected":[
+    {"kind":"period","text":"1980"},{"kind":"activity","text":"cocinar"}]},
+  {"id":"decade-pattern","text":"La década del 70 en Arequipa.","expected":[
+    {"kind":"period","text":"La década del 70"},{"kind":"place","text":"Arequipa"}]},
+  {"id":"generic-time","text":"Durante su juventud le gustaba pescar.","expected":[
+    {"kind":"period","text":"su juventud"},{"kind":"activity","text":"pescar"}]},
+  {"id":"empty","text":"","expected":[]}
+]
