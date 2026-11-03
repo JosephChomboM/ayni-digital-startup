@@ -150,6 +150,21 @@ class MemoriesRepository:
             return None
         return memory
 
+    def retry_failed_entities(self, memory_id: UUID, *, elder_profile_id: UUID) -> Memory | None:
+        memory = self.get_memory(memory_id, elder_profile_id=elder_profile_id, for_update=True)
+        if (
+            memory is None
+            or memory.type != MemoryType.ANECDOTE
+            or memory.entities_status != EntitiesStatus.FAILED
+        ):
+            return None
+        # Fence off late results from the previous attempt, even when text is unchanged.
+        memory.content_version += 1
+        memory.entities.clear()
+        memory.entities_status = EntitiesStatus.PENDING
+        self.session.flush()
+        return memory
+
     def replace_entities(
         self,
         memory_id: UUID,
