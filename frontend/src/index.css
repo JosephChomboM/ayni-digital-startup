@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  --background: #f1faee;
+  --background: #ffffff;
   --foreground: #264653;
   --card: #ffffff;
   --card-foreground: #264653;
@@ -17,7 +17,7 @@
   --accent: #e9c46a;
   --accent-foreground: #264653;
   --destructive: #dc2626;
-  --border: #e0e7ff;
+  --border: #e5e7eb;
   --input: #f3f4f6;
   --ring: #2c5f7c;
   --radius: 0.75rem;

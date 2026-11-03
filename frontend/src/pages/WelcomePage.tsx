@@ -10,6 +10,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import type { User } from "../api/auth";
@@ -87,9 +88,9 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#f1faee] text-[#264653] flex flex-col justify-between">
+    <div className="min-h-screen bg-white text-[#264653] flex flex-col justify-between">
       {/* BARRA SUPERIOR PÚBLICA */}
-      <header className="sticky top-0 z-30 border-b border-[#2c5f7c]/10 bg-[#f1faee]/90 backdrop-blur-md px-4 py-3 sm:px-8">
+      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur-md px-4 py-3 sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-sm">
@@ -124,7 +125,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
       {/* HÉROE PRINCIPAL UNIFORME Y ELEGANTE */}
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-8 space-y-16">
-        <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
+        <div className="grid gap-10 rounded-3xl bg-[#f7f9fa] p-6 sm:p-10 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a]/30 border border-[#e9c46a]/50 px-3.5 py-1 text-xs font-bold text-[#264653]">
               <Sparkles className="size-3.5 text-[#e76f51]" />
@@ -231,6 +232,20 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </div>
           </div>
         </div>
+
+        <section aria-labelledby="plan-title" className="grid gap-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:grid-cols-[1fr_auto] sm:items-center sm:p-8">
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#e76f51]">Acceso familiar</p>
+            <h2 id="plan-title" className="text-2xl font-bold text-[#2c5f7c]">Un solo pago, recuerdos para compartir</h2>
+            <p className="text-sm text-gray-600">Acceso a las herramientas de Ayni Digital para acompañar a tu familia.</p>
+          </div>
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <p className="text-3xl font-extrabold text-[#264653]">S/ 19.90 <span className="text-sm font-medium text-gray-500">pago único</span></p>
+            <Button onClick={handleRegister} className="bg-[#e76f51] text-white hover:bg-[#d65d3f]">
+              <CreditCard className="mr-2 size-4" /> Crear cuenta
+            </Button>
+          </div>
+        </section>
 
         {/* SECCIÓN CÓMO FUNCIONA */}
         <section className="space-y-8 pt-6 border-t border-gray-200/80">
