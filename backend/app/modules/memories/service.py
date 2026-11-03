@@ -77,6 +77,7 @@ class MemoriesService:
         profile_id, _ = self._context(actor_id)
         filters = {
             "elder_profile_id": profile_id,
+            "q": query.q,
             "type": query.type,
             "include_sensitive": query.include_sensitive,
         }
