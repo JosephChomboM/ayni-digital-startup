@@ -8,6 +8,10 @@ import pytest
 # Set this before pytest imports the app; never reuse a developer's real key.
 os.environ["JWT_SECRET"] = secrets.token_hex(32)
 
+# Keep local test data and schema separate from the development database. An
+# explicitly supplied DATABASE_URL still takes precedence (for example in CI).
+os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ayni:ayni@localhost:5432/ayni_test")
+
 
 @pytest.fixture(autouse=True)
 def fast_argon2(monkeypatch: pytest.MonkeyPatch) -> None:
