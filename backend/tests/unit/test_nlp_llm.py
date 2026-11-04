@@ -62,6 +62,27 @@ def test_llm_receives_only_the_anecdote() -> None:
     assert user_messages == [{"role": "user", "content": ANECDOTE}]
 
 
+def test_llm_api_key_is_sent_as_auth_header_not_in_request_body() -> None:
+    observed: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(request)
+        return groq_reply([])
+
+    api_key = "test-secret-key"
+    extractor = LlmExtractor(
+        api_key=api_key,
+        model="test-model",
+        timeout_seconds=1,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    extractor.extract(ANECDOTE)
+
+    assert len(observed) == 1
+    assert observed[0].headers["Authorization"] == f"Bearer {api_key}"
+    assert api_key.encode() not in observed[0].content
+
+
 def test_llm_entities_not_in_the_anecdote_are_dropped() -> None:
     extractor = make_extractor(
         httpx.MockTransport(
