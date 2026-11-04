@@ -19,17 +19,18 @@ Módulo encargado de gestionar el acceso y la red de apoyo. El consentimiento le
 *   **`GET /families/me/invitations`**: Lista las invitaciones activas.
 *   **`DELETE /families/me/invitations/{invitation_id}`**: Revoca una invitación.
 
-## 2. Baúl de Recuerdos (Propuesto)
-Rutas para la gestión del contenido emocional. Aún pendientes de implementación.
+## 2. Baúl de Recuerdos (Implementado)
+Las rutas de recuerdos requieren autenticación y están montadas directamente en `/memories`. Las operaciones autorizan por familia y rol; las respuestas no exponen el texto de una anécdota en errores de validación.
 
-*   **`POST /memories/photo`**: Sube una foto a un bucket privado. Devuelve el ID del recuerdo. Para visualizarla, se debe generar una URL firmada de corta duración.
-*   **`POST /memories/anecdote`**: Guarda una anécdota y dispara la extracción de entidades (si falla la IA, la anécdota se guarda igual).
-*   **`POST /memories/song`**: Guarda un enlace de YouTube/Spotify.
-*   **`GET /memories`**: Lista los recuerdos de la familia autenticada. No debe incluir los `is_sensitive=true` en la galería general.
-*   **`PATCH /memories/{id}`**: Edita el contenido y las marcas de `is_positive` / `is_sensitive`.
-*   **`DELETE /memories/{id}`**: Elimina el recuerdo y su archivo asociado (si corresponde).
+*   **`POST /memories`**: Crea una anécdota (`type=anecdote`, `text`) o canción (`type=song`, `url`). La extracción de entidades de una anécdota se agenda en segundo plano; las entradas inválidas devuelven `422`.
+*   **`GET /memories`**: Lista los recuerdos de la familia autenticada. Oculta los sensibles de forma predeterminada; admite `include_sensitive`, `type`, `limit` y `offset`.
+*   **`GET /memories/{memory_id}`**: Consulta un recuerdo accesible para la familia. Un ID de otra familia se responde como no encontrado.
+*   **`PATCH /memories/{memory_id}`**: Actualiza campos permitidos y marcas `is_positive` / `is_sensitive`. Solo puede editar el autor o la persona cuidadora principal; cambiar el texto reprograma extracción.
+*   **`DELETE /memories/{memory_id}`**: Elimina un recuerdo. Solo puede hacerlo el autor o la persona cuidadora principal; responde `204` sin cuerpo.
 
-## 3. Sesiones y Respuestas (Propuesto)
+Las fotos aún no tienen ruta de carga ni almacenamiento implementado. Las rutas específicas propuestas anteriormente (`/memories/photo`, `/memories/anecdote` y `/memories/song`) no forman parte del contrato actual.
+
+## 3. Sesiones y Respuestas (Propuesto; sin endpoints implementados)
 Módulo de generación de las guías de 15 a 20 minutos.
 
 *   **`POST /sessions/generate`**: Genera una sesión usando reglas y plantillas (sin depender del LLM o recomendador en esta fase). **Regla estricta:** solo usa recuerdos con `is_positive=true` e `is_sensitive=false`.
@@ -37,7 +38,7 @@ Módulo de generación de las guías de 15 a 20 minutos.
 *   **`GET /sessions/{id}`**: Devuelve el contenido detallado de la sesión.
 *   **`POST /sessions/{id}/response`**: Registra cómo reaccionó el adulto mayor (receptivo, emocionado, indiferente, agitado). Cada sesión admite una sola respuesta; si se envía una segunda, debe manejarse sin duplicar.
 
-## 4. Insights y Alertas (Propuesto)
+## 4. Insights y Alertas (Propuesto; sin endpoints implementados)
 Generación de patrones descriptivos a partir de las respuestas.
 
 *   **`GET /insights/dashboard`**: Devuelve datos agregados para los gráficos (sesiones completadas, tendencia). No debe afirmar mejora o deterioro clínico.

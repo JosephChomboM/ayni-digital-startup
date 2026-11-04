@@ -138,7 +138,7 @@ Los jobs de deploy quedan en verde apenas Render **acepta** el pedido; el build 
 
 | Pieza | Servicio |
 |---|---|
-| Base de datos y fotos | **Supabase**: un proyecto para stage y otro para producción |
+| Base de datos | **Supabase**: un proyecto para stage y otro para producción. Storage para fotos está previsto, pero no hay flujo de fotos implementado en el backend actual. |
 | API (FastAPI con Docker) | **Render**: se duerme tras 15 min sin uso y tarda ~1 min en despertar |
 | Frontend (React) | **Render**, sitio estático: no se duerme |
 | Pagos | **Simulados**: Mercado Pago en modo de prueba, sin cobros reales |
@@ -150,7 +150,7 @@ Hasta que termines esta parte, el job **Deploy a stage** sale en rojo porque fal
 1. Crea una cuenta en https://supabase.com y **dos proyectos**: `ayni-stage` y `ayni-prod`. Elige la región **East US (North Virginia)**, que queda cerca de Render. Guarda la contraseña de la base de cada proyecto en un lugar seguro, **nunca en el repo**.
 2. En cada proyecto:
    - **Cadena de conexión:** botón **Connect** → **Session pooler** → copia la URI y reemplaza `[YOUR-PASSWORD]` por la contraseña. Esa es la `DATABASE_URL`. Usa el *Session pooler*, no la *Direct connection* (Render no se conecta por IPv6) ni el *Transaction pooler*.
-   - **Bucket para fotos:** *Storage → New bucket* → nombre `fotos`, **sin** marcar *Public bucket*.
+   - Si se habilitan fotos en una entrega futura, crear el bucket `fotos` como **privado**. La configuración del bucket no implementa por sí sola carga, permisos ni URLs firmadas en la aplicación.
    - **Claves:** en *Project Settings → API*, copia la *Project URL* (`SUPABASE_URL`) y la clave **service_role** (`SUPABASE_SERVICE_ROLE_KEY`). Esa clave da acceso total, así que solo va en Render.
 3. Supabase **pausa los proyectos gratis tras 1 semana sin actividad**. Si stage deja de responder, entra al proyecto y dale **Restore**.
 
@@ -162,16 +162,18 @@ Hasta que termines esta parte, el job **Deploy a stage** sale en rojo porque fal
    - **APIs:** `DATABASE_URL`, `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`. Usa los de `ayni-stage` en `ayni-api-stage` y los de `ayni-prod` en `ayni-api-prod`. `JWT_SECRET` se genera solo.
    - **Webs:** `VITE_API_URL` = `https://ayni-api-stage.onrender.com` o `https://ayni-api-prod.onrender.com`. Si Render le asigna otra URL a la API (la ves arriba en el servicio), corrige esta variable después.
 4. Dale a **Apply**. Render crea los servicios y hace un primer deploy.
-5. Para comprobarlo, abre `https://<url-de-ayni-api-stage>/health/db`. Debe responder `{"status":"ok"}`; la primera vez tarda ~1 minuto.
+5. Comprueba `/health` (verifica que la API responde) y `/health/db` (verifica también una consulta a la base); ambos deben responder `{"status":"ok"}`. El health check configurado en Render es `/health`, por lo que `/health/db` requiere una comprobación aparte.
 
 ### C. Conectar GitHub con Render (deploy hooks)
 
 1. En **cada uno de los 4 servicios** de Render: *Settings → Deploy Hook* → copia la URL. Es secreta: cualquiera que la tenga puede desplegar.
 2. En GitHub: *Settings → Environments*:
-   - `stage` → *Add environment secret*: `RENDER_DEPLOY_HOOK_API` (hook de `ayni-api-stage`) y `RENDER_DEPLOY_HOOK_WEB` (hook de `ayni-web-stage`).
-   - `production` → los **mismos nombres**, con los hooks de `ayni-api-prod` y `ayni-web-prod`.
+   - `stage` → *Add environment secret*: `RENDER_API_STAGE_HOOK` (hook de `ayni-api-stage`) y `RENDER_WEB_STAGE_HOOK` (hook de `ayni-web-stage`).
+   - `production` → `RENDER_API_PROD_HOOK` (hook de `ayni-api-prod`) y `RENDER_WEB_PROD_HOOK` (hook de `ayni-web-prod`).
 3. Para probar: *Actions → CI/CD → la última corrida en main → Re-run all jobs*.
-4. Comparte con el equipo las URLs de `ayni-web-stage` y de `ayni-api-stage` (con `/docs` al final, para ver la API).
+4. Comparte con el equipo las URLs de `ayni-web-stage` y de `ayni-api-stage` (la documentación interactiva de FastAPI está en `/docs`). No incluyas hooks ni credenciales en el mensaje.
+
+El pipeline usa los nombres de secretos que aparecen arriba. Un `curl` exitoso solo confirma que Render aceptó el pedido; confirma en **Events** que el deploy terminó y que el commit esperado está activo antes de probar stage o aprobar producción. Para el diagrama por ambiente y los límites de confianza, consulta [Arquitectura física](../ARQUITECTURA_FISICA.md).
 
 **Más adelante**, cuando se usen, se agregan como variables de los servicios de API en Render (*Environment*):
 - las claves de LLM (`GROQ_API_KEY`);
