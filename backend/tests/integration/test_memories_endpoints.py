@@ -175,6 +175,32 @@ def test_get_list_hides_sensitive_by_default_and_supports_filters(
     assert len(included.json()["items"]) == 1
 
 
+def test_updating_memory_to_sensitive_hides_it_from_default_family_list(
+    client: TestClient,
+    caregiver_account: SimpleNamespace,
+    family_member: SimpleNamespace,
+    anecdote: MemoryResponse,
+) -> None:
+    updated = client.patch(
+        f"/memories/{anecdote.id}",
+        headers=_headers(caregiver_account),
+        json={"is_sensitive": True},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["is_sensitive"] is True
+
+    hidden = client.get("/memories", headers=_headers(family_member))
+    assert hidden.status_code == 200
+    assert hidden.json()["items"] == []
+    assert str(anecdote.id) not in hidden.text
+
+    included = client.get(
+        "/memories", headers=_headers(family_member), params={"include_sensitive": "true"}
+    )
+    assert included.status_code == 200
+    assert [item["id"] for item in included.json()["items"]] == [str(anecdote.id)]
+
+
 def test_get_list_requires_bearer_token(client: TestClient) -> None:
     response = client.get("/memories")
     assert response.status_code == 401
