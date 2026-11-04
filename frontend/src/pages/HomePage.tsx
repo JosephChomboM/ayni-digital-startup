@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import {
-  Sparkles,
+  CalendarDays,
   ArrowRight,
   Heart,
   BookOpen,
@@ -80,7 +80,6 @@ export const HomePage: React.FC<HomePageProps> = ({
       <section className="relative grid gap-8 overflow-hidden rounded-3xl bg-gradient-to-br from-[#2c5f7c] via-[#264653] to-[#e76f51] p-8 sm:p-12 lg:grid-cols-12 lg:items-center text-white shadow-xl">
         <div className="lg:col-span-7 space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a] px-3 py-1 text-xs font-extrabold text-[#264653] shadow-sm">
-            <Sparkles className="size-3.5" />
             <span>Hecho para acompañar en familia • {familyDisplayName}</span>
           </div>
 
@@ -155,7 +154,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#2c5f7c] uppercase">Sesiones de la Semana</span>
-            <Sparkles className="size-4 text-[#e9c46a]" />
+            <CalendarDays className="size-4 text-[#e9c46a]" />
           </div>
           <p className="text-3xl font-extrabold text-[#264653]">0</p>
           <p className="text-xs text-gray-500">Sesiones registradas en la red familiar</p>
@@ -216,6 +215,22 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
+      <section className="space-y-5">
+        <div><p className="text-sm font-semibold text-[#e76f51]">Recuerdos que nos acercan</p><h2 className="mt-1 text-2xl font-bold text-[#2c5f7c]">Ideas para compartir en familia</h2></div>
+        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { title: "Suben sus recuerdos", description: "Fotos, anécdotas y canciones para reunir las historias de la familia.", image: "/images/recuerdos.jpg", action: onViewMemories, label: "Ir a recuerdos" },
+            { title: "Guía de 15 minutos", description: "Una conversación breve, con preguntas sencillas y sin apuro.", image: "/images/guia-sesion.jpg", action: onStartSession, label: "Abrir guía" },
+            { title: "Registro de emociones", description: "Al final de la guía pueden conversar sobre cómo se sintió este momento.", image: "/images/emociones.jpg", action: onStartSession, label: "Ver la guía" },
+          ].map((item) => <button key={item.title} onClick={item.action} className="group text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c5f7c]">
+            <img src={item.image} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-2xl object-cover transition group-hover:brightness-95" />
+            <h3 className="mt-3 text-lg font-semibold text-[#264653]">{item.title}</h3>
+            <p className="mt-1 text-sm leading-relaxed text-gray-600">{item.description}</p>
+            <span className="mt-2 inline-flex text-sm font-semibold text-[#2c5f7c]">{item.label} <ArrowRight aria-hidden="true" className="ml-1 size-4" /></span>
+          </button>)}
+        </div>
+      </section>
+
       {/* 5. IMPACTO SOCIAL & OBJETIVOS DE DESARROLLO SOSTENIBLE (ODS 3 & ODS 10) CON BANDERAS INSTITUCIONALES */}
       <section className="rounded-2xl bg-white p-6 sm:p-8 border border-gray-200 shadow-sm space-y-6">
         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
@@ -229,13 +244,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* TARJETA ODS 3 */}
           <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#4C9F38]/30 flex flex-col sm:flex-row items-start gap-4 hover:shadow-md transition-all">
-            <div className="size-20 bg-[#4C9F38] text-white rounded-xl shrink-0 p-2 flex flex-col justify-between shadow-sm border border-[#4C9F38]">
-              <span className="text-[10px] font-black uppercase tracking-wider">ODS 3</span>
-              <div className="space-y-0.5">
-                <p className="text-xs font-black leading-none">SALUD</p>
-                <p className="text-[9px] font-semibold leading-none opacity-90">& BIENESTAR</p>
-              </div>
-            </div>
+            <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38]"><img src="/images/ods-3.jpg" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1 text-center text-[10px] font-bold text-white">ODS 3</span></div>
             <div className="space-y-1.5 flex-1">
               <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
                 Salud y Bienestar
@@ -248,13 +257,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {/* TARJETA ODS 10 */}
           <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#DD1367]/30 flex flex-col sm:flex-row items-start gap-4 hover:shadow-md transition-all">
-            <div className="size-20 bg-[#DD1367] text-white rounded-xl shrink-0 p-2 flex flex-col justify-between shadow-sm border border-[#DD1367]">
-              <span className="text-[10px] font-black uppercase tracking-wider">ODS 10</span>
-              <div className="space-y-0.5">
-                <p className="text-xs font-black leading-none">REDUCCIÓN DE</p>
-                <p className="text-[9px] font-semibold leading-none opacity-90">DESIGUALDADES</p>
-              </div>
-            </div>
+            <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-[#DD1367]"><img src="/images/ods-10.jpg" alt="ODS 10: Reducción de las desigualdades" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#DD1367]/90 p-1 text-center text-[10px] font-bold text-white">ODS 10</span></div>
             <div className="space-y-1.5 flex-1">
               <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
                 Reducción de las Desigualdades

@@ -1,5 +1,5 @@
 ﻿import React, { useState } from "react";
-import { Heart, ArrowLeft, Mail, Lock, User, ShieldCheck, Sparkles, Loader2 } from "lucide-react";
+import { Heart, ArrowLeft, Mail, Lock, User, ShieldCheck, Sparkles, Loader2, Phone } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
@@ -24,6 +24,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [registrationMode, setRegistrationMode] = useState<"family" | "invitation">("family");
   const [invitationToken, setInvitationToken] = useState("");
@@ -109,7 +110,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#f1faee] flex flex-col justify-between p-4 sm:p-8 text-[#264653]">
+    <div className="min-h-screen bg-white flex flex-col justify-between p-4 sm:p-8 text-[#264653]">
       <div className="mx-auto max-w-5xl w-full flex items-center justify-between pb-6">
         <button
           onClick={onBack}
@@ -126,8 +127,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </div>
 
-      <div className="mx-auto max-w-md w-full bg-white rounded-3xl border border-gray-200 shadow-xl p-6 sm:p-8 space-y-6">
-        <div className="flex rounded-xl bg-[#f1faee] p-1 border border-gray-200">
+      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-[0_12px_40px_rgba(38,70,83,0.08)] p-6 sm:p-8 space-y-6">
+        <div className="flex rounded-lg bg-gray-50 p-1 border border-gray-200">
           <button
             type="button"
             onClick={() => { reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
@@ -186,6 +187,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ej. Maria Martinez"
+                    className="pl-9 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="auth-phone" className="text-xs font-bold text-[#264653]">Teléfono <span className="font-normal text-gray-500">(opcional)</span></label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 size-4 text-gray-400" />
+                  <Input
+                    id="auth-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={20}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+51 987 654 321"
                     className="pl-9 text-xs"
                   />
                 </div>
@@ -288,7 +307,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <Button
             type="submit"
             disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented))}
-            className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-xl shadow-md transition-all mt-2"
+            className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-sm transition-all mt-2"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
