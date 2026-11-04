@@ -1,5 +1,5 @@
 ﻿import React, { useState } from "react";
-import { Heart, ArrowLeft, Mail, Lock, User, ShieldCheck, Sparkles, Loader2, Phone } from "lucide-react";
+import { Heart, ArrowLeft, Mail, Lock, Users, ShieldCheck, Loader2, Phone, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
@@ -23,8 +23,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [registrationMode, setRegistrationMode] = useState<"family" | "invitation">("family");
   const [invitationToken, setInvitationToken] = useState("");
@@ -33,11 +37,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [consentError, setConsentError] = useState<string | null>(null);
   const [consentAttempt, setConsentAttempt] = useState(0);
   const [hasConsented, setHasConsented] = useState(false);
+  const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const reloadConsent = () => {
     setConsent(null);
     setHasConsented(false);
+    setHasAcceptedPrivacy(false);
     setConsentLoading(true);
     setConsentError(null);
     setConsentAttempt((attempt) => attempt + 1);
@@ -66,12 +72,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       return;
     }
     if (mode === "register") {
-      if (!name.trim() || (registrationMode === "family" ? !familyName.trim() : !invitationToken.trim())) {
-        setError("Completa tu nombre y el nombre de tu familia o el código de invitación.");
+      if (!firstName.trim() || !lastName.trim() || !phone.trim() || !city.trim() || !district.trim() ||
+        (registrationMode === "family" ? !familyName.trim() : !invitationToken.trim())) {
+        setError("Completa todos los campos obligatorios para crear tu cuenta.");
         return;
       }
-      if (!consent || consentLoading || !hasConsented) {
-        setError("Lee y acepta el consentimiento para continuar.");
+      if (!consent || consentLoading || !hasConsented || !hasAcceptedPrivacy) {
+        setError("Lee y acepta el consentimiento y el tratamiento de datos personales para continuar.");
         return;
       }
     }
@@ -80,7 +87,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     try {
       if (mode === "register" && consent) {
         const data: RegisterPayload = {
-          email, password, name: name.trim(),
+          email, password, name: `${firstName.trim()} ${lastName.trim()}`,
           consent: { accepted: true, text_version: consent.text_version },
           ...(registrationMode === "family"
             ? { family_name: familyName.trim() }
@@ -127,7 +134,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </div>
 
-      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-[0_12px_40px_rgba(38,70,83,0.08)] p-6 sm:p-8 space-y-6">
+      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-[0_12px_40px_rgba(38,70,83,0.08)] p-5 sm:p-8 space-y-6">
         <div className="flex rounded-lg bg-gray-50 p-1 border border-gray-200">
           <button
             type="button"
@@ -139,7 +146,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 : "text-gray-500 hover:text-[#264653]"
             }`}
           >
-            Registro del Cuidador
+                Crear cuenta
           </button>
           <button
             type="button"
@@ -176,29 +183,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "register" && (
             <>
-              <div className="space-y-1">
-                <label htmlFor="auth-name" className="text-xs font-bold text-[#264653]">Tu Nombre Completo</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 size-4 text-gray-400" />
-                  <Input
-                    id="auth-name"
-                    required
-                    maxLength={100}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej. Maria Martinez"
-                    className="pl-9 text-xs"
-                  />
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1"><label htmlFor="auth-first-name" className="text-xs font-bold text-[#264653]">Nombre</label><Input id="auth-first-name" required autoComplete="given-name" maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej. María" className="text-sm" /></div>
+                <div className="space-y-1"><label htmlFor="auth-last-name" className="text-xs font-bold text-[#264653]">Apellido</label><Input id="auth-last-name" required autoComplete="family-name" maxLength={60} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ej. Martínez" className="text-sm" /></div>
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="auth-phone" className="text-xs font-bold text-[#264653]">Teléfono <span className="font-normal text-gray-500">(opcional)</span></label>
+                <label htmlFor="auth-phone" className="text-xs font-bold text-[#264653]">Teléfono</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
                     id="auth-phone"
                     type="tel"
+                    required
                     inputMode="tel"
                     autoComplete="tel"
                     maxLength={20}
@@ -210,25 +207,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </div>
               </div>
 
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1"><label htmlFor="auth-city" className="text-xs font-bold text-[#264653]">Ciudad</label><Input id="auth-city" required autoComplete="address-level2" maxLength={80} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Lima" className="text-sm"/></div>
+                <div className="space-y-1"><label htmlFor="auth-district" className="text-xs font-bold text-[#264653]">Distrito</label><Input id="auth-district" required autoComplete="address-level3" maxLength={80} value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Ej. Surco" className="text-sm"/></div>
+              </div>
+
               <div className="space-y-1">
-                <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#264653]">Forma de registro</label>
+                <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#264653]">Selecciona tu rol</label>
                 <select
                   id="auth-registration-mode"
                   value={registrationMode}
                   onChange={(e) => setRegistrationMode(e.target.value as "family" | "invitation")}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-xs"
                 >
-                  <option value="family">Crear un grupo familiar</option>
-                  <option value="invitation">Usar una invitación</option>
+                  <option value="family">Cuidador principal (hijo/a, cónyuge)</option>
+                  <option value="invitation">Familiar colaborador (nieto/a, hermano/a)</option>
                 </select>
               </div>
 
               <div className="space-y-1">
                 <label htmlFor="auth-family" className="text-xs font-bold text-[#264653]">
-                  {registrationMode === "family" ? "Nombre del Grupo Familiar" : "Código de invitación"}
+                  {registrationMode === "family" ? "Nombre del grupo familiar" : "Código de invitación"}
                 </label>
                 <div className="relative">
-                  <Sparkles className="absolute left-3 top-3 size-4 text-gray-400" />
+                  <Users className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
                     id="auth-family"
                     required
@@ -236,7 +238,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     value={registrationMode === "family" ? familyName : invitationToken}
                     onChange={(e) => registrationMode === "family"
                       ? setFamilyName(e.target.value) : setInvitationToken(e.target.value)}
-                    placeholder={registrationMode === "family" ? "Ej. Familia Martinez" : "Pega tu código de invitación"}
+                    placeholder={registrationMode === "family" ? "Ej. Familia Martínez" : "Pega el código que te compartieron"}
                     className="pl-9 text-xs"
                   />
                 </div>
@@ -266,7 +268,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <Lock className="absolute left-3 top-3 size-4 text-gray-400" />
               <Input
                 id="auth-password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 minLength={10}
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
@@ -274,8 +276,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="pl-9 text-xs"
+                className="pl-9 pr-11 text-sm"
               />
+              <button type="button" onClick={() => setShowPassword((show) => !show)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#2c5f7c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2c5f7c]">
+                {showPassword ? <EyeOff className="size-4"/> : <Eye className="size-4"/>}
+              </button>
             </div>
             <p id="auth-password-help" className="text-xs text-gray-500">Usa al menos 10 caracteres.</p>
           </div>
@@ -299,6 +304,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <input type="checkbox" checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} required />
                     <span>Acepto el consentimiento mostrado (versión {consent.text_version}).</span>
                   </label>
+                  <label className="flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-[#264653]">
+                    <input type="checkbox" checked={hasAcceptedPrivacy} onChange={(e) => setHasAcceptedPrivacy(e.target.checked)} required className="mt-0.5 accent-[#2c5f7c]" />
+                    <span>Acepto el tratamiento de mis datos personales conforme a la Ley N.° 29733. Entiendo que Ayni Digital no es una herramienta médica ni emite diagnósticos clínicos.</span>
+                  </label>
                 </>
               )}
             </div>
@@ -306,7 +315,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           <Button
             type="submit"
-            disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented))}
+            disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented || !hasAcceptedPrivacy))}
             className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-sm transition-all mt-2"
           >
             {loading ? (
@@ -314,14 +323,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <Loader2 className="size-4 animate-spin" /> Procesando...
               </span>
             ) : mode === "register" ? (
-              "Crear Cuenta de Cuidador"
+              "Crear cuenta"
             ) : (
               "Ingresar a Ayni Digital"
             )}
           </Button>
         </form>
 
-        <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+        <div className="pt-2 border-t border-gray-100 flex flex-col gap-3">
+          <button type="button" disabled title="El acceso con Google requiere configuración del backend" className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>Continuar con Google · Próximamente</button>
+          <p className="text-center text-xs text-gray-500">El acceso con Google todavía necesita integración del equipo backend.</p>
           <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
             <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
             <span>Tus datos y archivos familiares están protegidos de forma privada.</span>
