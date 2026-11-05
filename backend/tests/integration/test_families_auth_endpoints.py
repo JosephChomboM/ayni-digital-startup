@@ -98,6 +98,22 @@ def test_register_requires_consent_and_returns_uniform_validation_error(
     assert str(registration_payload["password"]) not in response.text
 
 
+def test_register_does_not_echo_unknown_invitation_token(
+    client: TestClient,
+    registration_payload: dict[str, object],
+) -> None:
+    token = secrets.token_urlsafe(32)
+    registration_payload.pop("family_name")
+    registration_payload["invitation_token"] = token
+
+    response = client.post("/auth/register", json=registration_payload)
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "invitation_not_found"
+    assert token not in response.text
+    assert str(registration_payload["password"]) not in response.text
+
+
 def test_login_returns_valid_token_and_expiration(
     client: TestClient,
     caregiver_account: SimpleNamespace,

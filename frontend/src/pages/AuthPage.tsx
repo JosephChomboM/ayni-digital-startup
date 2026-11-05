@@ -134,7 +134,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </div>
 
-      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-[0_12px_40px_rgba(38,70,83,0.08)] p-5 sm:p-8 space-y-6">
+      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-[0_12px_40px_rgba(38,70,83,0.08)] p-6 sm:p-8 space-y-6">
         <div className="flex rounded-lg bg-gray-50 p-1 border border-gray-200">
           <button
             type="button"

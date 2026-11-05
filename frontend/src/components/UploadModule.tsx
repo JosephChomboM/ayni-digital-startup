@@ -245,17 +245,20 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [searchText, setSearchText] = useState("")
+  const [query, setQuery] = useState("")
 
   useEffect(() => {
     let active = true
-    Promise.all([listMemories({ include_sensitive: includeSensitive, limit: 20, offset: page * 20 }), getMe()])
+    setLoading(true); setItems([]); setError(null)
+    Promise.all([listMemories({ q: query || undefined, include_sensitive: includeSensitive, limit: 20, offset: page * 20 }), getMe()])
       .then(([data, account]) => {
         if (!active) return
         setItems(data.items); setTotal(data.total); setUser(account.user); setError(null)
       }).catch((err: unknown) => { if (active) setError(memoryErrorMessage(err)) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [revision, includeSensitive, page, attempt])
+  }, [revision, includeSensitive, page, attempt, query])
   return (
     <Card className="border border-gray-200 bg-white shadow-sm rounded-2xl">
       <CardHeader>
@@ -267,6 +270,19 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <form className="flex flex-col gap-2" onSubmit={(event) => {
+          event.preventDefault(); setPage(0); setQuery(searchText.trim())
+        }}>
+          <label htmlFor="memory-search" className="text-xs font-bold text-[#264653]">Buscar recuerdos</label>
+          <Input id="memory-search" maxLength={100} value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Título, palabras, personas o lugares" />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" variant="outline">Buscar</Button>
+            <Button type="button" size="sm" variant="outline" disabled={!searchText && !query}
+              onClick={() => { setSearchText(""); setQuery(""); setPage(0) }}>Limpiar búsqueda</Button>
+          </div>
+        </form>
         <label className="flex items-center gap-2 text-xs text-[#264653]">
           <input type="checkbox" checked={includeSensitive} onChange={(e) => { setIncludeSensitive(e.target.checked); setPage(0); setLoading(true) }} />
           Mostrar temas delicados
@@ -276,8 +292,8 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
           <p>{error}</p>
           <button className="underline" onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>Volver a intentar</button>
         </div>}
-        {!loading && !error && items.length === 0 && <p className="text-xs text-gray-500">Todavía no hay recuerdos para mostrar.</p>}
-        {!error && items.map((memory) => (
+        {!loading && !error && items.length === 0 && <p className="text-xs text-gray-500">{query ? "No encontramos recuerdos con esa búsqueda." : "Todavía no hay recuerdos para mostrar."}</p>}
+        {!loading && !error && items.map((memory) => (
           <div key={memory.id} className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
             <p className="text-xs font-bold text-[#264653]">{memory.title}</p>
             {memory.type === "anecdote"

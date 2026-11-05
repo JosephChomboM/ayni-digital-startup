@@ -37,6 +37,17 @@ def test_non_agitated_reaction_breaks_the_streak() -> None:
     assert evaluate(["agitado", "indiferente", "agitado", "agitado"]).should_pause is False
 
 
+def test_evaluation_does_not_mutate_the_callers_history() -> None:
+    reactions = ["agitado", "receptivo", "agitado", "receptivo", "agitado"]
+    original = reactions.copy()
+
+    alert = evaluate(reactions)
+
+    assert reactions == original
+    assert alert.negative_count == 3
+    assert alert.should_pause is True
+
+
 @pytest.mark.parametrize("count,expected", [(2, False), (3, True)])
 def test_default_ratio_with_five_sessions(count: int, expected: bool) -> None:
     # Agitated reactions are separated to isolate the ratio rule.

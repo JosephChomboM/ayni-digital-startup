@@ -9,8 +9,18 @@ from app.modules.insights.schemas import (
     PauseReason,
     Reaction,
 )
+from app.modules.insights.summary import ReactionRecord, ReactionSummary, summarize_reactions
 
-__all__ = ["NegativeReaction", "PauseAlert", "PauseReason", "Reaction", "evaluate_pause_alert"]
+__all__ = [
+    "NegativeReaction",
+    "PauseAlert",
+    "PauseReason",
+    "Reaction",
+    "evaluate_pause_alert",
+    "ReactionRecord",
+    "ReactionSummary",
+    "summarize_reactions",
+]
 
 DEFAULT_NEGATIVE_REACTIONS: frozenset[NegativeReaction] = frozenset({"agitado"})
 

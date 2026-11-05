@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApplicationError
 from app.modules.families.service import FamiliesService
-from app.modules.memories.models import Memory, MemoryType
+from app.modules.memories.models import EntitiesStatus, Memory, MemoryType
 from app.modules.memories.repository import MemoriesRepository
 from app.modules.memories.schemas import (
     AnecdoteCreateRequest,
@@ -77,6 +77,7 @@ class MemoriesService:
         profile_id, _ = self._context(actor_id)
         filters = {
             "elder_profile_id": profile_id,
+            "q": query.q,
             "type": query.type,
             "include_sensitive": query.include_sensitive,
         }
@@ -123,3 +124,23 @@ class MemoriesService:
             memory = self._require_memory(memory_id, profile_id, for_update=True)
             self._require_editor(memory, actor_id, is_caregiver)
             self.repository.delete_memory(memory_id, elder_profile_id=profile_id)
+
+    def retry_entities(self, actor_id: UUID, memory_id: UUID) -> MemoryResponse:
+        profile_id, is_caregiver = self._context(actor_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id, for_update=True)
+            self._require_editor(memory, actor_id, is_caregiver)
+            if memory.type != MemoryType.ANECDOTE:
+                raise MemoriesError(
+                    code="validation_error",
+                    status_code=422,
+                    message="Solo puedes volver a analizar una anécdota.",
+                )
+            if memory.entities_status != EntitiesStatus.FAILED:
+                raise MemoriesError(
+                    code="extraction_not_failed",
+                    status_code=409,
+                    message="Solo puedes reintentar un análisis que haya fallado.",
+                )
+            retried = self.repository.retry_failed_entities(memory_id, elder_profile_id=profile_id)
+            return MemoryResponse.model_validate(retried)

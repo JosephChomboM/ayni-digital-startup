@@ -84,6 +84,28 @@ def test_database_rejects_content_that_does_not_match_type(
         session.flush()
 
 
+@pytest.mark.parametrize("entity_text", ["", "   ", "x" * 5001])
+def test_database_rejects_blank_or_oversized_entity_text(
+    session: Session,
+    caregiver_account: SimpleNamespace,
+    memory_profile_id: UUID,
+    entity_text: str,
+) -> None:
+    session.add(
+        Memory(
+            elder_profile_id=memory_profile_id,
+            created_by=caregiver_account.user_id,
+            type=MemoryType.ANECDOTE,
+            title="Paseo",
+            text="Paseamos por Lima.",
+            entities=[MemoryEntity(kind="place", text=entity_text)],
+        )
+    )
+
+    with pytest.raises(IntegrityError, match="ck_memory_entities_text"):
+        session.flush()
+
+
 def test_deleting_memory_removes_its_entities(
     session: Session, caregiver_account: SimpleNamespace, memory_profile_id: UUID
 ) -> None:

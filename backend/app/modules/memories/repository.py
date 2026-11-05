@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -66,13 +66,24 @@ class MemoriesRepository:
 
     @staticmethod
     def _filters(
-        elder_profile_id: UUID, type: MemoryType | None, include_sensitive: bool
+        elder_profile_id: UUID,
+        type: MemoryType | None,
+        include_sensitive: bool,
+        q: str | None = None,
     ) -> list[ColumnElement[bool]]:
         filters = [Memory.elder_profile_id == elder_profile_id]
         if type is not None:
             filters.append(Memory.type == type)
         if not include_sensitive:
             filters.append(Memory.is_sensitive.is_(False))
+        if q is not None:
+            filters.append(
+                or_(
+                    Memory.title.icontains(q, autoescape=True),
+                    Memory.text.icontains(q, autoescape=True),
+                    Memory.entities.any(MemoryEntity.text.icontains(q, autoescape=True)),
+                )
+            )
         return filters
 
     def list_memories(
@@ -81,13 +92,14 @@ class MemoriesRepository:
         elder_profile_id: UUID,
         type: MemoryType | None = None,
         include_sensitive: bool = False,
+        q: str | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[Memory]:
         return list(
             self.session.scalars(
                 select(Memory)
-                .where(*self._filters(elder_profile_id, type, include_sensitive))
+                .where(*self._filters(elder_profile_id, type, include_sensitive, q))
                 .options(selectinload(Memory.entities))
                 .order_by(Memory.created_at.desc(), Memory.id.desc())
                 .limit(limit)
@@ -101,12 +113,13 @@ class MemoriesRepository:
         elder_profile_id: UUID,
         type: MemoryType | None = None,
         include_sensitive: bool = False,
+        q: str | None = None,
     ) -> int:
         return (
             self.session.scalar(
                 select(func.count())
                 .select_from(Memory)
-                .where(*self._filters(elder_profile_id, type, include_sensitive))
+                .where(*self._filters(elder_profile_id, type, include_sensitive, q))
             )
             or 0
         )
@@ -148,6 +161,21 @@ class MemoriesRepository:
             or memory.entities_status != EntitiesStatus.PENDING
         ):
             return None
+        return memory
+
+    def retry_failed_entities(self, memory_id: UUID, *, elder_profile_id: UUID) -> Memory | None:
+        memory = self.get_memory(memory_id, elder_profile_id=elder_profile_id, for_update=True)
+        if (
+            memory is None
+            or memory.type != MemoryType.ANECDOTE
+            or memory.entities_status != EntitiesStatus.FAILED
+        ):
+            return None
+        # Fence off late results from the previous attempt, even when text is unchanged.
+        memory.content_version += 1
+        memory.entities.clear()
+        memory.entities_status = EntitiesStatus.PENDING
+        self.session.flush()
         return memory
 
     def replace_entities(
