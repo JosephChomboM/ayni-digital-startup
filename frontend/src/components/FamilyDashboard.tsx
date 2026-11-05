@@ -13,7 +13,7 @@ export function FamilyDashboard() {
             Acompañar también es recordar
           </h2>
         </div>
-        <span className="self-start sm:self-auto rounded-full bg-white border border-gray-200 px-3 py-1 text-[11px] font-bold text-gray-500 shadow-sm">
+        <span className="self-start sm:self-auto rounded-full bg-white border border-gray-200 px-3 py-1 text-[11px] font-bold text-gray-500 shadow-xs">
           Actualizado hoy
         </span>
       </div>
@@ -21,7 +21,7 @@ export function FamilyDashboard() {
       {/* 3 TARJETAS SUPERIORES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* TARJETA 1: SESIONES REALIZADAS */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3 relative overflow-hidden">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="p-2.5 rounded-xl bg-[#2c5f7c]/10 text-[#2c5f7c]">
               <Calendar className="size-5" />
@@ -36,7 +36,7 @@ export function FamilyDashboard() {
         </div>
 
         {/* TARJETA 2: ÚLTIMA SESIÓN */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3 relative overflow-hidden">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="p-2.5 rounded-xl bg-[#e9c46a]/30 text-[#264653]">
               <Clock className="size-5" />
@@ -51,7 +51,7 @@ export function FamilyDashboard() {
         </div>
 
         {/* TARJETA 3: CONTENIDO SUBIDO */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3 relative overflow-hidden">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="p-2.5 rounded-xl bg-[#e76f51]/10 text-[#e76f51]">
               <BookOpen className="size-5" />
@@ -67,7 +67,7 @@ export function FamilyDashboard() {
       </div>
 
       {/* SECCIÓN GRÁFICA: RESPUESTAS POSITIVAS POR SEMANA */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-[#2c5f7c]">

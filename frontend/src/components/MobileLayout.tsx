@@ -14,13 +14,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   title = "Ayni Digital",
 }) => {
   return (
-    <div className="min-h-screen bg-[#F4FBF7] text-[#1F2937] flex flex-col justify-between max-w-md mx-auto shadow-lg border-x border-[#0D7A5F]/10">
-      <header className="bg-[#0D7A5F] text-white p-4 sticky top-0 z-10 shadow-sm flex items-center justify-between">
+    <div className="min-h-screen bg-ayni-lightBg text-[#1F2937] flex flex-col justify-between max-w-md mx-auto shadow-lg border-x border-ayni-green/10">
+      <header className="bg-ayni-green text-white p-4 sticky top-0 z-10 shadow-xs flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-wide">{title}</h1>
-          <p className="text-xs text-[#E8F5E9] opacity-90">Recuerdos en familia</p>
+          <p className="text-xs text-ayni-softGreen opacity-90">Recuerdos en familia</p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-[#E8F5E9] text-[#0D7A5F] flex items-center justify-center font-bold text-sm">
+        <div className="w-8 h-8 rounded-full bg-ayni-softGreen text-ayni-green flex items-center justify-center font-bold text-sm">
           A
         </div>
       </header>
@@ -33,7 +33,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <button
           onClick={() => onTabChange?.("home")}
           className={`flex flex-col items-center py-1 px-3 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === "home" ? "text-[#0D7A5F] font-bold" : "text-gray-500 hover:text-[#0D7A5F]"
+            activeTab === "home" ? "text-ayni-green font-bold" : "text-gray-500 hover:text-ayni-green"
           }`}
         >
           <span className="text-lg">Inicio</span>
@@ -42,7 +42,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <button
           onClick={() => onTabChange?.("memories")}
           className={`flex flex-col items-center py-1 px-3 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === "memories" ? "text-[#0D7A5F] font-bold" : "text-gray-500 hover:text-[#0D7A5F]"
+            activeTab === "memories" ? "text-ayni-green font-bold" : "text-gray-500 hover:text-ayni-green"
           }`}
         >
           <span className="text-lg">Recuerdos</span>
@@ -51,7 +51,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <button
           onClick={() => onTabChange?.("session")}
           className={`flex flex-col items-center py-1 px-3 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === "session" ? "text-[#0D7A5F] font-bold" : "text-gray-500 hover:text-[#0D7A5F]"
+            activeTab === "session" ? "text-ayni-green font-bold" : "text-gray-500 hover:text-ayni-green"
           }`}
         >
           <span className="text-lg">Sesion</span>
@@ -60,7 +60,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <button
           onClick={() => onTabChange?.("profile")}
           className={`flex flex-col items-center py-1 px-3 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === "profile" ? "text-[#0D7A5F] font-bold" : "text-gray-500 hover:text-[#0D7A5F]"
+            activeTab === "profile" ? "text-ayni-green font-bold" : "text-gray-500 hover:text-ayni-green"
           }`}
         >
           <span className="text-lg">Perfil</span>

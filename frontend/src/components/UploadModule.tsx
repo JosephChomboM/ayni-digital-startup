@@ -106,11 +106,11 @@ export function UploadModule() {
 
   return (
     <div className="space-y-5">
-    <Card className="border border-gray-200 bg-white shadow-sm rounded-2xl">
+    <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-sm shrink-0">
+            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-xs shrink-0">
               <Heart className="size-5 fill-current text-[#e76f51]" />
               <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[#e9c46a]" />
             </div>
@@ -131,7 +131,7 @@ export function UploadModule() {
 
       <CardContent className="flex flex-col gap-5">
         <div aria-disabled="true" className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#2c5f7c]/30 bg-[#f1faee] px-5 py-7 text-center">
-          <div className="mb-3 rounded-full bg-white p-3 text-[#2c5f7c] shadow-sm">
+          <div className="mb-3 rounded-full bg-white p-3 text-[#2c5f7c] shadow-xs">
             <Upload className="size-5" />
           </div>
           <p className="font-bold text-xs text-[#264653]">Fotos familiares</p>
@@ -260,7 +260,7 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
     return () => { active = false }
   }, [revision, includeSensitive, page, attempt, query])
   return (
-    <Card className="border border-gray-200 bg-white shadow-sm rounded-2xl">
+    <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader>
         <CardTitle className="text-base font-bold text-[#2c5f7c]">
           Contribuciones familiares
@@ -297,7 +297,7 @@ export function Contributions({ revision = 0, busy = false, onEdit, onDelete }: 
           <div key={memory.id} className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
             <p className="text-xs font-bold text-[#264653]">{memory.title}</p>
             {memory.type === "anecdote"
-              ? <p className="text-[11px] text-gray-500 whitespace-pre-wrap break-words">{memory.text}</p>
+              ? <p className="text-[11px] text-gray-500 whitespace-pre-wrap wrap-break-word">{memory.text}</p>
               : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2c5f7c] underline">Abrir canción</a>}
             <div className="flex gap-2">
               {memory.is_positive && <Badge variant="outline">Recuerdo bonito</Badge>}

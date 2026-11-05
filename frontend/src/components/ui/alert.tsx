@@ -6,13 +6,13 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-xl border p-4 text-left text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current",
+  "group/alert relative grid w-full gap-0.5 rounded-xl border p-4 text-left text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 [svg]:*:row-span-2 [svg]:*:translate-y-0.5 [svg]:*:text-current",
   {
     variants: {
       variant: {
         default: "bg-card text-card-foreground border-border",
         destructive:
-          "bg-red-50 text-red-900 border-red-200 *:data-[slot=alert-description]:text-red-800 *:[svg]:text-red-600",
+          "bg-red-50 text-red-900 border-red-200 data-[slot=alert-description]:*:text-red-800 [svg]:*:text-red-600",
       },
     },
     defaultVariants: {

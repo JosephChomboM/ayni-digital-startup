@@ -77,9 +77,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="space-y-12">
       {/* 1. HERO SECTION PRINCIPAL */}
-      <section className="relative grid gap-8 overflow-hidden rounded-3xl bg-gradient-to-br from-[#2c5f7c] via-[#264653] to-[#e76f51] p-8 sm:p-12 lg:grid-cols-12 lg:items-center text-white shadow-xl">
+      <section className="relative grid gap-8 overflow-hidden rounded-3xl bg-linear-to-br from-[#2c5f7c] via-[#264653] to-[#e76f51] p-8 sm:p-12 lg:grid-cols-12 lg:items-center text-white shadow-xl">
         <div className="lg:col-span-7 space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a] px-3 py-1 text-xs font-extrabold text-[#264653] shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a] px-3 py-1 text-xs font-extrabold text-[#264653] shadow-xs">
             <span>Hecho para acompañar en familia • {familyDisplayName}</span>
           </div>
 
@@ -151,7 +151,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 3. METRICAS */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#2c5f7c] uppercase">Sesiones de la Semana</span>
             <CalendarDays className="size-4 text-[#e9c46a]" />
@@ -160,7 +160,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <p className="text-xs text-gray-500">Sesiones registradas en la red familiar</p>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#2c5f7c] uppercase">Recuerdos Disponibles</span>
             <BookOpen className="size-4 text-[#e76f51]" />
@@ -171,7 +171,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <p className="text-xs text-gray-500">Fotos, anécdotas y canciones subidas</p>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#2c5f7c] uppercase">Red Familiar</span>
             <Users className="size-4 text-[#2c5f7c]" />
@@ -201,7 +201,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <button
               key={session}
               onClick={onStartSession}
-              className="group rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#2c5f7c]/40 hover:shadow-md space-y-3"
+              className="group rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-xs transition hover:-translate-y-0.5 hover:border-[#2c5f7c]/40 hover:shadow-md space-y-3"
             >
               <div className="flex size-9 items-center justify-center rounded-xl bg-[#e9c46a]/30 text-[#264653] font-bold text-xs">
                 0{index + 1}
@@ -222,8 +222,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             { title: "Suben sus recuerdos", description: "Fotos, anécdotas y canciones para reunir las historias de la familia.", image: "/images/recuerdos.jpg", action: onViewMemories, label: "Ir a recuerdos" },
             { title: "Guía de 15 minutos", description: "Una conversación breve, con preguntas sencillas y sin apuro.", image: "/images/guia-sesion.jpg", action: onStartSession, label: "Abrir guía" },
             { title: "Registro de emociones", description: "Al final de la guía pueden conversar sobre cómo se sintió este momento.", image: "/images/emociones.jpg", action: onStartSession, label: "Ver la guía" },
-          ].map((item) => <button key={item.title} onClick={item.action} className="group text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c5f7c]">
-            <img src={item.image} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-2xl object-cover transition group-hover:brightness-95" />
+          ].map((item) => <button key={item.title} onClick={item.action} className="group text-left focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c5f7c]">
+            <img src={item.image} alt="" loading="lazy" className="aspect-4/3 w-full rounded-2xl object-cover transition group-hover:brightness-95" />
             <h3 className="mt-3 text-lg font-semibold text-[#264653]">{item.title}</h3>
             <p className="mt-1 text-sm leading-relaxed text-gray-600">{item.description}</p>
             <span className="mt-2 inline-flex text-sm font-semibold text-[#2c5f7c]">{item.label} <ArrowRight aria-hidden="true" className="ml-1 size-4" /></span>
@@ -232,7 +232,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* 5. IMPACTO SOCIAL & OBJETIVOS DE DESARROLLO SOSTENIBLE (ODS 3 & ODS 10) CON BANDERAS INSTITUCIONALES */}
-      <section className="rounded-2xl bg-white p-6 sm:p-8 border border-gray-200 shadow-sm space-y-6">
+      <section className="rounded-2xl bg-white p-6 sm:p-8 border border-gray-200 shadow-xs space-y-6">
         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
           <span className="text-2xl">🌍</span>
           <div>

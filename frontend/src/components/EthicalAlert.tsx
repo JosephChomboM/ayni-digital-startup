@@ -8,7 +8,7 @@ export function EthicalAlert() {
 
   return (
     <>
-      <Alert className="border-[#e76f51]/30 bg-[#e76f51]/10 text-[#264653] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+      <Alert className="border-[#e76f51]/30 bg-[#e76f51]/10 text-[#264653] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 rounded-xl bg-[#e76f51]/20 text-[#e76f51] shrink-0 mt-0.5 sm:mt-0">
             <AlertTriangle className="size-5" />
@@ -34,7 +34,7 @@ export function EthicalAlert() {
       </Alert>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-gray-200 relative">
             <button
               onClick={() => setShowModal(false)}
@@ -98,7 +98,7 @@ export function EthicalAlert() {
 
 export function SafetyNote() {
   return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-[#2c5f7c]/20 bg-[#2c5f7c]/5 px-5 py-3.5 text-xs text-[#2c5f7c] shadow-sm">
+    <div className="flex items-center gap-3.5 rounded-2xl border border-[#2c5f7c]/20 bg-[#2c5f7c]/5 px-5 py-3.5 text-xs text-[#2c5f7c] shadow-xs">
       <div className="p-1.5 rounded-lg bg-[#2c5f7c]/10 text-[#2c5f7c] shrink-0">
         <HeartHandshake className="size-4" />
       </div>

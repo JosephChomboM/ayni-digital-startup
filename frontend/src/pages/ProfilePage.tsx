@@ -176,11 +176,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   return (
     <div className="space-y-6">
       {/* Encabezado */}
-      <div className="bg-[#E8F5E9] p-6 rounded-3xl border border-[#0D7A5F]/20 text-center relative">
-        <div className="w-20 h-20 mx-auto rounded-full bg-white border-2 border-[#0D7A5F] flex items-center justify-center text-3xl shadow-sm">
+      <div className="bg-ayni-softGreen p-6 rounded-3xl border border-ayni-green/20 text-center relative">
+        <div className="w-20 h-20 mx-auto rounded-full bg-white border-2 border-ayni-green flex items-center justify-center text-3xl shadow-xs">
           👵
         </div>
-        <h2 className="text-xl font-bold text-[#0D7A5F] mt-3">
+        <h2 className="text-xl font-bold text-ayni-green mt-3">
           {profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}
         </h2>
         <p className="text-xs text-gray-600">
@@ -189,13 +189,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       </div>
 
       {/* Formulario Perfil */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-4">
         <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-          <h3 className="text-sm font-bold text-[#0D7A5F] flex items-center gap-2">
+          <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
             <span>👤</span> Perfil del Adulto Mayor
           </h3>
           {!isCuidador && (
-            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">
+            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm font-medium">
               Solo lectura
             </span>
           )}
@@ -247,7 +247,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                     value={name}
                     onChange={(e) => { setName(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. Mamá Elena"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
                   />
                 </div>
 
@@ -257,7 +257,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                     id="elder-birth-decade"
                     value={birthDecade}
                     onChange={(e) => { setBirthDecade(Number(e.target.value)); setProfileSuccess(null); }}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F] bg-white"
                   >
                     <option value={1930}>Década de 1930</option>
                     <option value={1940}>Década de 1940</option>
@@ -277,7 +277,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                     value={interestsText}
                     onChange={(e) => { setInterestsText(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. música, jardinería, boleros"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
                   />
                 </div>
 
@@ -297,8 +297,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       </div>
 
       {/* Miembros de la Familia */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-        <h3 className="text-sm font-bold text-[#0D7A5F] flex items-center gap-2">
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+        <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
           <span>👥</span> Miembros de la Familia
         </h3>
 
@@ -307,12 +307,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
         ) : (
           <div className="space-y-2">
             {members.map((m) => (
-              <div key={m.id} className="flex justify-between items-center p-3 bg-[#F4FBF7] rounded-xl border border-[#0D7A5F]/10 text-xs">
+              <div key={m.id} className="flex justify-between items-center p-3 bg-ayni-lightBg rounded-xl border border-ayni-green/10 text-xs">
                 <div>
                   <p className="font-bold text-gray-800">{m.name}</p>
                   <p className="text-[10px] text-gray-500 capitalize">{m.role.replace("_", " ")}</p>
                 </div>
-                <span className="text-[10px] bg-[#E8F5E9] text-[#0D7A5F] px-2 py-1 rounded font-bold">Activo</span>
+                <span className="text-[10px] bg-ayni-softGreen text-ayni-green px-2 py-1 rounded-sm font-bold">Activo</span>
               </div>
             ))}
           </div>
@@ -321,8 +321,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
       {/* Invitaciones (Solo Cuidador Principal) */}
       {isCuidador && (
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-          <h3 className="text-sm font-bold text-[#0D7A5F] flex items-center gap-2">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+          <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
             <span>✉️</span> Invitar Familiar
           </h3>
 
@@ -333,11 +333,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="familiar@example.com"
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
+              className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
             />
             <button
               type="submit"
-              className="px-3 py-2 bg-[#0D7A5F] text-white font-bold text-xs rounded-xl hover:bg-[#0A624C]"
+              className="px-3 py-2 bg-ayni-green text-white font-bold text-xs rounded-xl hover:bg-[#0A624C]"
             >
               Invitar
             </button>
@@ -350,7 +350,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           {generatedToken && (
             <div className="bg-[#FEF3C7] border border-[#D97706]/30 p-3 rounded-xl space-y-1">
               <p className="text-xs font-bold text-[#92400E]">Código de invitación generado:</p>
-              <p className="text-xs font-mono bg-white p-2 rounded border border-[#D97706]/20 select-all font-bold">
+              <p className="text-xs font-mono bg-white p-2 rounded-sm border border-[#D97706]/20 select-all font-bold">
                 {generatedToken}
               </p>
               <p className="text-[10px] text-[#92400E]/80">
