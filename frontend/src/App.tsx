@@ -2,6 +2,7 @@
 import { getMe, logout } from "./api/auth";
 import { SESSION_EXPIRED_EVENT } from "./api/client";
 import type { User } from "./api/auth";
+import { UserRound } from "lucide-react";
 
 import { WelcomePage } from "./pages/WelcomePage";
 import { HomePage } from "./pages/HomePage";
@@ -49,7 +50,7 @@ export function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f1faee]">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
           <div className="size-10 rounded-full border-4 border-[#2c5f7c] border-t-transparent animate-spin" />
           <p className="text-xs font-semibold text-[#264653]">Cargando Ayni Digital...</p>
@@ -85,9 +86,9 @@ export function App() {
 
   // 3. NAVEGACIÓN Y APLICACIÓN PRINCIPAL
   return (
-    <div className="min-h-screen bg-[#f1faee] text-[#264653]">
-      <header className="sticky top-0 z-30 border-b border-[#2c5f7c]/10 bg-[#f1faee]/90 backdrop-blur-md px-4 py-3 sm:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+    <div className="min-h-screen bg-white text-[#264653]">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => setView("home")}
             className="flex items-center gap-3 font-extrabold text-[#2c5f7c] text-lg hover:opacity-80 transition-opacity"
@@ -95,7 +96,7 @@ export function App() {
             Ayni Digital
           </button>
           
-          <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 text-xs font-bold">
+          <nav className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 text-xs font-semibold">
             <button
               onClick={() => setView("home")}
               className={`px-3 py-1.5 rounded-xl transition-all ${
@@ -136,6 +137,14 @@ export function App() {
               }`}
             >
               Dashboard
+            </button>
+            <button
+              onClick={() => setView("profile")}
+              aria-label="Abrir perfil familiar"
+              title="Perfil familiar"
+              className={`inline-flex items-center justify-center rounded-full p-2 transition-colors ${view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}
+            >
+              <UserRound className="size-4" />
             </button>
             <button
               onClick={() => {

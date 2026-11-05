@@ -130,7 +130,7 @@ export function UploadModule() {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5">
-        <div aria-disabled="true" className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#2c5f7c]/30 bg-[#f1faee] px-5 py-7 text-center">
+        <div aria-disabled="true" className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-7 text-center">
           <div className="mb-3 rounded-full bg-white p-3 text-[#2c5f7c] shadow-xs">
             <Upload className="size-5" />
           </div>

@@ -1,5 +1,5 @@
 ﻿import { useState } from "react"
-import { Clock3, Loader2, Pause, Play, Sparkles, Square } from "lucide-react"
+import { BookOpen, Clock3, Loader2, Pause, Play, Square } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Progress } from "./ui/progress"
@@ -26,7 +26,6 @@ export function SessionGuide() {
 
   return (
     <Card className="overflow-hidden border border-gray-200 bg-white shadow-xs rounded-2xl">
-      <div className="h-1.5 bg-linear-to-r from-[#2c5f7c] via-[#e9c46a] to-[#e76f51]" />
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -35,14 +34,14 @@ export function SessionGuide() {
               Una actividad breve, pensada para compartir recuerdos felices.
             </CardDescription>
           </div>
-          <div className="rounded-2xl bg-[#e76f51]/10 p-3 text-[#e76f51]">
-            <Sparkles className="size-5" />
+          <div className="text-[#e76f51]">
+            <BookOpen className="size-5" />
           </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {!started ? (
-          <div className="rounded-2xl bg-[#f1faee] border border-[#2c5f7c]/20 px-5 py-8 text-center space-y-3">
+          <div className="border-y border-slate-200 px-2 py-8 text-center space-y-3">
             <p className="text-xs text-gray-600 leading-relaxed max-w-sm mx-auto">
               Basada en el contenido, anécdotas e gustos musicales que tu familia ha compartido en la plataforma.
             </p>
@@ -57,7 +56,7 @@ export function SessionGuide() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Sparkles className="size-4" /> Generar sesión de hoy
+                  <BookOpen className="size-4" /> Preparar guía de hoy
                 </span>
               )}
             </Button>

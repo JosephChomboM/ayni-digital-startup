@@ -280,7 +280,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
               ["¿Quién puede aportar recuerdos?", "La persona cuidadora puede invitar a familiares para sumar fotos, anécdotas y canciones."],
               ["¿Cuánto dura una sesión?", "La guía propone alrededor de 15 minutos. Pueden hacer pausas o terminar cuando quieran."],
               ["¿Qué hacemos si un recuerdo incomoda?", "Pueden cambiar de tema, guardar el recuerdo para después o detener la sesión. El bienestar de la persona es lo primero."],
-              ["¿Cómo funciona el pago?", "El Plan Familia cuesta S/ 19.90 al mes. La pasarela funciona en modo de prueba, sin cobros reales."],
+              ["¿Cuánto cuesta el plan familiar?", "El Plan Familia tiene un pago mensual de S/ 19.90. La pasarela está en modo de prueba y todavía no realiza cobros reales."],
             ].map(([question, answer]) => <details key={question} className="group py-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-[#264653]">{question}<ChevronDown className="size-5 shrink-0 transition group-open:rotate-180"/></summary><p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-600">{answer}</p></details>)}
           </div>
         </section>

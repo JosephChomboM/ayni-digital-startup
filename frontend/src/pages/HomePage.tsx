@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   CalendarDays,
   ArrowRight,
-  Heart,
   BookOpen,
   Users,
   AlertTriangle,
@@ -78,65 +77,43 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="space-y-12">
       {/* 1. HERO SECTION PRINCIPAL */}
-      <section className="relative grid gap-8 overflow-hidden rounded-3xl bg-linear-to-br from-[#2c5f7c] via-[#264653] to-[#e76f51] p-8 sm:p-12 lg:grid-cols-12 lg:items-center text-white shadow-xl">
-        <div className="lg:col-span-7 space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#e9c46a] px-3 py-1 text-xs font-extrabold text-[#264653] shadow-xs">
-            <span>Hecho para acompañar en familia • {familyDisplayName}</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight">
-            Cuidar la memoria de quienes <span className="text-[#e9c46a]">más queremos</span>
+      <section className="grid gap-8 py-4 sm:py-8 lg:grid-cols-12 lg:items-center">
+        <div className="space-y-5 lg:col-span-7">
+          <p className="text-sm font-semibold text-[#e76f51]">Un espacio para {familyDisplayName}</p>
+          <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight text-[#2c5f7c] sm:text-5xl">
+            Cuidar la memoria de quienes <span className="text-[#e76f51]">más queremos</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-white/90 leading-relaxed max-w-xl">
+          <p className="max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
             Actividades de estimulación cognitiva por reminiscencia para hacer en casa con {elderDisplayName}, sin necesidad de ser un profesional de la salud.
           </p>
 
-          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <button
               onClick={onStartSession}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e76f51] px-6 py-3 text-xs font-extrabold text-white shadow-lg hover:bg-[#d65d3f] transition-all"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#e76f51] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#d65d3f]"
             >
               Comenzar sesión de hoy <ArrowRight className="size-4" />
             </button>
             <button
               onClick={onViewMemories}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-6 py-3 text-xs font-bold text-white border border-white/20 hover:bg-white/20 transition-all"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-6 py-3 text-sm font-semibold text-[#2c5f7c] transition-colors hover:bg-slate-50"
             >
-              <BookOpen className="size-4" /> Subir recuerdos
+              <BookOpen className="size-4" /> Ver recuerdos
             </button>
           </div>
 
-          <p className="text-[11px] text-white/80 pt-1">
-            <strong className="text-white">Importante:</strong> Esto no es un servicio de salud. No reemplaza consulta médica.
+          <p className="pt-1 text-sm text-slate-500">
+            <strong className="text-[#2c5f7c]">Ayni acompaña conversaciones familiares.</strong> No reemplaza la atención médica.
           </p>
         </div>
 
-        <div className="lg:col-span-5 relative rounded-2xl bg-white/10 backdrop-blur-md p-6 sm:p-8 border border-white/15 space-y-6">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#e9c46a] uppercase tracking-wider">Un momento para compartir</span>
-            <Heart className="size-5 text-[#e76f51] fill-current" />
-          </div>
-
-          <p className="text-xl sm:text-2xl font-serif italic text-white/95 leading-snug">
-            “A veces una canción abre la puerta a una historia.”
-          </p>
-
-          <div className="pt-4 border-t border-white/20 flex items-center justify-between">
-            <div className="flex -space-x-2">
-              <div className="flex size-8 items-center justify-center rounded-full border-2 border-[#2c5f7c] bg-[#e9c46a] text-xs font-bold text-[#264653]">
-                M
-              </div>
-              <div className="flex size-8 items-center justify-center rounded-full border-2 border-[#2c5f7c] bg-[#e76f51] text-xs font-bold text-white">
-                J
-              </div>
-              <div className="flex size-8 items-center justify-center rounded-full border-2 border-[#2c5f7c] bg-white text-xs font-bold text-[#2c5f7c]">
-                A
-              </div>
-            </div>
-            <span className="text-xs text-white/80 font-medium">Tu familia construye esta historia junta</span>
-          </div>
-        </div>
+        <figure className="relative min-h-64 overflow-hidden rounded-xl lg:col-span-5">
+          <img src="/images/familia-participa.jpg" alt="Familia compartiendo un recuerdo entre generaciones" className="absolute inset-0 h-full w-full object-cover" />
+          <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-5 pb-5 pt-16 text-sm font-medium text-white">
+            Un recuerdo compartido puede abrir una conversación en familia.
+          </figcaption>
+        </figure>
       </section>
 
       {/* 2. NOTA ÉTICA */}
@@ -237,7 +214,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 5. IMPACTO SOCIAL & OBJETIVOS DE DESARROLLO SOSTENIBLE (ODS 3 & ODS 10) CON BANDERAS INSTITUCIONALES */}
       <section className="rounded-2xl bg-white p-6 sm:p-8 border border-gray-200 shadow-xs space-y-6">
         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-          <span className="text-2xl">🌍</span>
+          <Users className="size-6 text-[#2c5f7c]" aria-hidden="true" />
           <div>
             <h3 className="text-base font-bold text-[#2c5f7c]">Impacto Social & Objetivos de Desarrollo Sostenible (ODS)</h3>
             <p className="text-xs text-gray-500">Ayni Digital impulsa dos pilares fundamentales de las Naciones Unidas en Lima Metropolitana</p>
@@ -246,7 +223,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* TARJETA ODS 3 */}
-          <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#4C9F38]/30 flex flex-col sm:flex-row items-start gap-4 hover:shadow-md transition-all">
+          <div className="bg-white p-5 rounded-lg border border-slate-200 flex flex-col sm:flex-row items-start gap-4">
             <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38]"><img src="/images/ods-3.jpg" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1 text-center text-[10px] font-bold text-white">ODS 3</span></div>
             <div className="space-y-1.5 flex-1">
               <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
@@ -259,7 +236,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* TARJETA ODS 10 */}
-          <div className="bg-[#f1faee] p-5 rounded-2xl border border-[#DD1367]/30 flex flex-col sm:flex-row items-start gap-4 hover:shadow-md transition-all">
+          <div className="bg-white p-5 rounded-lg border border-slate-200 flex flex-col sm:flex-row items-start gap-4">
             <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-[#DD1367]"><img src="/images/ods-10.jpg" alt="ODS 10: Reducción de las desigualdades" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#DD1367]/90 p-1 text-center text-[10px] font-bold text-white">ODS 10</span></div>
             <div className="space-y-1.5 flex-1">
               <h4 className="text-xs font-bold text-[#264653] uppercase tracking-wide">
