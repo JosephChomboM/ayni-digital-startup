@@ -13,6 +13,28 @@ import { deleteLocalFamilyPhoto, getLocalFamilyPhotos, saveLocalFamilyPhoto } fr
 import type { LocalFamilyPhoto } from "../api/localMedia"
 import { ProfilePage } from "../pages/ProfilePage"
 
+async function rasterizePhoto(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    if (bitmap.width * bitmap.height > 40_000_000) {
+      throw new Error("La foto tiene demasiados píxeles.")
+    }
+    const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext("2d")
+    if (!context) throw new Error("No se pudo procesar la foto.")
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    const png = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo convertir la foto.")), "image/png")
+    })
+    return new File([png], file.name.replace(/\.[^.]+$/, ".png"), { type: "image/png", lastModified: file.lastModified })
+  } finally {
+    bitmap.close()
+  }
+}
+
 function SpotifyIcon({ className = "size-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -127,7 +149,7 @@ export function UploadModule() {
     finally { setPending(false) }
   }
 
-  const handlePhotoFiles = (files: FileList | null) => {
+  const handlePhotoFiles = async (files: FileList | null) => {
     if (!files?.length || !currentUser) return
     setPhotoError(null)
     const selected = Array.from(files)
@@ -140,7 +162,15 @@ export function UploadModule() {
       setPhotoError("Usa fotos JPG, PNG o WebP de hasta 8 MB cada una.")
       return
     }
-    setPendingPhotos((current) => [...current, ...selected])
+    setPending(true)
+    try {
+      const safePhotos = await Promise.all(selected.map(rasterizePhoto))
+      setPendingPhotos((current) => [...current, ...safePhotos])
+    } catch {
+      setPhotoError("No se pudo procesar una de las fotos. Elige una imagen JPG, PNG o WebP válida.")
+    } finally {
+      setPending(false)
+    }
   }
 
   const handleDeletePhoto = async (photo: LocalFamilyPhoto) => {

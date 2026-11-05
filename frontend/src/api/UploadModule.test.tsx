@@ -12,6 +12,8 @@ import type { User } from "./auth";
 import type { Memory } from "./memories";
 
 const fetchMock = vi.fn<typeof fetch>();
+const canvasGetContextDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext");
+const canvasToBlobDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "toBlob");
 let actor: User;
 let records: Memory[];
 let profile: Record<string, unknown> | null;
@@ -75,7 +77,14 @@ beforeEach(() => {
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:test-photo") });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => {
+  cleanup();
+  if (canvasGetContextDescriptor) Object.defineProperty(HTMLCanvasElement.prototype, "getContext", canvasGetContextDescriptor);
+  else Reflect.deleteProperty(HTMLCanvasElement.prototype, "getContext");
+  if (canvasToBlobDescriptor) Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", canvasToBlobDescriptor);
+  else Reflect.deleteProperty(HTMLCanvasElement.prototype, "toBlob");
+  vi.unstubAllGlobals(); vi.unstubAllEnvs();
+});
 
 function postCalls() {
   return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
@@ -177,6 +186,9 @@ it.each([
 });
 
 it("saves selected photos with an anecdote and clears the selection after confirmation", async () => {
+  vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 20, height: 10, close: vi.fn() })));
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { configurable: true, value: () => ({ drawImage: vi.fn() }) });
+  Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", { configurable: true, value: (callback: (blob: Blob | null) => void) => callback(new Blob(["rasterized"], { type: "image/png" })) });
   render(<UploadModule />);
   await screen.findByText("Todavía no hay recuerdos para mostrar.");
   const file = new File(["image"], "<img src=x onerror=alert(1)>.jpg", { type: "image/jpeg" });
@@ -191,6 +203,7 @@ it("saves selected photos with an anecdote and clears the selection after confir
   expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();
   expect(photoStore.items).toHaveLength(1);
+  expect(photoStore.items[0].blob).toMatchObject({ type: "image/png" });
 });
 
 it("loads actual contributions, hides sensitive records and respects member permissions", async () => {
