@@ -19,15 +19,27 @@ Módulo encargado de gestionar el acceso y la red de apoyo. El consentimiento le
 *   **`GET /families/me/invitations`**: Lista las invitaciones activas.
 *   **`DELETE /families/me/invitations/{invitation_id}`**: Revoca una invitación.
 
-## 2. Baúl de Recuerdos (Propuesto)
-Rutas para la gestión del contenido emocional. Aún pendientes de implementación.
+## 2. Baúl de Recuerdos
 
-*   **`POST /memories/photo`**: Sube una foto a un bucket privado. Devuelve el ID del recuerdo. Para visualizarla, se debe generar una URL firmada de corta duración.
-*   **`POST /memories/anecdote`**: Guarda una anécdota y dispara la extracción de entidades (si falla la IA, la anécdota se guarda igual).
-*   **`POST /memories/song`**: Guarda un enlace de YouTube/Spotify.
-*   **`GET /memories`**: Lista los recuerdos de la familia autenticada. No debe incluir los `is_sensitive=true` en la galería general.
-*   **`PATCH /memories/{id}`**: Edita el contenido y las marcas de `is_positive` / `is_sensitive`.
-*   **`DELETE /memories/{id}`**: Elimina el recuerdo y su archivo asociado (si corresponde).
+Anécdotas y canciones implementadas en `main`. Fotos adjuntas implementadas en
+`hats/ayni-45-fotos-privadas`; PR, configuración de Supabase y prueba real pendientes.
+
+* **`POST /memories`**: JSON con type `anecdote` (title, text) o `song` (title, url),
+  más is_positive/is_sensitive. Para canciones solo videos de YouTube o pistas de Spotify.
+* **`GET /memories`**: Lista paginada de la familia; excluye sensibles por defecto.
+* **`GET /memories/{id}`**: Consulta un recuerdo de la familia.
+* **`PATCH /memories/{id}`**: Edita el autor o cuidador principal; no cambia el tipo.
+* **`DELETE /memories/{id}`**: Elimina el autor o cuidador principal; en la rama de fotos
+  también retira los archivos privados asociados.
+* **`POST /memories/{id}/entities/retry`**: Reintenta la extracción fallida de una anécdota.
+* **`POST /memories/{id}/photos`**: Multipart `file`, JPG/PNG/WebP de hasta 8 MiB;
+  autor del recuerdo o cuidador principal. 201 con metadatos y URL firmada.
+* **`GET /memories/{id}/photos`**: Miembros de la misma familia; lista paginada y URLs firmadas.
+* **`DELETE /memories/{id}/photos/{photo_id}`**: Autor o cuidador principal; 204 sin cuerpo.
+
+Todas requieren Bearer JWT. Fotos: bucket privado de Supabase, enlaces de 5 minutos,
+10 fotos por familia gratis y sin ese límite durante el periodo pagado del Plan Familia.
+Contrato, errores y coordinación con frontend: [PHOTOS.md](PHOTOS.md).
 
 ## 3. Sesiones y Respuestas (Propuesto)
 Módulo de generación de las guías de 15 a 20 minutos.
