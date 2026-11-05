@@ -1,0 +1,21 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { SessionGuide } from "./SessionGuide";
+afterEach(cleanup);
+it("discloses the example, pauses progression, and ends without claiming a saved record", () => {
+  const onViewMemories = vi.fn();
+  render(<SessionGuide onViewMemories={onViewMemories} />);
+  expect(screen.getByText(/no guarda sesiones ni reacciones/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Explorar el ejemplo/ }));
+  expect(screen.getByRole("status")).toHaveTextContent("Paso 1 de 4");
+  fireEvent.click(screen.getByRole("button", { name: "Pausar" }));
+  expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Paso 2 de 4");
+  fireEvent.click(screen.getByRole("button", { name: "Terminar aquí" }));
+  expect(screen.getByText(/No se ha guardado ningún registro/)).toBeInTheDocument();
+  expect(screen.queryByText("04:32")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Ir a mis recuerdos" }));
+  expect(onViewMemories).toHaveBeenCalledOnce();
+});

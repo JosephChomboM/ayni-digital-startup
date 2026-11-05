@@ -1,120 +1,42 @@
-﻿import { useState } from "react"
-import { Clock3, Loader2, Pause, Play, Sparkles, Square } from "lucide-react"
-import { Button } from "./ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
-import { Progress } from "./ui/progress"
+﻿import { useState } from "react";
+import { ArrowLeft, ArrowRight, BookOpen, Pause, Play } from "lucide-react";
+import { Button } from "./ui/button";
 
-export function SessionGuide() {
-  const [loading, setLoading] = useState(false)
-  const [started, setStarted] = useState(false)
-  const [paused, setPaused] = useState(false)
+const steps = [
+  { title: "Elijan un recuerdo", text: "Busquen una anécdota o una canción que les resulte agradable. Pregunta si le apetece compartir ese momento." },
+  { title: "Abre la conversación", text: "Puedes preguntar: ¿qué te viene a la mente con este recuerdo? Deja espacio para escuchar, sin buscar una respuesta correcta." },
+  { title: "Sigan su ritmo", text: "Si surge otra historia, escúchala. Si el recuerdo incomoda, cambien de tema o terminen. No hace falta completar todos los pasos." },
+  { title: "Cierren con calma", text: "Pregunta cómo se sintió y agradece el tiempo compartido. Una conversación breve también puede ser un buen momento." },
+];
 
-  const generate = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      setStarted(true)
-    }, 700)
-  }
-
-  const steps = [
-    "Muéstrale estas 3 fotos de su época en el Jirón de la Unión.",
-    "Pregúntale: ¿Te acuerdas de esta calle? ¿Qué tiendas o cines solías visitar?",
-    "Ponle la canción de Los Panchos que su familia marcó como favorita.",
-    "Observa su reacción y escucha con atención, sin presionarla a responder de inmediato.",
-  ]
-
+export function SessionGuide({ onViewMemories }: { onViewMemories?: () => void }) {
+  const [step, setStep] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [finished, setFinished] = useState(false);
+  const finish = () => { setFinished(true); setStep(null); setPaused(false); };
   return (
-    <Card className="overflow-hidden border border-gray-200 bg-white shadow-xs rounded-2xl">
-      <div className="h-1.5 bg-linear-to-r from-[#2c5f7c] via-[#e9c46a] to-[#e76f51]" />
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-bold text-[#2c5f7c]">Guía de sesión</CardTitle>
-            <CardDescription className="text-xs text-gray-500 mt-0.5">
-              Una actividad breve, pensada para compartir recuerdos felices.
-            </CardDescription>
-          </div>
-          <div className="rounded-2xl bg-[#e76f51]/10 p-3 text-[#e76f51]">
-            <Sparkles className="size-5" />
-          </div>
+    <section className="space-y-6 rounded-2xl bg-white p-6 sm:p-8" aria-labelledby="guide-title">
+      <div className="space-y-3">
+        <BookOpen aria-hidden="true" className="size-7 text-[#2c5f7c]" />
+        <h1 id="guide-title" className="text-2xl font-bold text-[#2c5f7c]">Guía de ejemplo</h1>
+        <p className="text-base leading-relaxed">Una propuesta para conversar en familia durante unos 15 minutos, o el tiempo que prefieran.</p>
+        <p className="rounded-xl bg-[#f1faee] p-4 text-sm leading-relaxed">Esta demostración no utiliza tus recuerdos, no mide el tiempo y no guarda sesiones ni reacciones.</p>
+      </div>
+      {finished ? <div className="space-y-4">
+        <h2 tabIndex={-1} ref={node => node?.focus()} className="text-xl font-bold text-[#2c5f7c]">Gracias por compartir este momento</h2>
+        <p>¿Cómo se sintieron? Pueden conversar sobre lo que les gustó y lo que prefieren dejar para otra ocasión.</p>
+        <p className="text-sm text-gray-600">Terminaste la guía de ejemplo. No se ha guardado ningún registro.</p>
+        <div className="flex flex-wrap gap-3"><Button onClick={() => { setFinished(false); setStep(0); }}>Volver a explorar</Button>{onViewMemories && <Button variant="outline" onClick={onViewMemories}>Ir a mis recuerdos</Button>}</div>
+      </div> : step === null ? <Button size="lg" onClick={() => setStep(0)}>Explorar el ejemplo<ArrowRight aria-hidden="true" className="ml-2 size-4" /></Button> : <>
+        <div role="status" className="text-sm font-semibold text-[#2c5f7c]">{paused ? "Guía en pausa" : `Paso ${step + 1} de ${steps.length}`}</div>
+        <div className="space-y-3 py-2" aria-live="polite"><h2 className="text-xl font-bold text-[#264653]">{steps[step].title}</h2><p className="text-base leading-relaxed">{paused ? "Tómense el tiempo que necesiten. Pueden continuar o terminar aquí." : steps[step].text}</p></div>
+        <div className="flex flex-wrap gap-3">
+          {step > 0 && <Button variant="outline" disabled={paused} onClick={() => setStep(step - 1)}><ArrowLeft aria-hidden="true" className="mr-2 size-4" />Anterior</Button>}
+          <Button variant="outline" onClick={() => setPaused(!paused)}>{paused ? <Play aria-hidden="true" className="mr-2 size-4" /> : <Pause aria-hidden="true" className="mr-2 size-4" />}{paused ? "Continuar" : "Pausar"}</Button>
+          {step < steps.length - 1 && <Button disabled={paused} onClick={() => setStep(step + 1)}>Siguiente<ArrowRight aria-hidden="true" className="ml-2 size-4" /></Button>}
         </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        {!started ? (
-          <div className="rounded-2xl bg-[#f1faee] border border-[#2c5f7c]/20 px-5 py-8 text-center space-y-3">
-            <p className="text-xs text-gray-600 leading-relaxed max-w-sm mx-auto">
-              Basada en el contenido, anécdotas e gustos musicales que tu familia ha compartido en la plataforma.
-            </p>
-            <Button
-              onClick={generate}
-              disabled={loading}
-              className="bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-xs transition-all"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="size-4 animate-spin" /> Organizando los recuerdos...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Sparkles className="size-4" /> Generar sesión de hoy
-                </span>
-              )}
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between rounded-xl bg-[#2c5f7c]/10 p-4 border border-[#2c5f7c]/20">
-              <div>
-                <p className="text-xs font-bold text-[#2c5f7c] uppercase">Sesión de hoy</p>
-                <p className="text-2xl font-extrabold text-[#264653]">15 min</p>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-[#2c5f7c]">
-                <Clock3 className="size-4" /> {paused ? "En pausa" : "04:32"}
-              </div>
-            </div>
-
-            <Progress value={30} className="h-2" />
-
-            <ol className="flex flex-col gap-4">
-              {steps.map((step, i) => (
-                <li key={i} className="flex gap-3 items-start">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#e9c46a] text-xs font-bold text-[#264653]">
-                    {i + 1}
-                  </span>
-                  <p className="pt-0.5 text-xs leading-relaxed text-[#264653] font-medium">
-                    {step}
-                  </p>
-                </li>
-              ))}
-            </ol>
-
-            <div className="flex gap-3 border-t border-gray-100 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setPaused(!paused)}
-                className="flex-1 border-gray-300 text-[#264653] hover:bg-gray-50 text-xs font-bold rounded-xl"
-              >
-                {paused ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Play className="size-4 text-[#2c5f7c]" /> Continuar
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Pause className="size-4 text-[#e76f51]" /> Pausar
-                  </span>
-                )}
-              </Button>
-              <Button
-                onClick={() => setStarted(false)}
-                className="flex-1 bg-[#e76f51] hover:bg-[#d65d3f] text-white text-xs font-bold rounded-xl"
-              >
-                <Square className="size-4 mr-1.5" /> Terminar sesión
-              </Button>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  )
+        <Button variant="outline" onClick={finish} className="w-full">Terminar aquí</Button>
+      </>}
+    </section>
+  );
 }

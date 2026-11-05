@@ -9,12 +9,13 @@ import { AuthPage } from "./pages/AuthPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SessionGuide } from "./components/SessionGuide";
 import { UploadModule } from "./components/UploadModule";
+import { BillingPanel } from "./components/BillingPanel";
 import { FamilyDashboard } from "./components/FamilyDashboard";
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard">("welcome");
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard" | "billing" | "account">("welcome");
 
   useEffect(() => {
     let active = true;
@@ -31,7 +32,8 @@ export function App() {
         const sessionData = await getMe();
         if (!active || sessionExpired) return;
         setCurrentUser(sessionData.user);
-        setView("home");
+        const billingReturn = new URLSearchParams(window.location.search).get("billing");
+        setView(billingReturn === "success" || billingReturn === "cancel" ? "billing" : "home");
       } catch {
         if (!active) return;
         setCurrentUser(null);
@@ -77,7 +79,8 @@ export function App() {
         onBack={() => setView("welcome")}
         onSuccess={(user) => {
           setCurrentUser(user);
-          setView("home");
+          const billingReturn = new URLSearchParams(window.location.search).get("billing");
+          setView(billingReturn === "success" || billingReturn === "cancel" ? "billing" : "home");
         }}
       />
     );
@@ -86,82 +89,57 @@ export function App() {
   // 3. NAVEGACIÓN Y APLICACIÓN PRINCIPAL
   return (
     <div className="min-h-screen bg-[#f1faee] text-[#264653]">
-      <header className="sticky top-0 z-30 border-b border-[#2c5f7c]/10 bg-[#f1faee]/90 backdrop-blur-md px-4 py-3 sm:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <button
-            onClick={() => setView("home")}
-            className="flex items-center gap-3 font-extrabold text-[#2c5f7c] text-lg hover:opacity-80 transition-opacity"
-          >
-            Ayni Digital
-          </button>
-          
-          <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 text-xs font-bold">
-            <button
-              onClick={() => setView("home")}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "home" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Inicio
-            </button>
-            <button
-              onClick={() => setView("profile")}
-              aria-current={view === "profile" ? "page" : undefined}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Perfil familiar
-            </button>
-            <button
-              onClick={() => setView("memories")}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "memories" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Subir recuerdos
-            </button>
-            <button
-              onClick={() => setView("session")}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "session" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Guía de Sesión
-            </button>
-            <button
-              onClick={() => setView("dashboard")}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "dashboard" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => {
-                logout();
-                setCurrentUser(null);
-                setView("welcome");
-              }}
-              className="text-[#e76f51] hover:underline text-xs font-semibold ml-2"
-            >
-              Cerrar sesión
-            </button>
+      <header className="border-b border-[#2c5f7c]/15 bg-white px-4 py-4 sm:px-8">
+        <div className="mx-auto max-w-7xl space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <button onClick={() => setView("home")} className="min-h-11 text-lg font-bold text-[#2c5f7c]">Ayni Digital</button>
+            <div className="flex min-w-0 items-center gap-3">
+              <button onClick={() => setView("account")} aria-label="Abrir mi cuenta" aria-current={view === "account" ? "page" : undefined} className="flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-2 py-1 text-left hover:bg-[#f1faee]">
+                <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2c5f7c] text-sm font-bold text-white">{(currentUser?.name || currentUser?.email || "A").trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span>
+                <span className="min-w-0"><span className="block max-w-48 truncate font-semibold">{currentUser?.name || currentUser?.email || "Mi cuenta"}</span><span className="block text-xs text-gray-600">{currentUser?.role === "cuidador_principal" ? "Cuidador principal" : "Familiar invitado"} · Sesión iniciada</span></span>
+              </button>
+              <button onClick={() => { logout(); setCurrentUser(null); setView("welcome"); }} className="hidden min-h-11 px-2 text-sm font-semibold text-[#264653] underline underline-offset-4 sm:block">Cerrar sesión</button>
+            </div>
+          </div>
+          <nav aria-label="Tu espacio familiar" className="flex flex-wrap items-center gap-1 text-sm">
+            {([
+              ["home", "Inicio"], ["profile", "Persona y familia"], ["memories", "Recuerdos"], ["session", "Guía de ejemplo"],
+            ] as const).map(([destination, label]) => <button key={destination} onClick={() => setView(destination)} aria-current={view === destination ? "page" : undefined} className={`min-h-11 rounded-xl px-3 py-2 font-semibold transition-colors ${view === destination ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#f1faee]"}`}>{label}</button>)}
+            <button onClick={() => setView("account")} aria-current={view === "account" ? "page" : undefined} className={`min-h-11 rounded-xl px-3 py-2 font-semibold ${view === "account" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#f1faee]"}`}>Mi cuenta</button>
+            <details className="relative">
+              <summary className={`flex min-h-11 cursor-pointer items-center rounded-xl px-3 py-2 font-semibold ${view === "dashboard" || view === "billing" ? "bg-[#2c5f7c] text-white" : "text-[#264653]"}`}>Más opciones</summary>
+              <div className="absolute left-0 z-40 mt-2 grid min-w-48 gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                {([["dashboard", "Resumen familiar"], ["billing", "Plan Familia"]] as const).map(([destination, label]) => <button key={destination} aria-current={view === destination ? "page" : undefined} onClick={event => { setView(destination); event.currentTarget.closest("details")?.removeAttribute("open"); }} className="min-h-11 rounded-lg px-3 text-left text-[#264653] hover:bg-[#f1faee]">{label}</button>)}
+              </div>
+            </details>
           </nav>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
+        {view === "account" && currentUser && <section className="mx-auto max-w-2xl space-y-6" aria-labelledby="account-title">
+          <div><h1 id="account-title" className="text-3xl font-bold text-[#2c5f7c]">Mi cuenta</h1><p className="mt-2 leading-relaxed">Esta es la cuenta con la que has iniciado sesión en Ayni.</p></div>
+          <dl className="divide-y divide-[#2c5f7c]/15 rounded-2xl bg-white px-6">
+            <div className="py-5"><dt className="text-sm text-gray-600">Nombre</dt><dd className="mt-1 break-words text-lg font-semibold">{currentUser.name || "Nombre no disponible"}</dd></div>
+            <div className="py-5"><dt className="text-sm text-gray-600">Correo electrónico</dt><dd className="mt-1 break-all">{currentUser.email}</dd></div>
+            <div className="py-5"><dt className="text-sm text-gray-600">Tu participación</dt><dd className="mt-1 font-semibold">{currentUser.role === "cuidador_principal" ? "Persona cuidadora principal" : "Familiar invitado"}</dd><dd className="mt-2 text-sm leading-relaxed">{currentUser.role === "cuidador_principal" ? "Puedes gestionar el perfil de la persona acompañada e invitar a tu familia." : "Puedes consultar el perfil de la persona acompañada y aportar recuerdos."}</dd></div>
+          </dl>
+          <p className="text-sm leading-relaxed text-gray-600">El perfil de la persona acompañada está en “Persona y familia”. La edición del nombre y correo de tu cuenta aún no está disponible.</p>
+          <div className="flex flex-wrap gap-3"><button onClick={() => setView("profile")} className="min-h-12 rounded-lg bg-[#2c5f7c] px-5 font-semibold text-white">Ver persona y familia</button><button onClick={() => { logout(); setCurrentUser(null); setView("welcome"); }} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold">Cerrar sesión</button></div>
+        </section>}
+
         {view === "home" && (
           <HomePage
             onStartSession={() => setView("session")}
             onViewMemories={() => setView("memories")}
+            onViewProfile={() => setView("profile")}
+            canManageFamily={currentUser?.role === "cuidador_principal"}
           />
         )}
 
         {view === "session" && (
           <div className="max-w-2xl mx-auto">
-            <SessionGuide />
+            <SessionGuide onViewMemories={() => setView("memories")} />
           </div>
         )}
 
@@ -179,9 +157,10 @@ export function App() {
 
         {view === "dashboard" && (
           <div className="max-w-5xl mx-auto">
-            <FamilyDashboard />
+            <FamilyDashboard onViewMemories={() => setView("memories")} />
           </div>
         )}
+        {view === "billing" && <div className="mx-auto max-w-2xl space-y-4"><h1 className="text-2xl font-bold text-[#2c5f7c]">Tu plan familiar</h1><BillingPanel /></div>}
       </main>
     </div>
   );
