@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Button } from "../components/Button";
+import { UserRound, Users, Mail } from "lucide-react";
 import type { User } from "../api/auth";
 import {
   getElderProfile,
@@ -176,9 +177,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   return (
     <div className="space-y-6">
       {/* Encabezado */}
-      <div className="bg-ayni-softGreen p-6 rounded-3xl border border-ayni-green/20 text-center relative">
-        <div className="w-20 h-20 mx-auto rounded-full bg-white border-2 border-ayni-green flex items-center justify-center text-3xl shadow-xs">
-          👵
+      <div className="border-b border-slate-200 px-2 py-6 text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 text-[#2c5f7c]">
+          <UserRound className="size-8" aria-hidden="true" />
         </div>
         <h2 className="text-xl font-bold text-ayni-green mt-3">
           {profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}
@@ -192,7 +193,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-4">
         <div className="flex justify-between items-center border-b border-gray-100 pb-2">
           <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <span>👤</span> Perfil del Adulto Mayor
+            <UserRound className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Perfil del Adulto Mayor
           </h3>
           {!isCuidador && (
             <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm font-medium">
@@ -207,7 +208,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           <>
             {profileNotFound && isCuidador && (
               <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-xs">
-                ℹ️ Completa el perfil de tu familiar para comenzar las actividades.
+                Completa el perfil de tu familiar para comenzar las actividades.
               </div>
             )}
 
@@ -219,7 +220,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
             {profileError && (
               <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
-                ⚠️ {profileError}
+                {profileError}
                 {!profile && !profileNotFound && (
                   <button type="button" className="block mt-2 underline"
                     onClick={() => setProfileAttempt((attempt) => attempt + 1)}>
@@ -231,7 +232,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
             {profileSuccess && (
               <div role="status" className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl text-xs">
-                ✅ {profileSuccess}
+                {profileSuccess}
               </div>
             )}
 
@@ -299,7 +300,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       {/* Miembros de la Familia */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
         <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-          <span>👥</span> Miembros de la Familia
+          <Users className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Miembros de la Familia
         </h3>
 
         {loadingMembers ? (
@@ -307,12 +308,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
         ) : (
           <div className="space-y-2">
             {members.map((m) => (
-              <div key={m.id} className="flex justify-between items-center p-3 bg-ayni-lightBg rounded-xl border border-ayni-green/10 text-xs">
+              <div key={m.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                 <div>
                   <p className="font-bold text-gray-800">{m.name}</p>
                   <p className="text-[10px] text-gray-500 capitalize">{m.role.replace("_", " ")}</p>
                 </div>
-                <span className="text-[10px] bg-ayni-softGreen text-ayni-green px-2 py-1 rounded-sm font-bold">Activo</span>
+                <span className="text-[10px] bg-white text-[#2c5f7c] px-2 py-1 rounded-sm font-semibold border border-slate-200">Activo</span>
               </div>
             ))}
           </div>
@@ -323,7 +324,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       {isCuidador && (
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
           <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <span>✉️</span> Invitar Familiar
+            <Mail className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Invitar Familiar
           </h3>
 
           <form onSubmit={handleCreateInvitation} className="flex gap-2">
@@ -337,14 +338,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
             />
             <button
               type="submit"
-              className="px-3 py-2 bg-ayni-green text-white font-bold text-xs rounded-xl hover:bg-[#0A624C]"
+              className="px-3 py-2 bg-[#e76f51] text-white font-semibold text-xs rounded-lg hover:bg-[#d65d3f]"
             >
               Invitar
             </button>
           </form>
 
           {inviteError && (
-            <p className="text-xs text-red-600 font-medium">⚠️ {inviteError}</p>
+            <p className="text-xs text-red-600 font-medium">{inviteError}</p>
           )}
 
           {generatedToken && (

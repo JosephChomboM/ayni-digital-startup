@@ -11,12 +11,12 @@ export const Button: React.FC<ButtonProps> = ({
   className = "",
   ...props
 }) => {
-  const baseStyles = "w-full py-3 px-4 rounded-2xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 shadow-xs";
+  const baseStyles = "w-full py-3 px-4 rounded-lg font-semibold transition-colors duration-200 disabled:opacity-50";
   
   const variants = {
-    primary: "bg-ayni-green hover:bg-ayni-darkGreen text-white",
-    secondary: "bg-ayni-softGreen hover:bg-[#D4EDDA] text-ayni-green",
-    outline: "border-2 border-ayni-green text-ayni-green hover:bg-ayni-lightBg",
+    primary: "bg-[#e76f51] hover:bg-[#d65d3f] text-white",
+    secondary: "bg-ayni-softGreen hover:bg-slate-200 text-ayni-green",
+    outline: "border border-ayni-green text-ayni-green hover:bg-ayni-lightBg",
   };
 
   return (

@@ -2,10 +2,18 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { UploadModule } from "../components/UploadModule";
+const photoStore = vi.hoisted(() => ({ items: [] as Array<Record<string, unknown>> }));
+vi.mock("../api/localMedia", () => ({
+  getLocalFamilyPhotos: vi.fn(async () => [...photoStore.items]),
+  saveLocalFamilyPhoto: vi.fn(async (photo: Record<string, unknown>) => { photoStore.items.push(photo); }),
+  deleteLocalFamilyPhoto: vi.fn(async (id: string) => { photoStore.items = photoStore.items.filter((photo) => photo.id !== id); }),
+}));
 import type { User } from "./auth";
 import type { Memory } from "./memories";
 
 const fetchMock = vi.fn<typeof fetch>();
+const canvasGetContextDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext");
+const canvasToBlobDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "toBlob");
 let actor: User;
 let records: Memory[];
 let profile: Record<string, unknown> | null;
@@ -61,27 +69,37 @@ beforeEach(() => {
     name: "Persona de prueba", role: "cuidador_principal", created_at: "2026-10-27T00:00:00Z",
   };
   records = [];
+  photoStore.items = [];
   profile = null;
   localStorage.setItem("ayni_token", crypto.randomUUID());
   vi.stubEnv("VITE_API_URL", "https://api.example.test");
   vi.stubGlobal("fetch", fetchMock.mockReset().mockImplementation(backend));
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:test-photo") });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => {
+  cleanup();
+  if (canvasGetContextDescriptor) Object.defineProperty(HTMLCanvasElement.prototype, "getContext", canvasGetContextDescriptor);
+  else Reflect.deleteProperty(HTMLCanvasElement.prototype, "getContext");
+  if (canvasToBlobDescriptor) Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", canvasToBlobDescriptor);
+  else Reflect.deleteProperty(HTMLCanvasElement.prototype, "toBlob");
+  vi.unstubAllGlobals(); vi.unstubAllEnvs();
+});
 
 function postCalls() {
   return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
 }
 
 it("searches through the API, resets pagination and can clear the search", async () => {
-  records = Array.from({ length: 21 }, (_, index) => memory({ title: `Recuerdo ${index}` }));
+  records = Array.from({ length: 101 }, (_, index) => memory({ title: `Recuerdo ${index}` }));
   records[0] = memory({ title: "Vacaciones", entities: [{ kind: "place", text: "Lima" }] });
   render(<UploadModule />);
   fireEvent.click(await screen.findByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Recuerdo 20");
+  await screen.findByText("Recuerdo 100");
   fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: " Lima " } });
   fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
   await screen.findByText("Vacaciones");
-  expect(screen.queryByText("Recuerdo 20")).toBeNull();
+  expect(screen.queryByText("Recuerdo 100")).toBeNull();
   expect(fetchMock.mock.calls.some(([url]) => {
     const parsed = new URL(String(url));
     return parsed.searchParams.get("q") === "Lima" && parsed.searchParams.get("offset") === "0";
@@ -112,8 +130,9 @@ it("saves an anecdote with title, text and both explicit marks", async () => {
   fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseamos en familia." } });
   fireEvent.click(screen.getByLabelText("Es un recuerdo bonito"));
   fireEvent.click(screen.getByLabelText("Es un tema delicado"));
-  fireEvent.click(screen.getByRole("button", { name: "Guardar recuerdo" }));
-  expect(await screen.findByText("Recuerdo guardado.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
+  expect(await screen.findByRole("heading", { name: "¡Se guardó correctamente!" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog")).toHaveTextContent("Recuerdo guardado.");
   expect(JSON.parse(postCalls()[0][1]?.body as string)).toEqual({
     type: "anecdote", title: "Un paseo", text: "Paseamos en familia.", is_positive: true, is_sensitive: true,
   });
@@ -125,10 +144,12 @@ it.each([
   ["https://open.spotify.com/track/1234567890123456789012", "https://open.spotify.com/track/1234567890123456789012"],
 ])("saves an actual song link: %s", async (url, normalized) => {
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("tab", { name: "Canción" }));
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Canción familiar" } });
   fireEvent.change(screen.getByLabelText(/Canción de YouTube o Spotify/), { target: { value: url } });
-  fireEvent.click(screen.getByRole("button", { name: "Guardar recuerdo" }));
-  expect(await screen.findByText("Recuerdo guardado.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Guardar canción" }));
+  expect(await screen.findByRole("heading", { name: "¡Se guardó correctamente!" })).toBeInTheDocument();
+  expect(screen.getByRole("dialog")).toHaveTextContent("Recuerdo guardado.");
   expect(JSON.parse(postCalls()[0][1]?.body as string)).toEqual({
     type: "song", title: "Canción familiar", url: normalized, is_positive: false, is_sensitive: false,
   });
@@ -139,12 +160,13 @@ it.each([
   "https://youtube.com/playlist?list=abcdefghijk",
 ])("rejects playlists before the POST: %s", async (url) => {
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("tab", { name: "Canción" }));
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Canción" } });
   fireEvent.change(screen.getByLabelText(/Canción de YouTube o Spotify/), { target: { value: url } });
-  fireEvent.click(screen.getByRole("button", { name: "Guardar recuerdo" }));
+  fireEvent.click(screen.getByRole("button", { name: "Guardar canción" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("sin listas de reproducción");
   expect(postCalls()).toHaveLength(0);
-  expect(screen.queryByText("Recuerdo guardado.")).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 it.each([
@@ -157,21 +179,31 @@ it.each([
   render(<UploadModule />);
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Un paseo" } });
   fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Un paseo." } });
-  fireEvent.click(screen.getByRole("button", { name: "Guardar recuerdo" }));
+  fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(expected);
-  expect(screen.queryByText("Recuerdo guardado.")).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.getByLabelText("Una anécdota especial")).toHaveValue("Un paseo.");
 });
 
-it("keeps photos disabled and never pretends they were saved", async () => {
+it("saves selected photos with an anecdote and clears the selection after confirmation", async () => {
+  vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 20, height: 10, close: vi.fn() })));
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { configurable: true, value: () => ({ drawImage: vi.fn() }) });
+  Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", { configurable: true, value: (callback: (blob: Blob | null) => void) => callback(new Blob(["rasterized"], { type: "image/png" })) });
   render(<UploadModule />);
   await screen.findByText("Todavía no hay recuerdos para mostrar.");
-  expect(screen.getByText("Próximamente")).toBeInTheDocument();
-  const photos = screen.getByRole("button", { name: /Elegir fotos/ });
-  expect(photos).toBeDisabled();
-  fireEvent.click(photos);
-  expect(postCalls()).toHaveLength(0);
-  expect(document.querySelector('input[type="file"]')).toBeNull();
+  const file = new File(["image"], "<img src=x onerror=alert(1)>.jpg", { type: "image/jpeg" });
+  fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } });
+  expect(await screen.findByText("1 foto seleccionada; se guardarán junto con el recuerdo.")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Un paseo" } });
+  fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseamos en familia." } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
+  fireEvent.click(await screen.findByRole("button", { name: "OK" }));
+  expect(await screen.findByText("Las fotos seleccionadas se adjuntan al guardar el recuerdo.")).toBeInTheDocument();
+  expect(screen.getByText("Foto familiar")).toBeInTheDocument();
+  expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();
+  expect(photoStore.items).toHaveLength(1);
+  expect(photoStore.items[0].blob).toMatchObject({ type: "image/png" });
 });
 
 it("loads actual contributions, hides sensitive records and respects member permissions", async () => {
@@ -194,7 +226,8 @@ it("reads, edits and deletes through real detail, PATCH and DELETE routes", asyn
   await waitFor(() => expect(screen.getByLabelText("Título del recuerdo")).toHaveValue("Un paseo"));
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Paseo actualizado" } });
   fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
-  await screen.findByText("Cambios guardados.");
+  expect(await screen.findByRole("dialog")).toHaveTextContent("Cambios guardados.");
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
   fireEvent.click(await screen.findByRole("button", { name: "Eliminar Paseo actualizado" }));
   await screen.findByText("Recuerdo eliminado.");
   await screen.findByText("Todavía no hay recuerdos para mostrar.");

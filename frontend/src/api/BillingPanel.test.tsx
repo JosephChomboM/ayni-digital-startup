@@ -32,17 +32,17 @@ afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.uns
 it("opens test Checkout and keeps the plan free until confirmation", async () => {
   const redirect = vi.fn();
   render(<BillingPanel onCheckout={redirect} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Continuar al pago de prueba" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Suscribirme" }));
   await vi.waitFor(() => expect(redirect).toHaveBeenCalledWith("https://checkout.stripe.com/c/pay/synthetic"));
-  expect(screen.getByText("Plan actual: Gratis")).toBeInTheDocument();
-  expect(screen.getByText(/S\/19.90 al mes/)).toBeInTheDocument();
+  expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent?.includes("Plan actual: Gratis") === true)).toBeInTheDocument();
+  expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent?.includes("S/ 19.90 al mes") === true)).toBeInTheDocument();
 });
 
 it("shows the backend error without simulating a successful payment", async () => {
   checkoutError = true;
   const redirect = vi.fn();
   render(<BillingPanel onCheckout={redirect} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Continuar al pago de prueba" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Suscribirme" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Los pagos no están disponibles.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-error-code", "billing_not_configured");
   expect(redirect).not.toHaveBeenCalled();
@@ -51,17 +51,17 @@ it("shows the backend error without simulating a successful payment", async () =
 it("shows a family member the plan without management actions", async () => {
   role = "familiar";
   render(<BillingPanel />);
-  await screen.findByText("Plan actual: Gratis");
-  expect(screen.queryByRole("button", { name: "Continuar al pago de prueba" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Cancelar renovación" })).not.toBeInTheDocument();
+  await screen.findByText((_, element) => element?.tagName === "P" && element.textContent?.includes("Plan actual: Gratis") === true);
+  expect(screen.queryByRole("button", { name: "Suscribirme" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Cancelar suscripción" })).not.toBeInTheDocument();
 });
 
 it("confirms cancellation and preserves the paid family plan", async () => {
   status = { ...status, plan: "family", subscription_status: "active", paid_until: "2030-01-01T00:00:00Z" };
   render(<BillingPanel />);
-  fireEvent.click(await screen.findByRole("button", { name: "Cancelar renovación" }));
-  fireEvent.click(screen.getByRole("button", { name: "Confirmar cancelación" }));
-  await screen.findByText("La renovación está cancelada. Conservas el periodo que ya pagaste.");
-  expect(screen.getByText("Plan actual: Familia")).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancelar suscripción" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sí, cancelar" }));
+  expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent?.includes("Plan actual: Familia") === true)).toBeInTheDocument();
+  expect(screen.getByText("La renovación se canceló correctamente. Conservas el acceso hasta el final del periodo pagado.")).toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/billing/cancel"))).toHaveLength(1);
 });

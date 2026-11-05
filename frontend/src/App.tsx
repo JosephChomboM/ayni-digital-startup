@@ -2,23 +2,28 @@
 import { getMe, logout } from "./api/auth";
 import { SESSION_EXPIRED_EVENT } from "./api/client";
 import type { User } from "./api/auth";
+import { Heart, LogOut, UserRound } from "lucide-react";
 
 import { WelcomePage } from "./pages/WelcomePage";
 import { HomePage } from "./pages/HomePage";
 import { AuthPage } from "./pages/AuthPage";
-import { ProfilePage } from "./pages/ProfilePage";
 import { SessionGuide } from "./components/SessionGuide";
 import { UploadModule } from "./components/UploadModule";
 import { FamilyDashboard } from "./components/FamilyDashboard";
+import { AccountPage } from "./pages/AccountPage";
+import type { AccountSection } from "./pages/AccountPage";
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard">("welcome");
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "settings" | "session" | "memories" | "dashboard">("welcome");
+  const [accountSection, setAccountSection] = useState<AccountSection>("overview");
 
   useEffect(() => {
     let active = true;
     let sessionExpired = false;
+    const billingReturn = ["success", "cancel"].includes(new URLSearchParams(window.location.search).get("billing") ?? "");
+    const restorePlan = billingReturn || sessionStorage.getItem("ayni_checkout_return") === "settings:plan";
     const requireLogin = () => {
       sessionExpired = true;
       setCurrentUser(null);
@@ -31,7 +36,13 @@ export function App() {
         const sessionData = await getMe();
         if (!active || sessionExpired) return;
         setCurrentUser(sessionData.user);
-        setView("home");
+        if (restorePlan) {
+          setAccountSection("plan");
+          setView("settings");
+          sessionStorage.removeItem("ayni_checkout_return");
+        } else {
+          setView("home");
+        }
       } catch {
         if (!active) return;
         setCurrentUser(null);
@@ -49,7 +60,7 @@ export function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f1faee]">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
           <div className="size-10 rounded-full border-4 border-[#2c5f7c] border-t-transparent animate-spin" />
           <p className="text-xs font-semibold text-[#264653]">Cargando Ayni Digital...</p>
@@ -85,17 +96,18 @@ export function App() {
 
   // 3. NAVEGACIÓN Y APLICACIÓN PRINCIPAL
   return (
-    <div className="min-h-screen bg-[#f1faee] text-[#264653]">
-      <header className="sticky top-0 z-30 border-b border-[#2c5f7c]/10 bg-[#f1faee]/90 backdrop-blur-md px-4 py-3 sm:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+    <div className="min-h-screen bg-white text-[#264653]">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => setView("home")}
-            className="flex items-center gap-3 font-extrabold text-[#2c5f7c] text-lg hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-80"
           >
-            Ayni Digital
+            <span className="flex size-9 items-center justify-center rounded-full bg-[#2c5f7c] text-[#e76f51]"><Heart className="size-5 fill-current" /></span>
+            <span><span className="block font-extrabold leading-tight text-[#2c5f7c]">Ayni Digital</span><span className="block text-[10px] font-normal text-slate-500">Recuerdos que nos acercan</span></span>
           </button>
           
-          <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 text-xs font-bold">
+          <nav className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 text-xs font-semibold">
             <button
               onClick={() => setView("home")}
               className={`px-3 py-1.5 rounded-xl transition-all ${
@@ -103,15 +115,6 @@ export function App() {
               }`}
             >
               Inicio
-            </button>
-            <button
-              onClick={() => setView("profile")}
-              aria-current={view === "profile" ? "page" : undefined}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Perfil familiar
             </button>
             <button
               onClick={() => setView("memories")}
@@ -138,22 +141,27 @@ export function App() {
               Dashboard
             </button>
             <button
-              onClick={() => {
-                logout();
-                setCurrentUser(null);
-                setView("welcome");
-              }}
-              className="text-[#e76f51] hover:underline text-xs font-semibold ml-2"
+              onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }}
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[#d65d3f] hover:underline"
             >
-              Cerrar sesión
+              <LogOut className="size-4" aria-hidden="true" /> <span className="hidden sm:inline">Cerrar sesión</span>
+            </button>
+            <button
+              onClick={() => { setAccountSection("overview"); setView("settings"); }}
+              aria-label="Abrir perfil familiar"
+              title="Perfil familiar"
+              className={`order-3 inline-flex size-8 items-center justify-center rounded-full transition-colors ${view === "settings" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}
+            >
+              <UserRound className="size-4" />
             </button>
           </nav>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
-        {view === "home" && (
+        {view === "home" && currentUser && (
           <HomePage
+            currentUser={currentUser}
             onStartSession={() => setView("session")}
             onViewMemories={() => setView("memories")}
           />
@@ -161,14 +169,12 @@ export function App() {
 
         {view === "session" && (
           <div className="max-w-2xl mx-auto">
-            <SessionGuide />
+            {currentUser && <SessionGuide currentUser={currentUser} onOpenMemories={() => setView("memories")} />}
           </div>
         )}
 
-        {view === "profile" && currentUser && (
-          <div className="max-w-2xl mx-auto">
-            <ProfilePage currentUser={currentUser} />
-          </div>
+        {view === "settings" && currentUser && (
+          <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} />
         )}
 
         {view === "memories" && (
@@ -178,8 +184,8 @@ export function App() {
         )}
 
         {view === "dashboard" && (
-          <div className="max-w-5xl mx-auto">
-            <FamilyDashboard />
+          <div className="max-w-7xl mx-auto">
+            {currentUser && <FamilyDashboard currentUser={currentUser} onOpenMemories={() => setView("memories")} onOpenSession={() => setView("session")} />}
           </div>
         )}
       </main>

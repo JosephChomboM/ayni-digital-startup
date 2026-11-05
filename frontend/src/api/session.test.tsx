@@ -47,7 +47,7 @@ it("returns an authenticated app directly to login after an API 401", async () =
   await act(async () => {
     await expect(apiFetch("/memories")).rejects.toMatchObject({ code: "unauthorized" });
   });
-  expect(screen.getByRole("heading", { name: "Bienvenido de nuevo" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
   expect(localStorage.getItem("ayni_token")).toBeNull();
 });
@@ -55,6 +55,6 @@ it("returns an authenticated app directly to login after an API 401", async () =
 it("opens login when the initial stored session has expired", async () => {
   fetchMock.mockResolvedValue(unauthorized());
   render(<App />);
-  expect(await screen.findByRole("heading", { name: "Bienvenido de nuevo" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
   expect(localStorage.getItem("ayni_token")).toBeNull();
 });
