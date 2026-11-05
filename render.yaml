@@ -26,6 +26,20 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # URL del frontend stage permitida para llamadas desde el navegador.
+      - key: CORS_ORIGINS
+        value: https://ayni-web-stage.onrender.com
+      # Stripe se configura solo en stage y solo con objetos/credenciales de prueba.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: BILLING_SUCCESS_URL
+        value: https://ayni-web-stage.onrender.com/?billing=success
+      - key: BILLING_CANCEL_URL
+        value: https://ayni-web-stage.onrender.com/?billing=cancel
 
   - type: web
     name: ayni-web-stage
@@ -37,7 +51,7 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: VITE_API_URL
-        sync: false
+        value: https://ayni-api-stage.onrender.com
     routes:
       - type: rewrite
         source: /*
@@ -66,6 +80,14 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # Origen y URLs de retorno de producción. Los pagos live aún no están habilitados
+      # por el backend; no configurar aquí claves de prueba ni live.
+      - key: CORS_ORIGINS
+        value: https://ayni-web-prod.onrender.com
+      - key: BILLING_SUCCESS_URL
+        value: https://ayni-web-prod.onrender.com/?billing=success
+      - key: BILLING_CANCEL_URL
+        value: https://ayni-web-prod.onrender.com/?billing=cancel
 
   - type: web
     name: ayni-web-prod
@@ -77,7 +99,7 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: VITE_API_URL
-        sync: false
+        value: https://ayni-api-prod.onrender.com
     routes:
       - type: rewrite
         source: /*

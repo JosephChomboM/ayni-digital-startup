@@ -46,7 +46,7 @@ Generación de patrones descriptivos a partir de las respuestas.
     *   ≥50% de respuestas negativas (solo `agitado` cuenta como negativa) en las últimas 5 sesiones.
     *   *La alerta debe sugerir pausar y consultar a un profesional, e incluir el disclaimer: "Esto no es un diagnóstico. Es un registro de actividades familiares".*
 
-## 5. Billing (Implementado en rama AYNI-86; PR pendiente)
+## 5. Billing (Implementado; configuración de stage pendiente)
 
 Plan Familia: **S/19.90 PEN al mes**, con Stripe solo en modo de prueba.
 Configuración, respuestas y verificación: [BILLING.md](BILLING.md).
