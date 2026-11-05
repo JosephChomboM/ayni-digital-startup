@@ -71,6 +71,9 @@ jobs:
         run: npm run lint
       - name: Tests
         run: npm test
+      - name: Condiciones de despliegue
+        working-directory: .
+        run: python3 .github/tests/test_deploy_conditions.py
       - name: Build
         run: npm run build
 
@@ -285,7 +288,15 @@ jobs:
 
   deploy-stage:
     name: Deploy a stage
-    if: github.event_name == 'push'
+    # A status function avoids implicit success() inheriting the intentionally
+    # skipped PR-only dependency-review job through the security gate.
+    # Still require every direct prerequisite to succeed before any deploy hook.
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          needs.backend.result == 'success' && needs.frontend.result == 'success' &&
+          needs.security.result == 'success' && needs.security-regressions.result == 'success' &&
+          needs.codeql.result == 'success' && needs.security-iac.result == 'success' &&
+          needs.security-container.result == 'success' }}
     needs: [backend, frontend, security, security-regressions, codeql, security-iac, security-container]
     runs-on: ubuntu-latest
     environment: stage
@@ -300,6 +311,8 @@ jobs:
 
   deploy-production:
     name: Deploy a producción
+    # Apply the same explicit status policy to the downstream job.
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.deploy-stage.result == 'success' }}
     needs: deploy-stage
     runs-on: ubuntu-latest
     # Este ambiente pide aprobación manual en GitHub antes de correr
