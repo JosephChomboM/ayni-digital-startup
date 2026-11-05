@@ -59,6 +59,8 @@ def test_checkout_uses_fixed_monthly_price_and_same_retry_key(
     gateway.create_checkout("cus_synthetic", family_id, attempt_id)
     params = create.call_args.args[0]
     assert params["mode"] == "subscription"
+    # Current Checkout API selects payment methods from Dashboard configuration.
+    assert "payment_method_types" not in params
     assert params["line_items"] == [{"price": "price_synthetic", "quantity": 1}]
     assert params["metadata"] == {"family_id": str(family_id), "attempt_id": str(attempt_id)}
     assert create.call_args.kwargs["options"]["idempotency_key"] == f"ayni-checkout-{attempt_id}"

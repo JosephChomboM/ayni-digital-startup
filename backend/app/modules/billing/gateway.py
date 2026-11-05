@@ -81,7 +81,6 @@ class StripeGateway:
                 {
                     "mode": "subscription",
                     "customer": customer_id,
-                    "payment_method_types": ["card"],
                     "line_items": [{"price": self.settings.stripe_price_id, "quantity": 1}],
                     "metadata": metadata,
                     "subscription_data": {"metadata": metadata},
