@@ -30,6 +30,9 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [notice, setNotice] = useState("");
+  const canSubscribe = status && ["none", "canceled", "incomplete_expired"].includes(status.subscription_status);
+  const canCancel = status && !canSubscribe && !status.cancel_at_period_end;
+  const returned = new URLSearchParams(window.location.search).get("billing");
 
   useEffect(() => {
     let active = true;
@@ -63,21 +66,18 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
 
   async function cancel() {
     if (saving) return;
+    if (!canCancel) return;
     setSaving(true);
     setError(null);
     try {
       const updated = await cancelSubscription();
       setStatus(updated);
       setConfirmCancel(false);
-      setNotice("La renovación está cancelada. Conservas el periodo que ya pagaste.");
+      setNotice("La renovación se canceló correctamente. Conservas el acceso hasta el final del periodo pagado.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err : new Error("No pudimos cancelar la renovación."));
     } finally { setSaving(false); }
   }
-
-  const canSubscribe = status && ["none", "canceled", "incomplete_expired"].includes(status.subscription_status);
-  const canCancel = status && !canSubscribe && !status.cancel_at_period_end;
-  const returned = new URLSearchParams(window.location.search).get("billing");
 
   return (
     <section id="billing-panel" aria-labelledby="billing-title" className={embedded ? "space-y-6 py-1 text-[#264653]" : "relative left-1/2 w-screen -translate-x-1/2 scroll-mt-20 bg-[#17232d] px-4 py-10 text-white sm:px-8 sm:py-14"}>
@@ -103,16 +103,22 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
         <div className={embedded ? "flex shrink-0 flex-col items-start gap-3 lg:min-w-56 lg:items-end" : "flex shrink-0 flex-col items-start gap-4 sm:items-end"}>
           <p className={`text-3xl font-bold ${embedded ? "text-[#2c5f7c]" : "text-white sm:text-4xl"}`}>S/ 19.90 <span className={`text-base font-medium ${embedded ? "text-slate-500" : "text-white/70"}`}>al mes</span></p>
           {caregiver && canSubscribe && !loading && <Button type="button" variant="secondary" disabled={saving} onClick={checkout} className="w-auto min-h-11 px-5 text-sm">{saving ? "Abriendo pago..." : status?.subscription_status === "canceled" ? "Renovar suscripción" : status?.subscription_status === "incomplete_expired" ? "Reintentar pago" : "Suscribirme"}</Button>}
-          {caregiver && !loading && !confirmCancel && canCancel && (
-            <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmCancel(true)} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
+          {caregiver && !loading && status && status.subscription_status !== "canceled" && !status.cancel_at_period_end && !confirmCancel && (
+            <Button type="button" variant="outline" disabled={saving} onClick={() => { setNotice(""); setConfirmCancel(true); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
           <p className={`max-w-xs text-xs ${embedded ? "text-slate-500 lg:text-right" : "text-white/60 sm:text-right"}`}>Los pagos están en modo de prueba y todavía no se realizan cobros reales.</p>
         </div>
       </div>
-      {confirmCancel && <div className={`mt-6 space-y-3 pt-5 ${embedded ? "border-t border-slate-200" : "mx-auto max-w-7xl border-t border-white/20"}`}>
-        <p className={`text-sm ${embedded ? "text-[#264653]" : "text-white"}`}>¿Quieres detener las próximas renovaciones? Conservas el periodo que ya pagaste.</p>
+      {confirmCancel && <div role="group" aria-label="Confirmación de cancelación" className={`mt-6 space-y-3 pt-5 ${embedded ? "border-t border-slate-200" : "mx-auto max-w-7xl border-t border-white/20"}`}>
+        <p className={`text-sm ${embedded ? "text-[#264653]" : "text-white"}`}>
+          {canCancel
+            ? `¿Estás segura de cancelar la suscripción? La renovación se detendrá y conservarás el acceso${status?.paid_until ? ` hasta el ${new Date(status.paid_until).toLocaleDateString("es-PE")}` : " durante el periodo pagado"}.`
+            : "Actualmente usas el Plan Gratis. No hay una suscripción activa para cancelar."}
+        </p>
         <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="destructive" disabled={saving} onClick={cancel} className="w-auto">Confirmar cancelación</Button>
-          <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmCancel(false)} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Volver</Button>
+          {canCancel ? <>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => { setConfirmCancel(false); setNotice("No se realizaron cambios. Tu suscripción sigue activa."); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>No cancelar</Button>
+            <Button type="button" variant="destructive" disabled={saving} onClick={cancel} className="w-auto">{saving ? "Cancelando…" : "Sí, cancelar"}</Button>
+          </> : <Button type="button" disabled={saving} onClick={() => setConfirmCancel(false)} className="w-auto bg-[#2c5f7c] text-white hover:bg-[#224a61]">OK</Button>}
         </div>
       </div>}
     </section>
