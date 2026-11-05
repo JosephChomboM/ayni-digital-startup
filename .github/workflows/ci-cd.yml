@@ -98,7 +98,68 @@ jobs:
           node-version: 24
       - name: Librerías de npm con vulnerabilidades conocidas
         working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
+
+  security-regressions:
+    name: Regresiones de seguridad (backend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --frozen
+      - name: Probar secretos, credenciales, JWT y CORS
+        run: >-
+          uv run pytest
+          tests/unit/test_security_settings.py
+          tests/unit/test_security_passwords.py
+          tests/unit/test_security_jwt.py
+          tests/unit/test_secret_audit.py
+          tests/unit/test_cors.py
+          -q
+
+  dependency-review:
+    name: Revisar dependencias nuevas del PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v7
+      - name: Bloquear dependencias nuevas con vulnerabilidades altas
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime,development,unknown
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript, actions]
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v7
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - name: Analizar código
+        uses: github/codeql-action/analyze@v4
 
   # ---------- DEPLOY (solo al mergear a main) ----------
   # Render despliega el commit exacto (?ref=) que pasó los tests.
@@ -107,7 +168,7 @@ jobs:
   deploy-stage:
     name: Deploy a stage
     if: github.event_name == 'push'
-    needs: [backend, frontend, security]
+    needs: [backend, frontend, security, security-regressions, codeql]
     runs-on: ubuntu-latest
     environment: stage
     env:
