@@ -1,21 +1,20 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import ApplicationError
+from app.modules.billing.errors import BillingError, provider_unavailable
+from app.modules.billing.gateway import BillingGateway, StripeGateway
 from app.modules.billing.models import Subscription
 from app.modules.billing.repository import BillingRepository
-from app.modules.billing.schemas import BillingStatusResponse
+from app.modules.billing.schemas import BillingStatusResponse, CheckoutResponse
 from app.modules.families.service import FamiliesService
 
 
-class BillingError(ApplicationError):
-    """A public error raised by billing."""
-
-
 class BillingService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, gateway: BillingGateway | None = None) -> None:
+        self.gateway = gateway or StripeGateway()
         self.session = session
         self.repository = BillingRepository(session)
         self.families = FamiliesService(session)
@@ -50,3 +49,65 @@ class BillingService:
         family_id = self._context(actor_id)
         with self.session.begin():
             return self._status(self.repository.get_subscription(family_id))
+
+    @staticmethod
+    def _existing_subscription() -> BillingError:
+        return BillingError(
+            code="subscription_already_exists",
+            message="Tu familia ya tiene una suscripción. Revisa su estado antes de continuar.",
+            status_code=409,
+        )
+
+    def create_checkout(self, actor_id: UUID) -> CheckoutResponse:
+        family_id = self._context(actor_id, caregiver_only=True)
+        with self.session.begin():
+            subscription = self.repository.lock_subscription(family_id)
+            if subscription.stripe_subscription_id and subscription.status not in {
+                "canceled",
+                "incomplete_expired",
+                "none",
+            }:
+                raise self._existing_subscription()
+            attempt = self.repository.pending_checkout(family_id)
+            now = datetime.now(UTC)
+            if attempt is not None:
+                if attempt.expires_at and attempt.expires_at <= now:
+                    if attempt.stripe_session_id:
+                        remote = self.gateway.get_checkout(attempt.stripe_session_id)
+                        if remote.get("status") == "complete":
+                            raise self._existing_subscription()
+                        if remote.get("status") != "expired":
+                            raise provider_unavailable()
+                        attempt.status = "expired"
+                        attempt = None
+                    else:
+                        # An unknown result must not create another checkout with a new key.
+                        raise provider_unavailable()
+                elif attempt.checkout_url and attempt.expires_at:
+                    return CheckoutResponse(
+                        checkout_url=attempt.checkout_url,
+                        expires_at=attempt.expires_at,
+                    )
+            if not subscription.stripe_customer_id:
+                subscription.stripe_customer_id = self.gateway.create_customer(family_id)
+            if attempt is None:
+                attempt = self.repository.create_checkout(family_id, now + timedelta(hours=23))
+            attempt_id, customer_id = attempt.id, subscription.stripe_customer_id
+        # Persist the retry key before contacting Stripe. Failed calls can safely be retried.
+        remote = self.gateway.create_checkout(customer_id, family_id, attempt_id)
+        url = urlsplit(str(remote.get("url", "")))
+        if url.scheme != "https" or url.hostname != "checkout.stripe.com" or url.username:
+            raise provider_unavailable()
+        with self.session.begin():
+            self.repository.lock_subscription(family_id)
+            attempt = self.repository.get_checkout(attempt_id, family_id)
+            if attempt is None:
+                raise provider_unavailable()
+            attempt.stripe_session_id = str(remote["id"])
+            attempt.checkout_url = str(remote["url"])
+            attempt.expires_at = datetime.fromtimestamp(int(remote["expires_at"]), UTC)
+            if attempt.status == "preparing":
+                attempt.status = "open"
+            return CheckoutResponse(
+                checkout_url=attempt.checkout_url, expires_at=attempt.expires_at
+            )
