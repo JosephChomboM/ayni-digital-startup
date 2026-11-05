@@ -168,7 +168,7 @@ export function App() {
 
         {view === "session" && (
           <div className="max-w-2xl mx-auto">
-            <SessionGuide />
+            {currentUser && <SessionGuide currentUser={currentUser} onOpenMemories={() => setView("memories")} />}
           </div>
         )}
 
@@ -183,8 +183,8 @@ export function App() {
         )}
 
         {view === "dashboard" && (
-          <div className="max-w-5xl mx-auto">
-            <FamilyDashboard />
+          <div className="max-w-7xl mx-auto">
+            {currentUser && <FamilyDashboard currentUser={currentUser} onOpenMemories={() => setView("memories")} onOpenSession={() => setView("session")} />}
           </div>
         )}
       </main>

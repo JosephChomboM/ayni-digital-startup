@@ -126,6 +126,5 @@ function UploadedMemories({ user }: { user: User }) {
         {(memory.is_positive || memory.is_sensitive) && <p className="mt-2 text-xs text-slate-500">{[memory.is_positive && "Recuerdo positivo", memory.is_sensitive && "Tema delicado"].filter(Boolean).join(" · ")}</p>}
       </li>)}
     </ul>}
-    <p className="border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-500">La versión actual permite guardar anécdotas y enlaces de canciones. La carga de fotos y videos aún no está habilitada.</p>
   </div>;
 }
