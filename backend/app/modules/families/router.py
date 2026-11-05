@@ -12,6 +12,7 @@ from app.modules.families.schemas import (
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
+    FamilyUpdateRequest,
     InvitationCreatedResponse,
     InvitationCreateRequest,
     InvitationListResponse,
@@ -67,6 +68,13 @@ def get_current_user(
 @router.get("/families/me", response_model=FamilyResponse)
 def get_family(user_id: AuthenticatedUserId, service: FamiliesServiceDep) -> FamilyResponse:
     return service.get_family(user_id)
+
+
+@router.patch("/families/me", response_model=FamilyResponse)
+def update_family(
+    data: FamilyUpdateRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> FamilyResponse:
+    return service.update_family(user_id, name=data.name)
 
 
 @router.get("/families/me/members", response_model=MemberListResponse)

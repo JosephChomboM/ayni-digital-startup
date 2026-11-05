@@ -29,6 +29,7 @@ from app.modules.families.schemas import (
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
+    FamilyUpdateRequest,
     InvitationCreatedResponse,
     InvitationCreateRequest,
     InvitationListResponse,
@@ -103,6 +104,21 @@ class FamiliesService:
             return FamilyResponse.model_validate(
                 self._family_for_actor(self._require_actor(actor_id))
             )
+
+    def update_family(self, actor_id: UUID, *, name: str) -> FamilyResponse:
+        request = FamilyUpdateRequest(name=name)
+        with self.session.begin():
+            actor = self._require_actor(actor_id, caregiver_only=True)
+            if verify_password(request.name, actor.password_hash):
+                raise FamiliesError(
+                    code="validation_error",
+                    message="Elige un nombre para tu familia distinto de tu contraseña.",
+                    status_code=422,
+                )
+            family = self._family_for_actor(actor, for_update=True)
+            family.name = request.name
+            self.session.flush()
+            return FamilyResponse.model_validate(family)
 
     def list_members(self, actor_id: UUID) -> MemberListResponse:
         with self.session.begin():
