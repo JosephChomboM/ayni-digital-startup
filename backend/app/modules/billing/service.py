@@ -82,8 +82,23 @@ class BillingService:
                         attempt.status = "expired"
                         attempt = None
                     else:
-                        # An unknown result must not create another checkout with a new key.
-                        raise provider_unavailable()
+                        remote = self.gateway.find_checkout(
+                            subscription.stripe_customer_id or "",
+                            attempt.id,
+                        )
+                        if remote and remote.get("status") == "complete":
+                            raise self._existing_subscription()
+                        if remote and remote.get("status") == "open":
+                            link = self._checkout_link(remote)
+                            attempt.stripe_session_id = str(remote["id"])
+                            attempt.checkout_url = link.checkout_url
+                            attempt.expires_at = link.expires_at
+                            attempt.status = "open"
+                            return link
+                        if remote and remote.get("status") != "expired":
+                            raise provider_unavailable()
+                        attempt.status = "expired"
+                        attempt = None
                 elif attempt.checkout_url and attempt.expires_at:
                     return CheckoutResponse(
                         checkout_url=attempt.checkout_url,
@@ -96,17 +111,15 @@ class BillingService:
             attempt_id, customer_id = attempt.id, subscription.stripe_customer_id
         # Persist the retry key before contacting Stripe. Failed calls can safely be retried.
         remote = self.gateway.create_checkout(customer_id, family_id, attempt_id)
-        url = urlsplit(str(remote.get("url", "")))
-        if url.scheme != "https" or url.hostname != "checkout.stripe.com" or url.username:
-            raise provider_unavailable()
+        link = self._checkout_link(remote)
         with self.session.begin():
             self.repository.lock_subscription(family_id)
             attempt = self.repository.get_checkout(attempt_id, family_id)
             if attempt is None:
                 raise provider_unavailable()
             attempt.stripe_session_id = str(remote["id"])
-            attempt.checkout_url = str(remote["url"])
-            attempt.expires_at = datetime.fromtimestamp(int(remote["expires_at"]), UTC)
+            attempt.checkout_url = link.checkout_url
+            attempt.expires_at = link.expires_at
             if attempt.status == "preparing":
                 attempt.status = "open"
             return CheckoutResponse(
@@ -139,3 +152,20 @@ class BillingService:
             subscription.cancel_at_period_end = True
             # The verified paid period remains available until its original end date.
             return self._status(subscription)
+
+    @staticmethod
+    def _checkout_link(remote: dict[str, object]) -> CheckoutResponse:
+        try:
+            url = urlsplit(str(remote.get("url", "")))
+            expires_at = datetime.fromtimestamp(int(str(remote["expires_at"])), UTC)
+            if (
+                url.scheme != "https"
+                or url.hostname != "checkout.stripe.com"
+                or url.username
+                or url.password
+                or expires_at <= datetime.now(UTC)
+            ):
+                raise provider_unavailable()
+        except (KeyError, ValueError, TypeError, OverflowError, OSError):
+            raise provider_unavailable() from None
+        return CheckoutResponse(checkout_url=str(remote["url"]), expires_at=expires_at)

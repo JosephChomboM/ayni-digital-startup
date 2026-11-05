@@ -20,7 +20,10 @@ class BillingRepository:
             insert(Subscription).values(family_id=family_id).on_conflict_do_nothing()
         )
         return self.session.scalars(
-            select(Subscription).where(Subscription.family_id == family_id).with_for_update()
+            select(Subscription)
+            .where(Subscription.family_id == family_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         ).one()
 
     def pending_checkout(self, family_id: UUID) -> CheckoutAttempt | None:

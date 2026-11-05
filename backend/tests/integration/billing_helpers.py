@@ -29,6 +29,7 @@ class FakeBillingGateway:
         self.subscriptions: dict[str, dict[str, Any]] = {}
         self.invoices: dict[str, dict[str, Any]] = {}
         self.cancel_calls = 0
+        self.checkouts: dict[str, dict[str, Any]] = {}
 
     def create_customer(self, family_id: UUID) -> str:
         return f"cus_{family_id.hex}"
@@ -37,16 +38,32 @@ class FakeBillingGateway:
         self, customer_id: str, family_id: UUID, attempt_id: UUID
     ) -> dict[str, Any]:
         self.checkout_calls.append(attempt_id)
-        return {
+        result = {
             "id": f"cs_test_{attempt_id.hex}",
             "livemode": False,
             "status": "open",
+            "customer": customer_id,
+            "metadata": {"attempt_id": str(attempt_id)},
             "url": f"https://checkout.stripe.com/c/pay/{attempt_id.hex}",
             "expires_at": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
         }
+        self.checkouts[result["id"]] = result
+        return deepcopy(result)
 
     def get_checkout(self, session_id: str) -> dict[str, Any]:
-        return {"id": session_id, "status": "expired", "livemode": False}
+        return deepcopy(
+            self.checkouts.get(
+                session_id, {"id": session_id, "status": "expired", "livemode": False}
+            )
+        )
+
+    def find_checkout(self, customer_id: str, attempt_id: UUID) -> dict[str, Any] | None:
+        for checkout in self.checkouts.values():
+            if checkout["customer"] == customer_id and checkout["metadata"]["attempt_id"] == str(
+                attempt_id
+            ):
+                return deepcopy(checkout)
+        return None
 
     def get_subscription(self, subscription_id: str) -> dict[str, Any]:
         return deepcopy(self.subscriptions[subscription_id])

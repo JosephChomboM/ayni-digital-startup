@@ -1,4 +1,7 @@
+import hashlib
+import hmac
 import secrets
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
@@ -72,3 +75,17 @@ def test_live_key_is_rejected_before_network_request() -> None:
     with pytest.raises(BillingError) as error:
         StripeGateway(config).create_customer(uuid4())
     assert error.value.code == "billing_not_configured"
+
+
+def test_signed_malformed_payload_returns_uniform_error() -> None:
+    config = settings()
+    payload = b"[]"
+    now = str(int(datetime.now(UTC).timestamp()))
+    digest = hmac.new(
+        config.stripe_webhook_secret.get_secret_value().encode(),
+        now.encode() + b"." + payload,
+        hashlib.sha256,
+    ).hexdigest()
+    with pytest.raises(BillingError) as error:
+        StripeGateway(config).verify_event(payload, f"t={now},v1={digest}")
+    assert error.value.code == "invalid_webhook_payload"

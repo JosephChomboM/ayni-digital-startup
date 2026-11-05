@@ -16,6 +16,7 @@ class BillingGateway(Protocol):
         self, customer_id: str, family_id: UUID, attempt_id: UUID
     ) -> dict[str, Any]: ...
     def get_checkout(self, session_id: str) -> dict[str, Any]: ...
+    def find_checkout(self, customer_id: str, attempt_id: UUID) -> dict[str, Any] | None: ...
     def get_subscription(self, subscription_id: str) -> dict[str, Any]: ...
     def get_invoice(self, invoice_id: str) -> dict[str, Any]: ...
     def cancel_subscription(self, subscription_id: str) -> dict[str, Any]: ...
@@ -105,6 +106,22 @@ class StripeGateway:
         except stripe.StripeError:
             raise provider_unavailable() from None
 
+    def find_checkout(self, customer_id: str, attempt_id: UUID) -> dict[str, Any] | None:
+        try:
+            sessions = self._client().v1.checkout.sessions.list(
+                {
+                    "customer": customer_id,
+                    "limit": 100,
+                }
+            )
+            for checkout in sessions.auto_paging_iter():
+                data = self._test_object(checkout)
+                if (data.get("metadata") or {}).get("attempt_id") == str(attempt_id):
+                    return data
+            return None
+        except stripe.StripeError:
+            raise provider_unavailable() from None
+
     def get_subscription(self, subscription_id: str) -> dict[str, Any]:
         try:
             return self._test_object(self._client().v1.subscriptions.retrieve(subscription_id))
@@ -142,7 +159,7 @@ class StripeGateway:
                 message="Firma de pago no válida.",
                 status_code=400,
             ) from None
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, TypeError, KeyError, AttributeError):
             raise BillingError(
                 code="invalid_webhook_payload",
                 message="El aviso de pago no es válido.",
