@@ -114,17 +114,21 @@ Las fechas incluyen zona horaria. No se guardan tarjetas ni claves en las tablas
 Cancelar detiene renovaciones al final del periodo pagado. No elimina recuerdos.
 Al vencer ese periodo se vuelve al plan gratis.
 
-## Verificación pendiente con Stripe
+## Verificación local y pendientes
 
 Las pruebas automatizadas usan PostgreSQL local, firma real con claves de prueba
 generadas por los tests y un proveedor simulado; no dependen de una cuenta externa.
-Antes de cerrar AYNI-86, completar con credenciales de prueba:
+Tras integrar `main` el 5 de noviembre de 2026: backend **480 pruebas aprobadas**
+y frontend **51 pruebas aprobadas**, sin omitidas ni fallos.
 
-- Contratación desde el frontend y activación tras el webhook.
-- Pago rechazado sin activar el plan.
-- Renovación aprobada y fallida.
-- Cancelación que conserva el periodo pagado y evita la próxima renovación.
-- Comprobación en stage y celular; revisión de frontend y QA independiente.
+También se verificó con Stripe en modo de prueba: contratación desde el frontend,
+pago rechazado sin activar el plan, renovación aprobada y fallida mediante reloj de
+prueba, y cancelación que conserva el periodo pagado. Los eventos firmados llegaron
+al webhook local con HTTP 200. Evidencia y alcance: [QA de AYNI-86](qa/AYNI-86.md).
+
+Antes de cerrar AYNI-86 quedan pendientes la configuración del webhook y las variables
+en Render, la comprobación en stage y celular, y la revisión de frontend y QA independiente.
+Las pruebas locales no acreditan un despliegue.
 
 Referencias oficiales: [pruebas](https://docs.stripe.com/testing),
 [webhooks de suscripciones](https://docs.stripe.com/billing/subscriptions/webhooks),
