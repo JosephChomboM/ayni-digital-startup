@@ -20,7 +20,7 @@ export async function apiFetch<T>(
 
   if (!baseUrl) {
     throw new ApiError(
-      "La dirección de la API (VITE_API_URL) no está configurada.",
+      "Ayni no está disponible en este momento. Vuelve a intentarlo más tarde.",
       "configuration_error",
       0
     );

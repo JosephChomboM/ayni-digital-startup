@@ -230,7 +230,7 @@ export function UploadModule() {
           {photoError && <p role="alert" className="text-sm text-red-700">{photoError}</p>}
           {pendingPhotos.length > 0 && <p className="text-sm font-medium text-[#2c5f7c]">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada" : "fotos seleccionadas"}; se guardarán junto con el recuerdo.</p>}
           {pendingPhotos.length > 0 && <StagedPhotoGrid files={pendingPhotos} onRemove={(index) => setPendingPhotos((items) => items.filter((_, itemIndex) => itemIndex !== index))} />}
-          {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos seleccionadas se adjuntan al guardar el recuerdo.</p>}
+          {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos seleccionadas se guardan solo en este navegador al guardar el recuerdo. No se sincronizan con otros dispositivos.</p>}
         </section>
 
         <div className="space-y-4 border-t border-slate-200 pt-5">

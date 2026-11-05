@@ -117,7 +117,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
     <CardHeader className="px-0 pb-5">
       <p className="text-sm font-semibold text-[#e76f51]">Un momento en familia</p>
       <CardTitle className="text-2xl font-semibold text-[#2c5f7c]">Guía de sesión</CardTitle>
-      <CardDescription className="max-w-2xl text-sm leading-relaxed text-slate-600">Una conversación breve que se adapta a sus recuerdos. Pueden saltar preguntas, cambiar de tema o detenerse cuando quieran.</CardDescription>
+      <CardDescription className="max-w-2xl text-sm leading-relaxed text-slate-600">Las fotos y las reseñas se guardan solo en este navegador y no se sincronizan. Una conversación breve que se adapta a sus recuerdos. Pueden saltar preguntas, cambiar de tema o detenerse cuando quieran.</CardDescription>
     </CardHeader>
     <CardContent className="space-y-6 px-0">
       {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm text-red-700"><span>{loadError}</span><button onClick={() => window.location.reload()} className="font-semibold underline">Volver a cargar</button></div>}
@@ -155,8 +155,8 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
         <div className="py-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Una pregunta posible</p><p className="mt-1 text-lg font-medium text-[#264653]">{steps[step].prompt}</p></div>
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <div className="flex gap-2">
-            <Button type="button" variant="outline" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>
-            {step < steps.length - 1 && <Button type="button" variant="outline" onClick={() => setStep((value) => value + 1)} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}
+            <Button type="button" variant="outline" disabled={paused || step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>
+            {step < steps.length - 1 && <Button type="button" variant="outline" disabled={paused} onClick={() => setStep((value) => value + 1)} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => setPaused((value) => !value)} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button>
@@ -175,7 +175,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
         <div className="flex flex-wrap gap-3"><Button disabled={!feeling || !experience} onClick={saveReview} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />Guardar reseña</Button><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir</Button></div>
       </section>}
 
-      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reseña guardada</h2><p className="text-sm text-slate-600">Gracias por registrar cómo fue este momento para su familia.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver a la guía</Button></div>}
+      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reseña guardada en este navegador</h2><p className="text-sm text-slate-600">Gracias por registrar cómo fue este momento para su familia.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver a la guía</Button></div>}
     </CardContent>
   </Card>;
 }

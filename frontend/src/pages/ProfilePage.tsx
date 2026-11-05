@@ -40,12 +40,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [membersError, setMembersError] = useState(false);
 
   useEffect(() => {
     let active = true;
     async function loadData() {
       setLoadingProfile(true);
       setLoadingMembers(true);
+      setMembersError(false);
       setProfileError(null);
 
       // Cargar Perfil
@@ -82,7 +84,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           setInvitations(invRes.items || []);
         }
       } catch {
-        // Manejo silencioso
+        if (active) setMembersError(true);
       } finally {
         if (active) setLoadingMembers(false);
       }
@@ -303,14 +305,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           <Users className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Miembros de la Familia
         </h3>
 
+        {membersError && <div role="alert" className="space-y-2 text-sm text-red-700"><p>No pudimos consultar todos los miembros o invitaciones de tu familia.</p><button type="button" onClick={() => setProfileAttempt(value => value + 1)} className="min-h-11 underline">Volver a intentar</button></div>}
         {loadingMembers ? (
           <p className="text-xs text-gray-500 text-center py-2">Cargando miembros...</p>
         ) : (
           <div className="space-y-2">
+            {!membersError && members.length === 0 && <p className="text-sm text-gray-600">Todavía no hay miembros para mostrar.</p>}
             {members.map((m) => (
               <div key={m.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                 <div>
-                  <p className="font-bold text-gray-800">{m.name}</p>
+                  <p className="font-bold text-gray-800">{m.name}{m.id === currentUser.id && <span className="ml-2 font-normal">(Tú)</span>}</p>
                   <p className="text-[10px] text-gray-500 capitalize">{m.role.replace("_", " ")}</p>
                 </div>
                 <span className="text-[10px] bg-white text-[#2c5f7c] px-2 py-1 rounded-sm font-semibold border border-slate-200">Activo</span>

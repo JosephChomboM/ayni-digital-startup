@@ -198,7 +198,7 @@ it("saves selected photos with an anecdote and clears the selection after confir
   fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseamos en familia." } });
   fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
   fireEvent.click(await screen.findByRole("button", { name: "OK" }));
-  expect(await screen.findByText("Las fotos seleccionadas se adjuntan al guardar el recuerdo.")).toBeInTheDocument();
+  expect(await screen.findByText("Las fotos seleccionadas se guardan solo en este navegador al guardar el recuerdo. No se sincronizan con otros dispositivos.")).toBeInTheDocument();
   expect(screen.getByText("Foto familiar")).toBeInTheDocument();
   expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();

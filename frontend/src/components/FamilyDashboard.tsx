@@ -88,7 +88,7 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
         <div>
           <p className="text-sm font-semibold text-[#e76f51]">Tu espacio familiar</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#2c5f7c]">Recuerdos que comparten</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">Un resumen de los aportes y de cómo la familia vivió sus actividades.</p>
+          <p className="mt-2 max-w-2xl text-slate-600">Anécdotas y canciones de tu familia, junto con fotos y reseñas guardadas solo en este navegador. Las fotos y reseñas no se sincronizan entre dispositivos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onOpenMemories}>Subir recuerdos</Button>
