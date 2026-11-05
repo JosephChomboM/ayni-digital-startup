@@ -225,7 +225,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {[
             { title: "Suben sus recuerdos", description: "Fotos, anécdotas y canciones para reunir las historias de la familia.", image: "/images/recuerdos.jpg", action: onViewMemories, label: "Ir a recuerdos" },
             { title: "Guía de 15 minutos", description: "Una conversación breve, con preguntas sencillas y sin apuro.", image: "/images/guia-sesion.jpg", action: onStartSession, label: "Abrir guía" },
-            { title: "Registro de emociones", description: "Al final de la guía pueden conversar sobre cómo se sintió este momento.", image: "/images/emociones.jpg", action: onStartSession, label: "Ver la guía" },
+            { title: "Registro de emociones", description: "Al final de la guía pueden conversar sobre cómo se sintió este momento.", image: "/images/emociones.avif", action: onStartSession, label: "Ver la guía" },
           ].map((item) => <button key={item.title} onClick={item.action} className="group flex h-full flex-col text-left focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c5f7c]">
             <img src={item.image} alt="" loading="lazy" className="aspect-4/3 w-full rounded-xl object-cover transition group-hover:brightness-95" />
             <h3 className="mt-4 text-lg font-semibold text-[#264653]">{item.title}</h3>
@@ -247,7 +247,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid gap-8 md:grid-cols-2 md:gap-12">
           <article className="flex items-start gap-5 border-b border-gray-200 pb-7 md:border-b-0 md:border-r md:pb-0 md:pr-10">
-            <div className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.jpg" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></div>
+            <div className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.png" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></div>
             <div className="space-y-2"><h3 className="text-lg font-semibold text-[#264653]">Salud y bienestar</h3><p className="text-sm leading-relaxed text-gray-600">Promovemos momentos de conexión y bienestar emocional en familia, respetando el ritmo de cada persona.</p></div>
           </article>
           <article className="flex items-start gap-5">

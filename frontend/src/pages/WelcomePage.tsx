@@ -39,7 +39,7 @@ const CAROUSEL_ITEMS = [
     subtitle: "Cada quien puede aportar una historia",
   },
   {
-    url: "/images/emociones.jpg",
+    url: "/images/emociones.avif",
     title: "Un momento para escuchar",
     subtitle: "Cada emoción merece respeto y espacio",
   },
@@ -53,7 +53,7 @@ const CAROUSEL_ITEMS = [
 const FEATURE_CARDS = [
   { title: "Suben sus recuerdos", text: "Fotos, anécdotas y canciones que la familia puede compartir.", more: "Cada persona de la familia puede aportar una historia, el nombre de quienes aparecen en una foto o el recuerdo que acompaña una canción.", image: "/images/recuerdos.jpg" },
   { title: "Guía de 15 minutos", text: "Una conversación breve, con preguntas sencillas y sin apuro.", more: "La guía propone una pregunta a la vez. Pueden conversar, hacer una pausa o terminar cuando la persona lo prefiera.", image: "/images/guia-sesion.jpg" },
-  { title: "Registro de emociones", text: "Anota cómo se sintió la persona y comparte el momento con la familia.", more: "Al terminar, conversen sobre cómo se sintió. El registro persistente estará disponible cuando se conecte el servicio del backend.", image: "/images/emociones.jpg" },
+  { title: "Registro de emociones", text: "Anota cómo se sintió la persona y comparte el momento con la familia.", more: "Al terminar, conversen sobre cómo se sintió. El registro persistente estará disponible cuando se conecte el servicio del backend.", image: "/images/emociones.avif" },
 ];
 
 export const WelcomePage: React.FC<WelcomePageProps> = ({
@@ -82,7 +82,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
   const benefits = [
     { title: "Cero sobrecarga", text: "Pantallas sencillas y palabras claras para acompañar sin complicaciones.", image: "/images/cero-sobrecarga.jpg" },
     { title: "Toda la familia participa", text: "Tus familiares pueden aportar recuerdos aunque estén lejos.", image: "/images/familia-participa.jpg" },
-    { title: "A su propio ritmo", text: "Si la persona se siente incómoda, hagan una pausa o cambien de tema.", image: "/images/propio-ritmo.jpg" },
+    { title: "A su propio ritmo", text: "Si la persona se siente incómoda, hagan una pausa o cambien de tema.", image: "/images/propio-ritmo.avif" },
   ];
 
   const handleLogin = () => {
@@ -297,7 +297,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
           <div className="grid gap-8 md:grid-cols-2 md:gap-12">
             <article className="flex items-start gap-5 border-b border-gray-200 pb-7 md:border-b-0 md:border-r md:pb-0 md:pr-10">
-              <a href="https://share.google/LoRB2g9gJcjAWnr6i" target="_blank" rel="noreferrer" aria-label="Ver imagen del ODS 3" className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.jpg" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></a>
+              <a href="https://share.google/LoRB2g9gJcjAWnr6i" target="_blank" rel="noreferrer" aria-label="Ver imagen del ODS 3" className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.png" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></a>
               <div className="space-y-2"><h3 className="text-lg font-semibold text-[#264653]">Salud y bienestar</h3><p className="text-sm leading-relaxed text-gray-600">Promovemos momentos de conexión y bienestar emocional en familia, respetando el ritmo de cada persona.</p></div>
             </article>
             <article className="flex items-start gap-5">
