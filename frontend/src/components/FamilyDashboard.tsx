@@ -110,11 +110,11 @@ export function FamilyDashboard() {
           </h4>
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between bg-white/70 p-2.5 rounded-xl border border-gray-200/50">
-              <span>🖼️ Fotos de viajes familiares</span>
+              <span>Fotos de viajes familiares</span>
               <span className="bg-[#2c5f7c] text-white font-bold text-[10px] px-2 py-0.5 rounded-md">Sugerido</span>
             </div>
             <div className="flex items-center justify-between bg-white/70 p-2.5 rounded-xl border border-gray-200/50">
-              <span>🎵 Música de su juventud</span>
+              <span>Música de su juventud</span>
               <span className="bg-[#e76f51] text-white font-bold text-[10px] px-2 py-0.5 rounded-md">Pendiente</span>
             </div>
           </div>

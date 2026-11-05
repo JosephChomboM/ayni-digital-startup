@@ -2,24 +2,28 @@
 import { getMe, logout } from "./api/auth";
 import { SESSION_EXPIRED_EVENT } from "./api/client";
 import type { User } from "./api/auth";
-import { UserRound } from "lucide-react";
+import { Heart, LogOut, UserRound } from "lucide-react";
 
 import { WelcomePage } from "./pages/WelcomePage";
 import { HomePage } from "./pages/HomePage";
 import { AuthPage } from "./pages/AuthPage";
-import { ProfilePage } from "./pages/ProfilePage";
 import { SessionGuide } from "./components/SessionGuide";
 import { UploadModule } from "./components/UploadModule";
 import { FamilyDashboard } from "./components/FamilyDashboard";
+import { AccountPage } from "./pages/AccountPage";
+import type { AccountSection } from "./pages/AccountPage";
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard">("welcome");
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "settings" | "session" | "memories" | "dashboard">("welcome");
+  const [accountSection, setAccountSection] = useState<AccountSection>("overview");
 
   useEffect(() => {
     let active = true;
     let sessionExpired = false;
+    const billingReturn = ["success", "cancel"].includes(new URLSearchParams(window.location.search).get("billing") ?? "");
+    const restorePlan = billingReturn || sessionStorage.getItem("ayni_checkout_return") === "settings:plan";
     const requireLogin = () => {
       sessionExpired = true;
       setCurrentUser(null);
@@ -32,7 +36,13 @@ export function App() {
         const sessionData = await getMe();
         if (!active || sessionExpired) return;
         setCurrentUser(sessionData.user);
-        setView("home");
+        if (restorePlan) {
+          setAccountSection("plan");
+          setView("settings");
+          sessionStorage.removeItem("ayni_checkout_return");
+        } else {
+          setView("home");
+        }
       } catch {
         if (!active) return;
         setCurrentUser(null);
@@ -91,9 +101,10 @@ export function App() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => setView("home")}
-            className="flex items-center gap-3 font-extrabold text-[#2c5f7c] text-lg hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-80"
           >
-            Ayni Digital
+            <span className="flex size-9 items-center justify-center rounded-full bg-[#2c5f7c] text-[#e76f51]"><Heart className="size-5 fill-current" /></span>
+            <span><span className="block font-extrabold leading-tight text-[#2c5f7c]">Ayni Digital</span><span className="block text-[10px] font-normal text-slate-500">Recuerdos que nos acercan</span></span>
           </button>
           
           <nav className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 text-xs font-semibold">
@@ -104,15 +115,6 @@ export function App() {
               }`}
             >
               Inicio
-            </button>
-            <button
-              onClick={() => setView("profile")}
-              aria-current={view === "profile" ? "page" : undefined}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
-              }`}
-            >
-              Perfil familiar
             </button>
             <button
               onClick={() => setView("memories")}
@@ -139,22 +141,18 @@ export function App() {
               Dashboard
             </button>
             <button
-              onClick={() => setView("profile")}
-              aria-label="Abrir perfil familiar"
-              title="Perfil familiar"
-              className={`inline-flex items-center justify-center rounded-full p-2 transition-colors ${view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}
+              onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }}
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[#d65d3f] hover:underline"
             >
-              <UserRound className="size-4" />
+              <LogOut className="size-4" aria-hidden="true" /> <span className="hidden sm:inline">Cerrar sesión</span>
             </button>
             <button
-              onClick={() => {
-                logout();
-                setCurrentUser(null);
-                setView("welcome");
-              }}
-              className="text-[#e76f51] hover:underline text-xs font-semibold ml-2"
+              onClick={() => { setAccountSection("overview"); setView("settings"); }}
+              aria-label="Abrir perfil familiar"
+              title="Perfil familiar"
+              className={`order-3 inline-flex size-8 items-center justify-center rounded-full transition-colors ${view === "settings" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}
             >
-              Cerrar sesión
+              <UserRound className="size-4" />
             </button>
           </nav>
         </div>
@@ -174,10 +172,8 @@ export function App() {
           </div>
         )}
 
-        {view === "profile" && currentUser && (
-          <div className="max-w-2xl mx-auto">
-            <ProfilePage currentUser={currentUser} />
-          </div>
+        {view === "settings" && currentUser && (
+          <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} />
         )}
 
         {view === "memories" && (

@@ -208,7 +208,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           <>
             {profileNotFound && isCuidador && (
               <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-xs">
-                ℹ️ Completa el perfil de tu familiar para comenzar las actividades.
+                Completa el perfil de tu familiar para comenzar las actividades.
               </div>
             )}
 
@@ -220,7 +220,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
             {profileError && (
               <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
-                ⚠️ {profileError}
+                {profileError}
                 {!profile && !profileNotFound && (
                   <button type="button" className="block mt-2 underline"
                     onClick={() => setProfileAttempt((attempt) => attempt + 1)}>
@@ -232,7 +232,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
             {profileSuccess && (
               <div role="status" className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl text-xs">
-                ✅ {profileSuccess}
+                {profileSuccess}
               </div>
             )}
 
@@ -345,7 +345,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           </form>
 
           {inviteError && (
-            <p className="text-xs text-red-600 font-medium">⚠️ {inviteError}</p>
+            <p className="text-xs text-red-600 font-medium">{inviteError}</p>
           )}
 
           {generatedToken && (

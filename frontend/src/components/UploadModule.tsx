@@ -92,7 +92,7 @@ export function UploadModule() {
 
   const handleShareWhatsApp = () => {
     const mensaje = encodeURIComponent(
-      "¡Hola! 👋 Te invito a unirte a nuestro grupo en Ayni Digital para subir fotos, canciones y anécdotas familiares. 💚"
+      "Te invito a unirte a nuestro grupo en Ayni Digital para compartir fotos, canciones y anécdotas familiares."
     )
     window.open(`https://wa.me/?text=${mensaje}`, "_blank")
   }
