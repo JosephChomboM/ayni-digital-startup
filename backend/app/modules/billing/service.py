@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -11,6 +12,22 @@ from app.modules.billing.repository import BillingRepository
 from app.modules.billing.schemas import BillingStatusResponse, CheckoutResponse, WebhookResponse
 from app.modules.billing.webhooks import BillingWebhookProcessor
 from app.modules.families.service import FamiliesService
+
+
+@dataclass(frozen=True)
+class PhotoQuotaPolicy:
+    maximum: int | None
+
+    def require_capacity(self, current_count: int) -> None:
+        if self.maximum is not None and current_count >= self.maximum:
+            raise BillingError(
+                code="photo_limit_reached",
+                message=(
+                    "Tu familia llegó al límite de 10 fotos del plan gratis. "
+                    "Puedes borrar una foto o revisar el Plan Familia."
+                ),
+                status_code=409,
+            )
 
 
 class BillingService:
@@ -50,6 +67,10 @@ class BillingService:
         family_id = self._context(actor_id)
         with self.session.begin():
             return self._status(self.repository.get_subscription(family_id))
+
+    def get_photo_quota(self, actor_id: UUID) -> PhotoQuotaPolicy:
+        status = self.get_status(actor_id)
+        return PhotoQuotaPolicy(maximum=None if status.plan == "family" else 10)
 
     @staticmethod
     def _existing_subscription() -> BillingError:
