@@ -39,8 +39,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: "3.12"
       - name: Instalar dependencias
@@ -61,8 +61,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Instalar dependencias
@@ -76,29 +76,208 @@ jobs:
 
   # ---------- SEGURIDAD ----------
 
-  security:
-    name: Seguridad
+  security-scans:
+    name: Escaneos de dependencias y secretos
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Buscar contraseñas o claves subidas por error
-        uses: gitleaks/gitleaks-action@v3
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Librerías de Python con vulnerabilidades conocidas
         working-directory: backend
         run: |
           uv export --frozen --no-hashes --format requirements-txt > requirements.txt
           uvx pip-audit -r requirements.txt
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Librerías de npm con vulnerabilidades conocidas
         working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
+
+  security-regressions:
+    name: Regresiones de seguridad (backend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --frozen
+      - name: Probar secretos, credenciales, JWT y CORS
+        run: >-
+          uv run pytest
+          tests/unit/test_security_settings.py
+          tests/unit/test_security_passwords.py
+          tests/unit/test_security_jwt.py
+          tests/unit/test_secret_audit.py
+          tests/unit/test_cors.py
+          -q
+
+  dependency-review:
+    name: Revisar dependencias nuevas del PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Bloquear dependencias nuevas con vulnerabilidades altas
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime,development,unknown
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript, actions]
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - name: Analizar código
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+
+  security-iac:
+    name: Seguridad de IaC (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Analizar Dockerfile y Docker Compose
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: json
+          output: trivy-iac-report.json
+      - name: Mostrar hallazgos IaC en el resumen del job
+        if: always()
+        run: |
+          echo '### Trivy IaC (HIGH/CRITICAL)' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s trivy-iac-report.json ]; then
+            jq -r '.Results[]? as $r | ($r.Misconfigurations // [])[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL") | "| \($r.Target) | \(.ID) | \(.Severity) | \(.Title) |"' trivy-iac-report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No se generó informe.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Guardar informe de IaC
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: trivy-iac-report
+          path: trivy-iac-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  security-container:
+    name: Seguridad de imagen backend (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Construir imagen local para escaneo
+        run: docker build --tag ayni-api:${{ github.sha }} ./backend
+      - name: Buscar CVE altas y críticas en la imagen
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ayni-api:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-container-report.json
+      - name: Mostrar CVE en el resumen del job
+        if: always()
+        run: |
+          echo '### Trivy imagen (HIGH/CRITICAL)' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s trivy-container-report.json ]; then
+            jq -r '.Results[]? as $r | ($r.Vulnerabilities // [])[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL") | "| \($r.Target) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "sin corrección") | \(.VulnerabilityID) | \(.Severity) |"' trivy-container-report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No se generó informe.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Guardar informe de imagen
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: trivy-container-report
+          path: trivy-container-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Este es el check requerido por el ruleset actual de main. Al agregar los
+  # escaneos como dependencias, cualquier fallo de seguridad bloquea ese check.
+  security:
+    name: Seguridad
+    if: always()
+    needs:
+      - security-scans
+      - security-regressions
+      - dependency-review
+      - codeql
+      - security-iac
+      - security-container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exigir que pasen todos los controles
+        if: always()
+        env:
+          SECURITY_SCANS: ${{ needs.security-scans.result }}
+          SECURITY_REGRESSIONS: ${{ needs.security-regressions.result }}
+          DEPENDENCY_REVIEW: ${{ needs.dependency-review.result }}
+          CODEQL: ${{ needs.codeql.result }}
+          SECURITY_IAC: ${{ needs.security-iac.result }}
+          SECURITY_CONTAINER: ${{ needs.security-container.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          failed=0
+          for check in SECURITY_SCANS SECURITY_REGRESSIONS CODEQL SECURITY_IAC SECURITY_CONTAINER; do
+            value="${!check}"
+            echo "$check: $value"
+            if [ "$value" != "success" ]; then
+              echo "::error::$check no pasó; el merge queda bloqueado."
+              failed=1
+            fi
+          done
+          echo "DEPENDENCY_REVIEW: $DEPENDENCY_REVIEW"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$DEPENDENCY_REVIEW" != "success" ]; then
+            echo "::error::La revisión de dependencias no pasó; el merge queda bloqueado."
+            failed=1
+          elif [ "$EVENT_NAME" = "push" ] && [ "$DEPENDENCY_REVIEW" != "skipped" ] && [ "$DEPENDENCY_REVIEW" != "success" ]; then
+            echo "::error::Estado inesperado en la revisión de dependencias."
+            failed=1
+          fi
+          exit "$failed"
 
   # ---------- DEPLOY (solo al mergear a main) ----------
   # Render despliega el commit exacto (?ref=) que pasó los tests.
@@ -107,7 +286,7 @@ jobs:
   deploy-stage:
     name: Deploy a stage
     if: github.event_name == 'push'
-    needs: [backend, frontend, security]
+    needs: [backend, frontend, security, security-regressions, codeql, security-iac, security-container]
     runs-on: ubuntu-latest
     environment: stage
     env:
