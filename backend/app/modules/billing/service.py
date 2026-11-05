@@ -115,3 +115,27 @@ class BillingService:
 
     def handle_webhook(self, payload: bytes, signature: str) -> WebhookResponse:
         return BillingWebhookProcessor(self.session, self.gateway).process(payload, signature)
+
+    def cancel_subscription(self, actor_id: UUID) -> BillingStatusResponse:
+        family_id = self._context(actor_id, caregiver_only=True)
+        with self.session.begin():
+            subscription = self.repository.get_subscription(family_id)
+            if subscription is None or not subscription.stripe_subscription_id:
+                raise BillingError(
+                    code="subscription_not_found",
+                    message="Tu familia todavía no tiene una suscripción.",
+                    status_code=404,
+                )
+            subscription = self.repository.lock_subscription(family_id)
+            if subscription.cancel_at_period_end or subscription.status == "canceled":
+                return self._status(subscription)
+            remote = self.gateway.cancel_subscription(subscription.stripe_subscription_id)
+            if (
+                remote.get("id") != subscription.stripe_subscription_id
+                or remote.get("customer") != subscription.stripe_customer_id
+                or not remote.get("cancel_at_period_end")
+            ):
+                raise provider_unavailable()
+            subscription.cancel_at_period_end = True
+            # The verified paid period remains available until its original end date.
+            return self._status(subscription)
