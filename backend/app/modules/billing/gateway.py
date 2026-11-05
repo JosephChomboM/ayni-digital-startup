@@ -8,6 +8,9 @@ from app.modules.billing.settings import BillingSettings, get_billing_settings
 
 
 class BillingGateway(Protocol):
+    @property
+    def price_id(self) -> str: ...
+
     def create_customer(self, family_id: UUID) -> str: ...
     def create_checkout(
         self, customer_id: str, family_id: UUID, attempt_id: UUID
@@ -22,6 +25,10 @@ class BillingGateway(Protocol):
 class StripeGateway:
     def __init__(self, settings: BillingSettings | None = None) -> None:
         self.settings = settings or get_billing_settings()
+
+    @property
+    def price_id(self) -> str:
+        return self.settings.stripe_price_id
 
     def _client(self) -> stripe.StripeClient:
         self.settings.require()

@@ -8,7 +8,8 @@ from app.modules.billing.errors import BillingError, provider_unavailable
 from app.modules.billing.gateway import BillingGateway, StripeGateway
 from app.modules.billing.models import Subscription
 from app.modules.billing.repository import BillingRepository
-from app.modules.billing.schemas import BillingStatusResponse, CheckoutResponse
+from app.modules.billing.schemas import BillingStatusResponse, CheckoutResponse, WebhookResponse
+from app.modules.billing.webhooks import BillingWebhookProcessor
 from app.modules.families.service import FamiliesService
 
 
@@ -111,3 +112,6 @@ class BillingService:
             return CheckoutResponse(
                 checkout_url=attempt.checkout_url, expires_at=attempt.expires_at
             )
+
+    def handle_webhook(self, payload: bytes, signature: str) -> WebhookResponse:
+        return BillingWebhookProcessor(self.session, self.gateway).process(payload, signature)

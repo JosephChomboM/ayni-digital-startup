@@ -76,3 +76,11 @@ class BillingRepository:
             )
         )
         self.session.flush()
+
+    def latest_checkout(self, family_id: UUID) -> CheckoutAttempt | None:
+        return self.session.scalar(
+            select(CheckoutAttempt)
+            .where(CheckoutAttempt.family_id == family_id)
+            .order_by(CheckoutAttempt.created_at.desc(), CheckoutAttempt.id.desc())
+            .limit(1)
+        )
