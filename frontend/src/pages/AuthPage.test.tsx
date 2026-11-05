@@ -47,11 +47,20 @@ function fillCredentials(password: string = crypto.randomUUID()): void {
 }
 
 async function fillRegistration(): Promise<void> {
-  await screen.findByRole("checkbox");
-  fireEvent.change(screen.getByLabelText("Tu Nombre Completo"), { target: { value: user.name } });
-  fireEvent.change(screen.getByLabelText("Nombre del Grupo Familiar"), { target: { value: "Familia de prueba" } });
+  await screen.findByRole("checkbox", { name: /Acepto el consentimiento mostrado/ });
+  fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Persona" } });
+  fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "de prueba" } });
+  fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+51 987 654 321" } });
+  fireEvent.change(screen.getByLabelText("Ciudad"), { target: { value: "Lima" } });
+  fireEvent.change(screen.getByLabelText("Distrito"), { target: { value: "Surco" } });
+  fireEvent.change(screen.getByLabelText("Nombre del grupo familiar"), { target: { value: "Familia de prueba" } });
   fillCredentials();
-  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("checkbox", { name: /Acepto el consentimiento mostrado/ }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /Acepto el tratamiento de mis datos personales/ }));
+}
+
+function createAccountButton(): HTMLElement {
+  return screen.getAllByRole("button", { name: /^Crear cuenta$/ }).at(-1)!;
 }
 
 function submit(): void {
@@ -89,7 +98,7 @@ describe("AuthPage families contract", () => {
     render(<AuthPage onBack={vi.fn()} onSuccess={onSuccess} />);
     await fillRegistration();
     const invitation = crypto.randomUUID();
-    fireEvent.change(screen.getByLabelText("Forma de registro"), { target: { value: "invitation" } });
+    fireEvent.change(screen.getByLabelText("Selecciona tu rol"), { target: { value: "invitation" } });
     fireEvent.change(screen.getByLabelText("Código de invitación"), { target: { value: invitation } });
     submit();
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
@@ -112,8 +121,8 @@ describe("AuthPage families contract", () => {
   it("does not submit registration without explicit acceptance", async () => {
     render(<AuthPage onBack={vi.fn()} onSuccess={vi.fn()} />);
     await fillRegistration();
-    fireEvent.click(screen.getByRole("checkbox"));
-    expect(screen.getByRole("button", { name: "Crear Cuenta de Cuidador" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Acepto el consentimiento mostrado/ }));
+    expect(createAccountButton()).toBeDisabled();
     submit();
     expect(await screen.findByRole("alert")).toHaveTextContent("acepta el consentimiento");
     expect(posts()).toHaveLength(0);
@@ -157,9 +166,10 @@ describe("AuthPage families contract", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("network unavailable"));
     render(<AuthPage onBack={vi.fn()} onSuccess={vi.fn()} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos conectar");
-    expect(screen.getByRole("button", { name: "Crear Cuenta de Cuidador" })).toBeDisabled();
+    expect(createAccountButton()).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Volver a cargar el consentimiento" }));
-    expect(await screen.findByRole("checkbox")).not.toBeChecked();
+    expect(await screen.findByRole("checkbox", { name: /Acepto el consentimiento mostrado/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Acepto el tratamiento de mis datos personales/ })).not.toBeChecked();
     expect(screen.getByText(texts.text)).toBeInTheDocument();
     expect(posts()).toHaveLength(0);
   });
