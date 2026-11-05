@@ -179,3 +179,45 @@ def test_put_elder_profile_forbids_family_member(
     )
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "forbidden"
+
+
+def test_rename_family_requires_primary_caregiver_and_preserves_other_families(
+    client: TestClient,
+    caregiver_account: SimpleNamespace,
+    family_member: SimpleNamespace,
+    other_caregiver_account: SimpleNamespace,
+) -> None:
+    other_before = client.get("/families/me", headers=_headers(other_caregiver_account)).json()
+    assert client.patch("/families/me", json={"name": "Familia nueva"}).status_code == 401
+    denied = client.patch(
+        "/families/me", json={"name": "Familia nueva"}, headers=_headers(family_member)
+    )
+    assert denied.status_code == 403
+    renamed = client.patch(
+        "/families/me", json={"name": " Familia nueva "}, headers=_headers(caregiver_account)
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["id"] == str(caregiver_account.family_id)
+    assert renamed.json()["name"] == "Familia nueva"
+    assert (
+        client.get("/families/me", headers=_headers(family_member)).json()["name"]
+        == "Familia nueva"
+    )
+    assert (
+        client.get("/families/me", headers=_headers(other_caregiver_account)).json() == other_before
+    )
+
+
+def test_rename_family_rejects_password_and_invalid_payload(
+    client: TestClient, caregiver_account: SimpleNamespace
+) -> None:
+    before = client.get("/families/me", headers=_headers(caregiver_account)).json()
+    for payload in [
+        {"name": caregiver_account.password.get_secret_value()},
+        {"name": " "},
+        {"name": "x" * 101},
+        {"name": "Familia nueva", "family_id": str(caregiver_account.family_id)},
+    ]:
+        response = client.patch("/families/me", json=payload, headers=_headers(caregiver_account))
+        assert response.status_code == 422
+    assert client.get("/families/me", headers=_headers(caregiver_account)).json() == before

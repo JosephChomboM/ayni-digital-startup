@@ -74,6 +74,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setError("Completa todos los campos obligatorios para crear tu cuenta.");
         return;
       }
+      if (registrationMode === "family" && familyName.trim() === password.trim()) {
+        setError("Elige un nombre para tu familia distinto de tu contraseña.");
+        return;
+      }
       if (!consent || consentLoading || !hasConsented || !hasAcceptedPrivacy) {
         setError("Lee y acepta el consentimiento y el tratamiento de datos personales para continuar.");
         return;
@@ -214,6 +218,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <Users className="absolute left-3 top-3 size-4 text-gray-400" />
                       <Input
                         id="auth-family"
+                        autoComplete="off"
                         required
                         maxLength={registrationMode === "family" ? 100 : undefined}
                         value={registrationMode === "family" ? familyName : invitationToken}

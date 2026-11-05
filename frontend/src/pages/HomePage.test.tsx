@@ -60,3 +60,11 @@ it("includes locally stored photos without mistaking the first API page for the 
   render(<HomePage {...actions()} currentUser={{ id: "u", name: "Ana", email: "ana@example.test", role: "familiar", family_id: "f", created_at: "" }} />);
   expect(await screen.findByText(/8 recuerdos disponibles/)).toBeInTheDocument();
 });
+
+it("keeps a neutral heading even if the stored group name contains an accidental secret", async () => {
+  const accidentalValue = crypto.randomUUID();
+  vi.mocked(getMyFamily).mockResolvedValue({ id: "f", name: accidentalValue, created_at: "" });
+  render(<HomePage {...actions()} />);
+  expect(await screen.findByRole("heading", { name: "Tu espacio familiar" })).toBeInTheDocument();
+  expect(screen.queryByText(accidentalValue)).not.toBeInTheDocument();
+});

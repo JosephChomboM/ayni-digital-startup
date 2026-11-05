@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Users } from "lucide-react";
-import { getElderProfile, getMyFamily } from "../api/families";
-import type { ElderProfile, Family } from "../api/families";
+import { getElderProfile } from "../api/families";
+import type { ElderProfile } from "../api/families";
 import { listMemories } from "../api/memories";
 import type { User } from "../api/auth";
 import { getLocalFamilyPhotos } from "../api/localMedia";
@@ -18,7 +18,6 @@ interface HomePageProps {
 
 export function HomePage({ onStartSession, onViewMemories, onViewProfile, canManageFamily, currentUser }: HomePageProps) {
   const [profile, setProfile] = useState<ElderProfile | null>(null);
-  const [family, setFamily] = useState<Family | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -28,13 +27,12 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([getMyFamily(), getElderProfile(), listMemories({ limit: 1 }), familyId ? getLocalFamilyPhotos(familyId) : Promise.resolve([])]).then(([familyResult, profileResult, memoriesResult, photosResult]) => {
+    Promise.allSettled([getElderProfile(), listMemories({ limit: 1 }), familyId ? getLocalFamilyPhotos(familyId) : Promise.resolve([])]).then(([profileResult, memoriesResult, photosResult]) => {
       if (!active) return;
-      setFamily(familyResult.status === "fulfilled" ? familyResult.value : null);
       setProfile(profileResult.status === "fulfilled" ? profileResult.value : null);
       setCount(memoriesResult.status === "fulfilled" ? memoriesResult.value.total + (photosResult.status === "fulfilled" ? photosResult.value.length : 0) : null);
       const profileMissing = profileResult.status === "rejected" && profileResult.reason instanceof ApiError && profileResult.reason.code === "elder_profile_not_found";
-      setError(photosResult.status === "rejected" || familyResult.status === "rejected" || (profileResult.status === "rejected" && !profileMissing) || (memoriesResult.status === "rejected" && !profileMissing));
+      setError(photosResult.status === "rejected" || (profileResult.status === "rejected" && !profileMissing) || (memoriesResult.status === "rejected" && !profileMissing));
       setLoading(false);
     });
     return () => { active = false; };
@@ -50,7 +48,7 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
   return (
     <div className="mx-auto max-w-5xl space-y-10">
       <header className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight text-[#2c5f7c] sm:text-4xl">{family?.name || "Tu espacio familiar"}</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#2c5f7c] sm:text-4xl">Tu espacio familiar</h1>
         <p className="max-w-2xl text-base leading-relaxed text-[#264653]">Un lugar para reunir historias y preparar un momento con {profile?.name || "tu familiar"}. Una conversación, a su ritmo.</p>
       </header>
 

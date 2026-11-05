@@ -183,3 +183,14 @@ describe("AuthPage families contract", () => {
   expect(createAccountButton()).toBeDisabled();
   expect(fetchMock).not.toHaveBeenCalled();
 });
+
+it("blocks a family name accidentally copied from the password", async () => {
+  render(<AuthPage onBack={vi.fn()} onSuccess={vi.fn()} />);
+  await fillRegistration();
+  const sameValue = crypto.randomUUID();
+  fillCredentials(sameValue);
+  fireEvent.change(screen.getByLabelText("Nombre del grupo familiar"), { target: { value: sameValue } });
+  submit();
+  expect(await screen.findByRole("alert")).toHaveTextContent("distinto de tu contraseña");
+  expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/auth/register"))).toHaveLength(0);
+});
