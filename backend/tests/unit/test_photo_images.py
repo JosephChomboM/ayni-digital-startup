@@ -40,6 +40,11 @@ def test_invalid_or_mislabeled_file_is_rejected() -> None:
     with pytest.raises(ApplicationError) as error:
         validate_photo(data.getvalue(), "image/jpeg", "foto.jpg")
     assert error.value.code == "photo_format_invalid"
+    broken = bytearray(data.getvalue())
+    broken[-13] ^= 1  # Corrupt a PNG chunk checksum after its valid header.
+    with pytest.raises(ApplicationError) as error:
+        validate_photo(bytes(broken), "image/png", "foto.png")
+    assert error.value.code == "photo_format_invalid"
 
 
 def test_oversized_file_is_rejected_before_image_decode() -> None:

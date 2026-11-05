@@ -264,6 +264,23 @@ def test_upload_rejects_oversized_request_before_storage(
     assert response.status_code == 413
     assert response.json()["detail"]["code"] == "photo_too_large"
     assert not storage.objects
+    streamed_headers = {
+        **headers(caregiver_account),
+        "Content-Type": "multipart/form-data; boundary=ayni",
+    }
+    chunks = iter(
+        [
+            b'--ayni\r\nContent-Disposition: form-data; name="file"; filename="a.png"\r\n'
+            b"Content-Type: image/png\r\n\r\n",
+            b"x" * (PHOTO_MAX_BYTES + 65537),
+            b"\r\n--ayni--\r\n",
+        ]
+    )
+    streamed = client.post(
+        f"/memories/{memory.id}/photos", headers=streamed_headers, content=chunks
+    )
+    assert streamed.status_code == 413
+    assert streamed.json()["detail"]["code"] == "photo_too_large"
 
 
 def test_deleting_memory_also_removes_private_photo_objects(

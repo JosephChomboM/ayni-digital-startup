@@ -73,6 +73,7 @@ def validate_photo(data: bytes, content_type: str, filename: str) -> ValidatedPh
                 return ValidatedPhoto(encoded, mime, extension, clean.width, clean.height)
     except (
         UnidentifiedImageError,
+        SyntaxError,
         OSError,
         ValueError,
         Image.DecompressionBombError,
