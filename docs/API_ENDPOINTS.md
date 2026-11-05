@@ -46,9 +46,19 @@ Generación de patrones descriptivos a partir de las respuestas.
     *   ≥50% de respuestas negativas (solo `agitado` cuenta como negativa) en las últimas 5 sesiones.
     *   *La alerta debe sugerir pausar y consultar a un profesional, e incluir el disclaimer: "Esto no es un diagnóstico. Es un registro de actividades familiares".*
 
-## 5. Billing (Post-MVP)
-*   **`GET /billing/status`**: Devuelve el plan actual (Free / Plan Familia).
-*   **`POST /billing/checkout`**: Genera un link de pago (Mercado Pago en modo test). Se requerirá un webhook para sincronizar estados en el futuro.
+## 5. Billing (Implementado en rama AYNI-86; PR pendiente)
+
+Plan Familia: **S/19.90 PEN al mes**, con Stripe solo en modo de prueba.
+Configuración, respuestas y verificación: [BILLING.md](BILLING.md).
+
+* **`GET /billing/status`**: Miembros autenticados consultan el plan y estado de su familia.
+* **`POST /billing/checkout`**: Solo cuidador principal. Cuerpo `{}`; devuelve `checkout_url` y `expires_at`. El precio se determina en el backend.
+* **`POST /billing/cancel`**: Solo cuidador principal. Cuerpo `{}`; cancela futuras renovaciones y conserva el periodo pagado.
+* **`POST /billing/webhook`**: Stripe, sin JWT; exige firma `Stripe-Signature`. Confirma pagos y sincroniza estados. Volver a la pantalla de éxito no activa el plan.
+
+Las peticiones de usuario envían `Authorization: Bearer <JWT>`.
+Los errores mantienen `{"detail":{"code":"...","message":"..."}}`.
+La aplicación de cuotas a otros módulos y la verificación con Stripe/stage siguen pendientes.
 
 ## 6. Eliminación de Cuenta (Pendiente de definición)
 *   **`DELETE /users/me`**: Elimina de forma real la cuenta, sus recuerdos, fotos y respuestas. Falta definir el comportamiento si quien elimina es un familiar o la cuidadora principal.
