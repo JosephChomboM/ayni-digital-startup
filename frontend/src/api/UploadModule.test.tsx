@@ -179,7 +179,7 @@ it.each([
 it("saves selected photos with an anecdote and clears the selection after confirmation", async () => {
   render(<UploadModule />);
   await screen.findByText("Todavía no hay recuerdos para mostrar.");
-  const file = new File(["image"], "foto-familiar.jpg", { type: "image/jpeg" });
+  const file = new File(["image"], "<img src=x onerror=alert(1)>.jpg", { type: "image/jpeg" });
   fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } });
   expect(await screen.findByText("1 foto seleccionada; se guardarán junto con el recuerdo.")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Un paseo" } });
@@ -187,7 +187,9 @@ it("saves selected photos with an anecdote and clears the selection after confir
   fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
   fireEvent.click(await screen.findByRole("button", { name: "OK" }));
   expect(await screen.findByText("Las fotos seleccionadas se adjuntan al guardar el recuerdo.")).toBeInTheDocument();
-  expect(screen.getByText("foto-familiar.jpg")).toBeInTheDocument();
+  expect(screen.getByText("Foto familiar")).toBeInTheDocument();
+  expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();
   expect(photoStore.items).toHaveLength(1);
 });
 

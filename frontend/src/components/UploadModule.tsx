@@ -314,10 +314,10 @@ function PhotoGrid({ photos, currentUserId, onDelete }: {
 
   return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
     {photos.map((photo) => <figure key={photo.id} className="group relative overflow-hidden rounded-lg">
-      {sources[photo.id] && <img src={sources[photo.id]} alt={photo.name} className="aspect-square w-full object-cover" />}
+      {sources[photo.id] && <img src={sources[photo.id]} alt="Foto familiar guardada" className="aspect-square w-full object-cover" />}
       <figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600">
-        <span className="truncate">{photo.name}</span>
-        {photo.created_by === currentUserId && <button type="button" onClick={() => onDelete(photo)} aria-label={`Eliminar ${photo.name}`} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button>}
+        <span className="truncate">Foto familiar</span>
+        {photo.created_by === currentUserId && <button type="button" onClick={() => onDelete(photo)} aria-label="Eliminar foto familiar" className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button>}
       </figcaption>
     </figure>)}
   </div>;
@@ -330,7 +330,7 @@ function StagedPhotoGrid({ files, onRemove }: { files: File[]; onRemove: (index:
     setSources(urls)
     return () => urls.forEach((url) => URL.revokeObjectURL(url))
   }, [files])
-  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{files.map((file, index) => <figure key={`${file.name}-${file.lastModified}-${index}`} className="overflow-hidden rounded-lg">{sources[index] && <img src={sources[index]} alt={file.name} className="aspect-square w-full object-cover" />}<figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600"><span className="truncate">{file.name}</span><button type="button" onClick={() => onRemove(index)} aria-label={`Quitar ${file.name}`} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button></figcaption></figure>)}</div>
+  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{files.map((_, index) => <figure key={index} className="overflow-hidden rounded-lg">{sources[index] && <img src={sources[index]} alt={`Vista previa de foto ${index + 1}`} className="aspect-square w-full object-cover" />}<figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600"><span className="truncate">Foto seleccionada {index + 1}</span><button type="button" onClick={() => onRemove(index)} aria-label={`Quitar foto ${index + 1}`} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button></figcaption></figure>)}</div>
 }
 
 export function Contributions({ revision = 0, busy = false, photos = [], currentUserId = "", onDeletePhoto, onEdit, onDelete }: {
