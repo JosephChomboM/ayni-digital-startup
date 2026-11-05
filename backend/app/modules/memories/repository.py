@@ -10,6 +10,7 @@ from app.modules.memories.models import (
     Memory,
     MemoryEntity,
     MemoryEntityKind,
+    MemoryPhoto,
     MemoryType,
 )
 
@@ -211,3 +212,52 @@ class MemoriesRepository:
         memory.entities_status = EntitiesStatus.FAILED
         self.session.flush()
         return True
+
+    def lock_photo_capacity(self, profile_id: UUID) -> None:
+        # One family profile shares a single capacity across all its memories.
+        self.session.execute(
+            select(
+                func.pg_advisory_xact_lock(
+                    func.hashtextextended("ayni-photos:" + str(profile_id), 0)
+                )
+            )
+        )
+
+    def add_photo(self, photo: MemoryPhoto) -> MemoryPhoto:
+        self.session.add(photo)
+        self.session.flush()
+        return photo
+
+    def list_photos(
+        self,
+        memory_id: UUID,
+        *,
+        elder_profile_id: UUID,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[MemoryPhoto]:
+        query = (
+            select(MemoryPhoto)
+            .join(Memory)
+            .where(Memory.id == memory_id, Memory.elder_profile_id == elder_profile_id)
+            .order_by(MemoryPhoto.created_at.desc(), MemoryPhoto.id.desc())
+            .offset(offset)
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        return list(self.session.scalars(query))
+
+    def count_photos(self, profile_id: UUID, memory_id: UUID | None = None) -> int:
+        query = (
+            select(func.count())
+            .select_from(MemoryPhoto)
+            .join(Memory)
+            .where(Memory.elder_profile_id == profile_id)
+        )
+        if memory_id is not None:
+            query = query.where(Memory.id == memory_id)
+        return self.session.scalar(query) or 0
+
+    def delete_photo(self, photo: MemoryPhoto) -> None:
+        self.session.delete(photo)
+        self.session.flush()

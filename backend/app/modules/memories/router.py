@@ -8,6 +8,9 @@ from app.core.db import get_db
 from app.modules.families.service import get_authenticated_user_id
 from app.modules.memories.extraction import extract_anecdote_entities
 from app.modules.memories.models import EntitiesStatus, MemoryType
+from app.modules.memories.photo_router import get_photo_storage
+from app.modules.memories.photo_router import router as photo_router
+from app.modules.memories.photo_storage import PhotoStorage
 from app.modules.memories.schemas import (
     MemoryCreateRequest,
     MemoryListRequest,
@@ -18,10 +21,14 @@ from app.modules.memories.schemas import (
 from app.modules.memories.service import MemoriesService
 
 router = APIRouter(prefix="/memories", tags=["memories"])
+router.include_router(photo_router)
 
 
-def get_memories_service(db: Annotated[Session, Depends(get_db)]) -> MemoriesService:
-    return MemoriesService(db)
+def get_memories_service(
+    db: Annotated[Session, Depends(get_db)],
+    storage: Annotated[PhotoStorage, Depends(get_photo_storage)],
+) -> MemoriesService:
+    return MemoriesService(db, photo_storage=storage)
 
 
 AuthenticatedUserId = Annotated[UUID, Depends(get_authenticated_user_id)]
