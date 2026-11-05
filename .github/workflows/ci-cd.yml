@@ -168,7 +168,7 @@ jobs:
       - name: Descargar código
         uses: actions/checkout@v7
       - name: Analizar Dockerfile y Docker Compose
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -197,7 +197,7 @@ jobs:
       - name: Construir imagen local para escaneo
         run: docker build --tag ayni-api:${{ github.sha }} ./backend
       - name: Buscar CVE altas y críticas en la imagen
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ayni-api:${{ github.sha }}
