@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Heart,
   ArrowRight,
@@ -280,7 +280,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
               ["¿Quién puede aportar recuerdos?", "La persona cuidadora puede invitar a familiares para sumar fotos, anécdotas y canciones."],
               ["¿Cuánto dura una sesión?", "La guía propone alrededor de 15 minutos. Pueden hacer pausas o terminar cuando quieran."],
               ["¿Qué hacemos si un recuerdo incomoda?", "Pueden cambiar de tema, guardar el recuerdo para después o detener la sesión. El bienestar de la persona es lo primero."],
-              ["¿Cómo funciona el pago?", "El acceso se ofrece por un pago único de S/ 19.90. El cobro se habilitará cuando esté conectada la pasarela de pago."],
+              ["¿Cómo funciona el pago?", "El Plan Familia cuesta S/ 19.90 al mes. La pasarela funciona en modo de prueba, sin cobros reales."],
             ].map(([question, answer]) => <details key={question} className="group py-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-[#264653]">{question}<ChevronDown className="size-5 shrink-0 transition group-open:rotate-180"/></summary><p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-600">{answer}</p></details>)}
           </div>
         </section>
@@ -309,8 +309,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
         <section aria-labelledby="plan-title" className="relative left-1/2 w-screen -translate-x-1/2 scroll-mt-24 bg-[#17232d] px-4 py-12 text-white sm:px-8 sm:py-16">
           <div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-2xl space-y-3"><p className="text-sm font-semibold text-[#e9c46a]">Acceso familiar</p><h2 id="plan-title" className="text-3xl font-semibold">Un solo pago, recuerdos para compartir</h2><p className="text-base leading-relaxed text-white/75">El plan contempla acceso a las herramientas de Ayni para organizar recuerdos familiares y acompañar conversaciones.</p><ul className="space-y-2 text-sm leading-relaxed text-white/80"><li>• Espacio para reunir fotos, anécdotas y canciones significativas.</li><li>• Guía de conversación de aproximadamente 15 minutos, con opción de pausar o terminar.</li><li>• Registro para conversar sobre cómo se sintió la persona al finalizar.</li></ul></div>
-            <div className="flex shrink-0 flex-col items-start gap-4 sm:items-end"><p className="text-4xl font-bold">S/ 19.90 <span className="text-base font-medium text-white/70">pago único</span></p><Button onClick={handleRegister} className="min-h-12 bg-[#e76f51] px-6 text-base font-semibold text-white hover:bg-[#d65d3f]">Crear cuenta <ArrowRight className="ml-2 size-4"/></Button><p className="max-w-xs text-xs text-white/60 sm:text-right">El cobro todavía no está habilitado. Falta definir límites del plan y conectar la pasarela.</p></div>
+            <div className="max-w-2xl space-y-3"><p className="text-sm font-semibold text-[#e9c46a]">Acceso familiar</p><h2 id="plan-title" className="text-3xl font-semibold">Un plan mensual, recuerdos para compartir</h2><p className="text-base leading-relaxed text-white/75">El plan contempla acceso a las herramientas de Ayni para organizar recuerdos familiares y acompañar conversaciones.</p><ul className="space-y-2 text-sm leading-relaxed text-white/80"><li>• Espacio para reunir fotos, anécdotas y canciones significativas.</li><li>• Guía de conversación de aproximadamente 15 minutos, con opción de pausar o terminar.</li><li>• Registro para conversar sobre cómo se sintió la persona al finalizar.</li></ul></div>
+            <div className="flex shrink-0 flex-col items-start gap-4 sm:items-end"><p className="text-4xl font-bold">S/ 19.90 <span className="text-base font-medium text-white/70">al mes</span></p><Button onClick={handleRegister} className="min-h-12 bg-[#e76f51] px-6 text-base font-semibold text-white hover:bg-[#d65d3f]">Crear cuenta <ArrowRight className="ml-2 size-4"/></Button><p className="max-w-xs text-xs text-white/60 sm:text-right">Gestiona el Plan Familia desde tu cuenta. Los pagos están en modo de prueba.</p></div>
           </div>
         </section>
       </main>

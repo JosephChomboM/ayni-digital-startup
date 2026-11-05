@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CalendarDays,
   ArrowRight,
@@ -10,6 +10,7 @@ import {
 import { getElderProfile, getMyFamily } from "../api/families";
 import type { ElderProfile, Family } from "../api/families";
 import { ApiError } from "../api/client";
+import { BillingPanel } from "../components/BillingPanel";
 
 interface HomePageProps {
   onStartSession: () => void;
@@ -230,6 +231,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>)}
         </div>
       </section>
+
+      <BillingPanel />
 
       {/* 5. IMPACTO SOCIAL & OBJETIVOS DE DESARROLLO SOSTENIBLE (ODS 3 & ODS 10) CON BANDERAS INSTITUCIONALES */}
       <section className="rounded-2xl bg-white p-6 sm:p-8 border border-gray-200 shadow-xs space-y-6">

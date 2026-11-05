@@ -17,7 +17,7 @@ fallaba porque PostCSS seguía usando directamente `tailwindcss` como plugin.
 ## Verificación local
 
 - `npm run lint`: sin errores; tres advertencias existentes de React.
-- `npm test`: 44 pruebas satisfactorias en 7 archivos.
+- `npm test`: 51 pruebas satisfactorias en 9 archivos tras incorporar `main`.
 - `npm run build`: compilación de TypeScript y Vite satisfactoria.
 - `npm audit --audit-level=high`: cero vulnerabilidades reportadas.
 - Revisión del build en navegador: bienvenida y navegación al acceso; colores,
@@ -30,6 +30,13 @@ requiere Safari 16.4+, Chrome 111+ o Firefox 128+; no se ha comprobado en esos t
 navegadores ni en dispositivos físicos.
 
 Referencia: https://tailwindcss.com/docs/upgrade-guide
+
+## Sincronización con main
+
+Incorporados TypeScript 7.0.2, Oxlint 1.90.0, billing y los cambios de registro del
+equipo. Resuelto el conflicto del botón de registro conservando la exigencia de
+aceptar privacidad (`hasAcceptedPrivacy`) junto con las clases migradas a Tailwind 4.
+El lockfile se regeneró con esas versiones y ambos paquetes Tailwind en 4.3.3.
 
 Para revertir toda la actualización, revertir el merge del PR completo, incluyendo
 los manifests y lockfile. No hay cambios de API, datos ni migraciones.

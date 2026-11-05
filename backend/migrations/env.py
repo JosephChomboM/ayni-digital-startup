@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.core.db import Base
+from app.modules.billing import models as _billing_models  # noqa: F401
 from app.modules.families import models as _families_models  # noqa: F401
 from app.modules.memories import models as _memories_models  # noqa: F401
 
