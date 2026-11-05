@@ -4,49 +4,66 @@ import {
   BookOpen,
   Users,
   AlertTriangle,
+  Bell,
+  Music2,
+  Share2,
 } from "lucide-react";
-import { getElderProfile, getMyFamily } from "../api/families";
+import { getElderProfile, getFamilyMembers, getMyFamily } from "../api/families";
 import type { ElderProfile, Family } from "../api/families";
+import type { User } from "../api/auth";
 import { ApiError } from "../api/client";
 import { BillingPanel } from "../components/BillingPanel";
+import { listMemories } from "../api/memories";
+import type { Memory } from "../api/memories";
+import type { Member } from "../api/families";
+import { getLocalFamilyPhotos } from "../api/localMedia";
+import { getFamilySessionFeedback } from "../api/sessionFeedback";
 
 interface HomePageProps {
+  currentUser: User;
   onStartSession: () => void;
   onViewMemories: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
+  currentUser,
   onStartSession,
   onViewMemories,
 }) => {
   const [elderProfile, setElderProfile] = useState<ElderProfile | null>(null);
   const [family, setFamily] = useState<Family | null>(null);
   const [loading, setLoading] = useState(true);
+  const [memoryCount, setMemoryCount] = useState<number | null>(null);
+  const [sessionCount, setSessionCount] = useState<number | null>(null);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [recentSessions, setRecentSessions] = useState<ReturnType<typeof getFamilySessionFeedback>>([]);
+  const [shareNotice, setShareNotice] = useState<{ id: string; date: string } | null>(null);
 
   useEffect(() => {
     async function loadDashboardData() {
       setLoading(true);
-      try {
-        const familyData = await getMyFamily();
-        setFamily(familyData);
-      } catch {
-        // Silencioso
-      }
-
-      try {
-        const profileData = await getElderProfile();
-        setElderProfile(profileData);
-      } catch (err) {
-        if (err instanceof ApiError && err.code === "elder_profile_not_found") {
-          setElderProfile(null);
-        }
-      } finally {
-        setLoading(false);
-      }
+      const [familyResult, profileResult, memoriesResult, photosResult, membersResult] = await Promise.allSettled([
+        getMyFamily(), getElderProfile(), listMemories({ include_sensitive: false, limit: 100 }),
+        getLocalFamilyPhotos(currentUser.family_id),
+        getFamilyMembers(),
+      ]);
+      if (familyResult.status === "fulfilled") setFamily(familyResult.value);
+      if (profileResult.status === "fulfilled") setElderProfile(profileResult.value);
+      else if (profileResult.reason instanceof ApiError && profileResult.reason.code === "elder_profile_not_found") setElderProfile(null);
+      if (memoriesResult.status === "fulfilled" && photosResult.status === "fulfilled") setMemoryCount(memoriesResult.value.items.length + photosResult.value.length);
+      if (memoriesResult.status === "fulfilled") setRecentMemories(memoriesResult.value.items);
+      if (membersResult.status === "fulfilled") { setMemberCount(membersResult.value.items.length); setMembers(membersResult.value.items); }
+      const feedback = getFamilySessionFeedback(currentUser.family_id);
+      const week = feedback.filter((item) => Date.now() - new Date(item.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
+      setSessionCount(week.length);
+      setRecentSessions(week.slice(0, 3));
+      setLoading(false);
     }
 
     loadDashboardData();
-  }, []);
+  }, [currentUser.family_id]);
 
   const elderDisplayName = elderProfile?.name || "tu familiar";
   const familyDisplayName = family?.name || "Familia";
@@ -63,6 +80,12 @@ export const HomePage: React.FC<HomePageProps> = ({
       `Te invito a unirte al grupo de ${familyDisplayName} en Ayni Digital para compartir recuerdos con ${elderDisplayName}.`
     );
     window.open(`https://wa.me/?text=${mensaje}`, "_blank");
+  };
+
+  const handleShareProgress = () => {
+    const mensaje = encodeURIComponent(`Avance de ${familyDisplayName} en Ayni Digital: ${memoryCount ?? 0} recuerdos disponibles y ${sessionCount ?? 0} sesiones registradas esta semana. Seguimos compartiendo momentos con ${elderDisplayName}.`);
+    window.open(`https://wa.me/?text=${mensaje}`, "_blank");
+    setShareNotice({ id: crypto.randomUUID(), date: new Date().toISOString() });
   };
 
   if (loading) {
@@ -116,50 +139,25 @@ export const HomePage: React.FC<HomePageProps> = ({
         </figure>
       </section>
 
-      {/* 2. NOTA ÉTICA */}
+      {/* Nota de cuidado */}
       <div className="flex items-start gap-4 bg-[#fff8e5] px-4 py-4 text-sm text-[#81500c] sm:px-5">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[#c77d12]" />
         <div className="space-y-1">
-          <p className="font-bold">Nota de Seguridad Ética y Uso Responsable</p>
+          <p className="font-bold">Nota de cuidado y uso responsable</p>
           <p className="leading-relaxed">
-            Ayni Digital NO diagnostica ninguna condición clínica ni reemplaza la consulta geriátrica, psicológica o médica. Si observas agitaciones o respuestas negativas recurrentes, se recomienda pausar la sesión.
+            Ayni Digital no diagnostica condiciones clínicas ni reemplaza la consulta geriátrica, psicológica o médica. Si notas incomodidad, cansancio o respuestas negativas, pueden pausar la sesión.
           </p>
         </div>
       </div>
 
-      {/* 3. METRICAS */}
-      <section className="mx-auto grid max-w-5xl grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-        <div className="space-y-2 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#2c5f7c]">Sesiones de la semana</span>
-          </div>
-          <p className="text-3xl font-extrabold text-[#264653]">0</p>
-          <p className="text-xs text-gray-500">Sesiones registradas en la red familiar</p>
-        </div>
-
-        <div className="space-y-2 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#2c5f7c] uppercase">Recuerdos Disponibles</span>
-            <BookOpen className="size-4 text-[#e76f51]" />
-          </div>
-          <p className="text-3xl font-extrabold text-[#264653]">
-            {elderProfile?.interests ? elderProfile.interests.length : 0}
-          </p>
-          <p className="text-xs text-gray-500">Fotos, anécdotas y canciones subidas</p>
-        </div>
-
-        <div className="space-y-2 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#2c5f7c] uppercase">Red Familiar</span>
-            <Users className="size-4 text-[#2c5f7c]" />
-          </div>
-          <p className="text-3xl font-extrabold text-[#264653]">Activa</p>
-          <button
-            onClick={handleShareWhatsApp}
-          className="text-sm text-[#168447] font-semibold hover:underline flex items-center gap-1 pt-1"
-          >
-            <span>Invitar familiar por WhatsApp</span>
-          </button>
+      {/* Resumen */}
+      <section aria-label="Resumen familiar" className="mx-auto grid max-w-6xl gap-x-10 gap-y-7 sm:grid-cols-3">
+        <SummaryItem icon={<Users className="size-5 text-[#2c5f7c]" />} label="Sesiones esta semana" value={sessionCount === null ? "—" : sessionCount} detail="Sesiones con reseña registrada" />
+        <SummaryItem icon={<BookOpen className="size-5 text-[#e76f51]" />} label="Recuerdos disponibles" value={memoryCount === null ? "—" : memoryCount} detail="Fotos, anécdotas y canciones" />
+        <div className="min-w-0 border-t border-slate-200 pt-4 sm:border-t-0 sm:pt-0">
+          <div className="flex items-center gap-2"><Users className="size-5 text-[#2c5f7c]" /><p className="text-sm font-medium text-slate-600">Red familiar</p></div>
+          <p className="mt-3 text-2xl font-semibold leading-tight text-[#264653]">{memberCount === null ? "Tu familia" : `${memberCount} ${memberCount === 1 ? "integrante" : "integrantes"}`}</p>
+          <button onClick={handleShareWhatsApp} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#168447] hover:underline">Invitar por WhatsApp</button>
         </div>
       </section>
 
@@ -174,27 +172,42 @@ export const HomePage: React.FC<HomePageProps> = ({
         </button>
       </section>
 
+      <section aria-labelledby="home-notifications-title" className="grid gap-4 border-y border-slate-200 py-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+        <div>
+          <div className="flex items-center gap-2"><Bell className="size-5 text-[#2c5f7c]" /><h2 id="home-notifications-title" className="text-lg font-semibold text-[#2c5f7c]">Actividad reciente</h2></div>
+          <ul className="mt-4 space-y-3">
+            {[
+              ...recentMemories.slice(0, 3).map((memory) => ({ id: memory.id, text: `${members.find((member) => member.id === memory.created_by)?.name ?? (memory.created_by === currentUser.id ? currentUser.name : "Un familiar")} subió ${memory.type === "song" ? "una canción" : "un recuerdo"}: “${memory.title}”`, date: memory.created_at, icon: memory.type === "song" ? "music" : "book" })),
+              ...recentSessions.map((session) => ({ id: session.id, text: `${session.user_name} finalizó una sesión`, date: session.created_at, icon: "session" })),
+              ...(shareNotice ? [{ id: shareNotice.id, text: "Preparaste un avance para compartir por WhatsApp", date: shareNotice.date, icon: "share" }] : []),
+            ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4).map((item) => <li key={item.id} className="flex items-start gap-3 text-sm text-slate-700"><span className="mt-0.5 text-[#2c5f7c]">{item.icon === "music" ? <Music2 className="size-4" /> : item.icon === "session" ? <Users className="size-4" /> : item.icon === "share" ? <Share2 className="size-4" /> : <BookOpen className="size-4" />}</span><span className="min-w-0 flex-1">{item.text}</span><time dateTime={item.date} className="shrink-0 text-xs text-slate-500">{new Date(item.date).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}</time></li>)}
+            {recentMemories.length === 0 && recentSessions.length === 0 && !shareNotice && <li className="text-sm text-slate-500">Cuando alguien comparta un recuerdo o registre una sesión, su actividad aparecerá aquí.</li>}
+          </ul>
+        </div>
+        <div className="sm:text-right"><button onClick={handleShareProgress} className="inline-flex items-center gap-2 text-sm font-semibold text-[#168447] hover:underline"><Users className="size-4" />Compartir progreso por WhatsApp</button></div>
+      </section>
+
       {/* 4. SESIONES RÁPIDAS */}
       <section className="space-y-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-[#e76f51]">Para cualquier momento</p>
+          <p className="text-sm font-semibold text-[#e76f51]">Para cualquier momento</p>
             <h2 className="text-xl font-bold text-[#2c5f7c]">Sesiones rápidas de estimulación</h2>
           </div>
           <span className="hidden text-xs text-gray-500 sm:block">Elige una idea recomendada para comenzar</span>
         </div>
 
-        <div className="grid gap-x-8 md:grid-cols-3">
+        <div className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
           {quickSessions.map((session, index) => (
             <button
               key={session.title}
               onClick={onStartSession}
-              className="group flex h-full items-start gap-4 py-5 text-left md:gap-5"
+              className="group grid h-full grid-cols-[auto_minmax(0,1fr)] items-start gap-4 border-t border-slate-200 py-5 text-left md:gap-5"
             >
               <div className="shrink-0 text-5xl font-semibold leading-none text-[#e9c46a] sm:text-6xl">
                 {index + 1}
               </div>
-              <div className="flex min-h-28 flex-col items-start">
+              <div className="flex min-h-32 flex-col items-start">
                 <h3 className="text-lg font-semibold leading-snug text-[#2c5f7c]">{session.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{session.description}</p>
                 <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-[#e76f51]">
@@ -246,3 +259,11 @@ export const HomePage: React.FC<HomePageProps> = ({
     </div>
   );
 };
+
+function SummaryItem({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: number | string; detail: string }) {
+  return <div className="min-w-0 border-t border-slate-200 pt-4 sm:border-t-0 sm:pt-0">
+    <div className="flex items-center gap-2">{icon}<p className="text-sm font-medium text-slate-600">{label}</p></div>
+    <p className="mt-3 text-2xl font-semibold leading-tight text-[#264653]">{value}</p>
+    <p className="mt-2 text-sm text-slate-500">{detail}</p>
+  </div>;
+}

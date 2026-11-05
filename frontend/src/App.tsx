@@ -159,8 +159,9 @@ export function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
-        {view === "home" && (
+        {view === "home" && currentUser && (
           <HomePage
+            currentUser={currentUser}
             onStartSession={() => setView("session")}
             onViewMemories={() => setView("memories")}
           />

@@ -27,7 +27,6 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
   const [caregiver, setCaregiver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [notice, setNotice] = useState("");
@@ -43,12 +42,7 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
       if (active) setError(err instanceof Error ? err : new Error("No pudimos consultar el plan."));
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt]);
-
-  function refresh() {
-    setLoading(true);
-    setAttempt((value) => value + 1);
-  }
+  }, []);
 
   async function checkout() {
     if (saving) return;
@@ -97,22 +91,20 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
             <li>• Guía de conversación de aproximadamente 15 minutos, que pueden pausar o terminar.</li>
             <li>• Un momento para conversar sobre cómo se sintió cada persona al finalizar.</li>
           </ul>
-          {loading ? <p role="status" className="text-sm text-slate-500">Consultando el plan...</p> : status && <p className="text-sm text-slate-600">Plan actual: <strong className="text-[#264653]">{status.plan === "family" ? "Familia" : "Gratis"}</strong>. {statusMessages[status.subscription_status]}</p>}
-          {status?.paid_until && <p className="text-sm text-slate-600">Periodo pagado hasta el {new Date(status.paid_until).toLocaleDateString("es-PE")}.</p>}
-          {status?.cancel_at_period_end && <p className="text-sm text-slate-600">La renovación está cancelada. Conservas el periodo pagado.</p>}
-          {!caregiver && status && <p className="text-sm text-slate-600">La persona cuidadora principal gestiona el plan de la familia.</p>}
-          {returned === "success" && status?.plan !== "family" && <p role="status" className="text-sm text-slate-600">Estamos verificando el pago. Actualiza el estado en unos momentos.</p>}
-          {returned === "cancel" && <p className="text-sm text-slate-600">Saliste del pago de prueba. Puedes revisar tu plan aquí.</p>}
+          {loading ? <p role="status" className={`text-sm ${embedded ? "text-slate-500" : "text-white/70"}`}>Consultando el plan...</p> : status && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Plan actual: <strong className={embedded ? "text-[#264653]" : "text-white"}>{status.plan === "family" ? "Familia" : "Gratis"}</strong>. {statusMessages[status.subscription_status]}</p>}
+          {status?.paid_until && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Periodo pagado hasta el {new Date(status.paid_until).toLocaleDateString("es-PE")}.</p>}
+          {status?.cancel_at_period_end && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>La renovación está cancelada. Conservas el periodo pagado.</p>}
+          {!caregiver && status && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>La persona cuidadora principal gestiona el plan de la familia.</p>}
+          {returned === "success" && status?.plan !== "family" && <p role="status" className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Estamos verificando el pago. Actualiza el estado en unos momentos.</p>}
+          {returned === "cancel" && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Saliste del pago de prueba. Puedes revisar tu plan aquí.</p>}
           {error && <p role="alert" data-error-code={error instanceof ApiError ? error.code : undefined} className="text-sm text-red-700">{error.message}</p>}
           {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
         </div>
         <div className={embedded ? "flex shrink-0 flex-col items-start gap-3 lg:min-w-56 lg:items-end" : "flex shrink-0 flex-col items-start gap-4 sm:items-end"}>
           <p className={`text-3xl font-bold ${embedded ? "text-[#2c5f7c]" : "text-white sm:text-4xl"}`}>S/ 19.90 <span className={`text-base font-medium ${embedded ? "text-slate-500" : "text-white/70"}`}>al mes</span></p>
           {caregiver && canSubscribe && !loading && <Button type="button" variant="secondary" disabled={saving} onClick={checkout} className="w-auto min-h-11 px-5 text-sm">{saving ? "Abriendo pago..." : status?.subscription_status === "canceled" ? "Renovar suscripción" : status?.subscription_status === "incomplete_expired" ? "Reintentar pago" : "Suscribirme"}</Button>}
-          {caregiver && !loading && !confirmCancel && (canCancel
-            ? <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmCancel(true)} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>
-            : <Button type="button" variant="outline" disabled title="No hay una suscripción activa para cancelar" className={embedded ? "w-auto border-slate-200 bg-slate-50 text-slate-400" : "w-auto border-white/20 bg-transparent text-white/50"}>Cancelar suscripción</Button>)}
-          <Button type="button" variant="outline" disabled={loading || saving} onClick={refresh} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Actualizar estado</Button>
+          {caregiver && !loading && !confirmCancel && canCancel && (
+            <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmCancel(true)} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
           <p className={`max-w-xs text-xs ${embedded ? "text-slate-500 lg:text-right" : "text-white/60 sm:text-right"}`}>Los pagos están en modo de prueba y todavía no se realizan cobros reales.</p>
         </div>
       </div>
