@@ -22,6 +22,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   const [profile, setProfile] = useState<ElderProfile | null>(null);
   const [profileNotFound, setProfileNotFound] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileAttempt, setProfileAttempt] = useState(0);
 
   // Formulario Perfil Adulto Mayor
   const [name, setName] = useState("");
@@ -40,6 +41,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
+    let active = true;
     async function loadData() {
       setLoadingProfile(true);
       setLoadingMembers(true);
@@ -48,53 +50,72 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       // Cargar Perfil
       try {
         const data = await getElderProfile();
+        if (!active) return;
         setProfile(data);
         setName(data.name);
         setBirthDecade(data.birth_decade);
         setInterestsText((data.interests || []).join(", "));
         setProfileNotFound(false);
       } catch (err) {
+        if (!active) return;
         if (err instanceof ApiError && err.code === "elder_profile_not_found") {
+          setProfile(null);
           setProfileNotFound(true);
-        } else if (err instanceof ApiError) {
-          setProfileError(err.message);
+        } else {
+          setProfileError(err instanceof ApiError ? err.message : "No pudimos cargar el perfil.");
         }
       } finally {
-        setLoadingProfile(false);
+        if (active) setLoadingProfile(false);
       }
 
+      if (!active) return;
       // Cargar Miembros e Invitaciones
       try {
         const membersRes = await getFamilyMembers();
+        if (!active) return;
         setMembers(membersRes.items || []);
 
         if (isCuidador) {
           const invRes = await getInvitations();
+          if (!active) return;
           setInvitations(invRes.items || []);
         }
       } catch {
         // Manejo silencioso
       } finally {
-        setLoadingMembers(false);
+        if (active) setLoadingMembers(false);
       }
     }
 
     loadData();
-  }, [currentUser, isCuidador]);
+    return () => { active = false; };
+  }, [currentUser, isCuidador, profileAttempt]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isCuidador) return;
+    if (!isCuidador || savingProfile) return;
 
-    setSavingProfile(true);
     setProfileError(null);
     setProfileSuccess(null);
 
     const interestsArray = interestsText
       .split(",")
       .map((i) => i.trim())
-      .filter((i) => i.length > 0)
-      .slice(0, 20);
+      .filter((i) => i.length > 0);
+
+    if (!name.trim() || Array.from(name.trim()).length > 100) {
+      setProfileError("Escribe un nombre o apodo de 1 a 100 caracteres.");
+      return;
+    }
+    if (interestsArray.length > 20) {
+      setProfileError("Agrega hasta 20 intereses, separados por comas.");
+      return;
+    }
+    if (interestsArray.some((interest) => Array.from(interest).length > 100)) {
+      setProfileError("Cada interés puede tener hasta 100 caracteres.");
+      return;
+    }
+    setSavingProfile(true);
 
     try {
       const updated = await updateElderProfile({
@@ -103,6 +124,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
         interests: interestsArray,
       });
       setProfile(updated);
+      setName(updated.name);
+      setBirthDecade(updated.birth_decade);
+      setInterestsText(updated.interests.join(", "));
       setProfileNotFound(false);
       setProfileSuccess("Perfil guardado correctamente.");
     } catch (err) {
@@ -157,7 +181,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           👵
         </div>
         <h2 className="text-xl font-bold text-[#0D7A5F] mt-3">
-          {profile ? profile.name : profileNotFound ? "Perfil incompleto" : "Cargando..."}
+          {profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}
         </h2>
         <p className="text-xs text-gray-600">
           {profile ? `Década de ${profile.birth_decade}s` : "Registra la información del adulto mayor"}
@@ -187,38 +211,52 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
               </div>
             )}
 
+            {profileNotFound && !isCuidador && (
+              <p className="text-xs text-gray-600">
+                Pide a quien cuida principalmente que complete el perfil de tu familiar.
+              </p>
+            )}
+
             {profileError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
+              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
                 ⚠️ {profileError}
+                {!profile && !profileNotFound && (
+                  <button type="button" className="block mt-2 underline"
+                    onClick={() => setProfileAttempt((attempt) => attempt + 1)}>
+                    Volver a intentar
+                  </button>
+                )}
               </div>
             )}
 
             {profileSuccess && (
-              <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl text-xs">
+              <div role="status" className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl text-xs">
                 ✅ {profileSuccess}
               </div>
             )}
 
-            {isCuidador ? (
+            {isCuidador && (profile !== null || profileNotFound) ? (
               <form onSubmit={handleSaveProfile} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre o Apodo</label>
+                  <label htmlFor="elder-name" className="block text-xs font-semibold text-gray-700 mb-1">Nombre o Apodo</label>
                   <input
+                    id="elder-name"
                     type="text"
                     required
                     maxLength={100}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => { setName(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. Mamá Elena"
                     className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Década de Nacimiento</label>
+                  <label htmlFor="elder-birth-decade" className="block text-xs font-semibold text-gray-700 mb-1">Década de Nacimiento</label>
                   <select
+                    id="elder-birth-decade"
                     value={birthDecade}
-                    onChange={(e) => setBirthDecade(Number(e.target.value))}
+                    onChange={(e) => { setBirthDecade(Number(e.target.value)); setProfileSuccess(null); }}
                     className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] bg-white"
                   >
                     <option value={1930}>Década de 1930</option>
@@ -230,13 +268,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label htmlFor="elder-interests" className="block text-xs font-semibold text-gray-700 mb-1">
                     Intereses y Gustos (separados por comas)
                   </label>
                   <input
+                    id="elder-interests"
                     type="text"
                     value={interestsText}
-                    onChange={(e) => setInterestsText(e.target.value)}
+                    onChange={(e) => { setInterestsText(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. música, jardinería, boleros"
                     className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                   />
@@ -246,7 +285,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                   {savingProfile ? "Guardando..." : "Guardar Perfil"}
                 </Button>
               </form>
-            ) : (
+            ) : !isCuidador && (
               <div className="space-y-2 text-xs text-gray-700">
                 <p><strong>Nombre:</strong> {profile?.name || "-"}</p>
                 <p><strong>Década:</strong> {profile ? `${profile.birth_decade}s` : "-"}</p>

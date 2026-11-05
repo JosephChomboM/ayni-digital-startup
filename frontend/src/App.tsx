@@ -6,6 +6,7 @@ import type { User } from "./api/auth";
 import { WelcomePage } from "./pages/WelcomePage";
 import { HomePage } from "./pages/HomePage";
 import { AuthPage } from "./pages/AuthPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { SessionGuide } from "./components/SessionGuide";
 import { UploadModule } from "./components/UploadModule";
 import { FamilyDashboard } from "./components/FamilyDashboard";
@@ -13,7 +14,7 @@ import { FamilyDashboard } from "./components/FamilyDashboard";
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "session" | "memories" | "dashboard">("welcome");
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard">("welcome");
 
   useEffect(() => {
     let active = true;
@@ -94,7 +95,7 @@ export function App() {
             Ayni Digital
           </button>
           
-          <nav className="flex items-center gap-2 sm:gap-4 text-xs font-bold">
+          <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 text-xs font-bold">
             <button
               onClick={() => setView("home")}
               className={`px-3 py-1.5 rounded-xl transition-all ${
@@ -102,6 +103,15 @@ export function App() {
               }`}
             >
               Inicio
+            </button>
+            <button
+              onClick={() => setView("profile")}
+              aria-current={view === "profile" ? "page" : undefined}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                view === "profile" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#2c5f7c]/10"
+              }`}
+            >
+              Perfil familiar
             </button>
             <button
               onClick={() => setView("memories")}
@@ -152,6 +162,12 @@ export function App() {
         {view === "session" && (
           <div className="max-w-2xl mx-auto">
             <SessionGuide />
+          </div>
+        )}
+
+        {view === "profile" && currentUser && (
+          <div className="max-w-2xl mx-auto">
+            <ProfilePage currentUser={currentUser} />
           </div>
         )}
 
