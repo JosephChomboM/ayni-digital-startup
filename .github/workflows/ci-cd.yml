@@ -177,6 +177,15 @@ jobs:
           exit-code: "1"
           format: json
           output: trivy-iac-report.json
+      - name: Mostrar hallazgos IaC en el resumen del job
+        if: always()
+        run: |
+          echo '### Trivy IaC (HIGH/CRITICAL)' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s trivy-iac-report.json ]; then
+            jq -r '.Results[]? as $r | ($r.Misconfigurations // [])[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL") | "| \($r.Target) | \(.ID) | \(.Severity) | \(.Title) |"' trivy-iac-report.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No se generó informe.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Guardar informe de IaC
         if: always()
         uses: actions/upload-artifact@v7
@@ -208,6 +217,15 @@ jobs:
           exit-code: "1"
           format: json
           output: trivy-container-report.json
+      - name: Mostrar CVE en el resumen del job
+        if: always()
+        run: |
+          echo '### Trivy imagen (HIGH/CRITICAL)' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s trivy-container-report.json ]; then
+            jq -r '.Results[]? as $r | ($r.Vulnerabilities // [])[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL") | "| \($r.Target) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "sin corrección") | \(.VulnerabilityID) | \(.Severity) |"' trivy-container-report.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No se generó informe.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Guardar informe de imagen
         if: always()
         uses: actions/upload-artifact@v7
