@@ -205,7 +205,7 @@ export function UploadModule() {
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <Badge variant="secondary" className="bg-[#e76f51]/10 text-[#e76f51] hover:bg-[#e76f51]/20 font-bold text-[10px]">
+          <Badge variant="secondary" className="bg-[#e76f51]/10 text-[#9e3f2c] hover:bg-[#e76f51]/20 font-bold text-[10px]">
             <Check className="size-3 mr-1" /> Contenido protegido
           </Badge>
           <Button

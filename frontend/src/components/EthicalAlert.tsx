@@ -10,7 +10,7 @@ export function EthicalAlert() {
     <>
       <Alert className="border-[#e76f51]/30 bg-[#e76f51]/10 text-[#264653] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-start gap-3.5">
-          <div className="p-2.5 rounded-xl bg-[#e76f51]/20 text-[#e76f51] shrink-0 mt-0.5 sm:mt-0">
+          <div className="p-2.5 rounded-xl bg-[#e76f51]/20 text-[#b94c35] shrink-0 mt-0.5 sm:mt-0">
             <AlertTriangle className="size-5" />
           </div>
           <div>
@@ -27,7 +27,7 @@ export function EthicalAlert() {
           variant="outline"
           size="sm"
           onClick={() => setShowModal(true)}
-          className="border-[#e76f51]/40 bg-white text-[#e76f51] hover:bg-[#e76f51] hover:text-white transition-all font-bold text-xs shrink-0 w-full sm:w-auto"
+          className="border-[#e76f51]/40 bg-white text-[#b94c35] hover:bg-[#b94c35] hover:text-white transition-all font-bold text-xs shrink-0 w-full sm:w-auto"
         >
           Ver recomendaciones <ArrowRight className="size-3.5 ml-1" />
         </Button>
@@ -76,7 +76,7 @@ export function EthicalAlert() {
               </div>
 
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#e76f51]/10 border border-[#e76f51]/20">
-                <AlertTriangle className="size-4 text-[#e76f51] shrink-0 mt-0.5" />
+                <AlertTriangle className="size-4 text-[#b94c35] shrink-0 mt-0.5" />
                 <p className="text-[#264653]">
                   <strong>Consulta profesional:</strong> Ante cambios bruscos en el comportamiento o agitación persistente, acude al geriatra o neurólogo tratante.
                 </p>
