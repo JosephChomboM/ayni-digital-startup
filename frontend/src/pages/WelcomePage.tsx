@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { AyniIcon } from "../components/AyniIcon";
 import { Button } from "../components/ui/button";
 import type { User } from "../api/auth";
@@ -115,7 +115,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
                 <p className="ayni-question">{memoryType === "story" ? "¿Qué era lo que más te gustaba de esos domingos?" : "¿Qué canción les gustaría volver a escuchar juntos?"}</p>
               </article>
             </div>
-            <figcaption>Vista de ejemplo de Ayni, sin datos de una familia real. En tu cuenta puedes guardar anécdotas y enlaces de canciones; las fotos aún no están disponibles.</figcaption>
+            <figcaption>Vista de ejemplo de Ayni, sin datos de una familia real. En tu cuenta puedes guardar anécdotas y enlaces de canciones; las fotos se guardan solo en este navegador.</figcaption>
           </figure>
         </section>
 
@@ -126,7 +126,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
         <section id="plan-title" aria-labelledby="plan-heading" className="relative -mx-4 scroll-mt-24 sm:-mx-8 bg-[#17232d] px-4 py-12 text-white sm:px-8 sm:py-16">
           <div className="mx-auto flex max-w-7xl flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl space-y-3"><h2 id="plan-heading" className="text-3xl font-semibold">Un plan mensual, recuerdos para compartir</h2><p className="text-base leading-relaxed text-white/75">Actualmente puedes guardar anécdotas y enlaces de canciones. Las fotos y el registro de sesiones todavía no están disponibles.</p><ul className="space-y-2 text-sm leading-relaxed text-white/80"><li>• Espacio familiar para reunir anécdotas y canciones significativas.</li><li>• Guía de ejemplo para conversar, con opción de pausar o terminar.</li><li>• Preguntas para conversar sobre cómo se sintió la persona al finalizar.</li></ul></div>
+            <div className="max-w-2xl space-y-3"><h2 id="plan-heading" className="text-3xl font-semibold">Un plan mensual, recuerdos para compartir</h2><p className="text-base leading-relaxed text-white/75">Puedes guardar anécdotas y enlaces de canciones en tu familia. Las fotos y reseñas de sesión se conservan solo en este navegador, sin sincronización entre dispositivos.</p><ul className="space-y-2 text-sm leading-relaxed text-white/80"><li>• Espacio familiar para reunir anécdotas y canciones significativas.</li><li>• Guía con sus recuerdos, con opción de pausar o terminar.</li><li>• Preguntas para conversar sobre cómo se sintió la persona al finalizar.</li></ul></div>
             <div className="flex shrink-0 flex-col items-start gap-4 lg:items-end"><p className="text-4xl font-bold">S/ 19.90 <span className="text-base font-medium text-white/70">al mes</span></p><Button onClick={handleRegister} className="min-h-12 bg-[#b94c35] px-6 text-base font-semibold text-white hover:bg-[#9e3f2c]">Crear cuenta <AyniIcon name="arrow" className="ml-2 size-4"/></Button><p className="max-w-xs text-xs text-white/60 lg:text-right">Gestiona el Plan Familia desde tu cuenta. Los pagos están en modo de prueba.</p></div>
           </div>
         </section>
@@ -136,8 +136,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           <div className="divide-y divide-gray-200 border-y border-gray-200">
             {[
               ["¿Ayni reemplaza una atención médica?", "No. Ayni es una herramienta familiar para compartir recuerdos; no diagnostica ni sustituye atención profesional."],
-              ["¿Quién puede aportar recuerdos?", "La persona cuidadora puede invitar a familiares para sumar anécdotas y enlaces de canciones. Las fotos todavía no están disponibles."],
-              ["¿Cuánto dura una sesión?", "Pueden explorar la guía de ejemplo a su ritmo, hacer pausas o terminar cuando quieran. Esta guía no guarda sesiones ni reacciones."],
+              ["¿Quién puede aportar recuerdos?", "La persona cuidadora puede invitar a familiares para sumar anécdotas y enlaces de canciones. Las fotos se guardan solo en el navegador donde se añaden."],
+              ["¿Cuánto dura una sesión?", "Pueden explorar la guía de ejemplo a su ritmo, hacer pausas o terminar cuando quieran. Las reseñas de sesión se guardan solo en este navegador, sin sincronización."],
               ["¿Qué hacemos si un recuerdo incomoda?", "Pueden cambiar de tema, guardar el recuerdo para después o detener la sesión. El bienestar de la persona es lo primero."],
               ["¿Cómo funciona el pago?", "El Plan Familia cuesta S/ 19.90 al mes. La pasarela funciona en modo de prueba, sin cobros reales."],
             ].map(([question, answer]) => <details key={question} className="group py-4"><summary className="flex cursor-pointer list-none min-h-11 items-center justify-between gap-4 text-base font-semibold text-[#264653]">{question}<AyniIcon name="down" className="size-5 shrink-0 transition group-open:rotate-180"/></summary><p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-600">{answer}</p></details>)}
@@ -155,7 +155,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
           <div className="grid gap-8 md:grid-cols-2 md:gap-12">
             <article className="flex items-start gap-5 border-b border-gray-200 pb-7 md:border-b-0 md:border-r md:pb-0 md:pr-10">
-              <a href="https://share.google/LoRB2g9gJcjAWnr6i" target="_blank" rel="noreferrer" aria-label="Ver imagen del ODS 3" className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.jpg" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></a>
+              <a href="https://share.google/LoRB2g9gJcjAWnr6i" target="_blank" rel="noreferrer" aria-label="Ver imagen del ODS 3" className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-[#4C9F38] sm:size-28"><img src="/images/ods-3.png" alt="ODS 3: Salud y bienestar" loading="lazy" className="h-full w-full object-cover"/><span className="absolute inset-x-0 bottom-0 bg-[#4C9F38]/90 p-1.5 text-center text-xs font-bold text-white">ODS 3</span></a>
               <div className="space-y-2"><h3 className="text-lg font-semibold text-[#264653]">Salud y bienestar</h3><p className="text-sm leading-relaxed text-gray-600">Promovemos momentos de conexión y bienestar emocional en familia, respetando el ritmo de cada persona.</p></div>
             </article>
             <article className="flex items-start gap-5">

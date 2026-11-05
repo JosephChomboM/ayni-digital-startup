@@ -3,6 +3,8 @@ import { ArrowRight, BookOpen, Users } from "lucide-react";
 import { getElderProfile, getMyFamily } from "../api/families";
 import type { ElderProfile, Family } from "../api/families";
 import { listMemories } from "../api/memories";
+import type { User } from "../api/auth";
+import { getLocalFamilyPhotos } from "../api/localMedia";
 import { ApiError } from "../api/client";
 import { Button } from "../components/ui/button";
 
@@ -11,9 +13,10 @@ interface HomePageProps {
   onViewMemories: () => void;
   onViewProfile: () => void;
   canManageFamily: boolean;
+  currentUser?: User;
 }
 
-export function HomePage({ onStartSession, onViewMemories, onViewProfile, canManageFamily }: HomePageProps) {
+export function HomePage({ onStartSession, onViewMemories, onViewProfile, canManageFamily, currentUser }: HomePageProps) {
   const [profile, setProfile] = useState<ElderProfile | null>(null);
   const [family, setFamily] = useState<Family | null>(null);
   const [count, setCount] = useState<number | null>(null);
@@ -21,26 +24,28 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
+  const familyId = currentUser?.family_id;
+
   useEffect(() => {
     let active = true;
-    Promise.allSettled([getMyFamily(), getElderProfile(), listMemories({ limit: 1 })]).then(([familyResult, profileResult, memoriesResult]) => {
+    Promise.allSettled([getMyFamily(), getElderProfile(), listMemories({ limit: 1 }), familyId ? getLocalFamilyPhotos(familyId) : Promise.resolve([])]).then(([familyResult, profileResult, memoriesResult, photosResult]) => {
       if (!active) return;
       setFamily(familyResult.status === "fulfilled" ? familyResult.value : null);
       setProfile(profileResult.status === "fulfilled" ? profileResult.value : null);
-      setCount(memoriesResult.status === "fulfilled" ? memoriesResult.value.total : null);
+      setCount(memoriesResult.status === "fulfilled" ? memoriesResult.value.total + (photosResult.status === "fulfilled" ? photosResult.value.length : 0) : null);
       const profileMissing = profileResult.status === "rejected" && profileResult.reason instanceof ApiError && profileResult.reason.code === "elder_profile_not_found";
-      setError(familyResult.status === "rejected" || (profileResult.status === "rejected" && !profileMissing) || (memoriesResult.status === "rejected" && !profileMissing));
+      setError(photosResult.status === "rejected" || familyResult.status === "rejected" || (profileResult.status === "rejected" && !profileMissing) || (memoriesResult.status === "rejected" && !profileMissing));
       setLoading(false);
     });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, familyId]);
 
   if (loading) return <p role="status" className="py-12 text-base">Preparando tu espacio familiar…</p>;
 
   const needsProfile = !profile;
   const needsMemory = count === 0;
   const nextAction = needsProfile ? onViewProfile : needsMemory ? onViewMemories : onStartSession;
-  const nextLabel = needsProfile ? (canManageFamily ? "Completar perfil familiar" : "Ver perfil familiar") : needsMemory ? "Compartir el primer recuerdo" : "Explorar la guía de ejemplo";
+  const nextLabel = needsProfile ? (canManageFamily ? "Completar perfil familiar" : "Ver perfil familiar") : needsMemory ? "Compartir el primer recuerdo" : "Preparar una sesión";
 
   return (
     <div className="mx-auto max-w-5xl space-y-10">
@@ -57,9 +62,9 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
       <section aria-labelledby="next-step-title" className="grid overflow-hidden rounded-2xl bg-white md:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col items-start justify-center gap-5 p-6 sm:p-8">
           <h2 id="next-step-title" className="text-2xl font-bold text-[#2c5f7c]">{error ? "Tus recuerdos siguen siendo el punto de partida" : needsProfile ? "Empecemos por conocer a tu familiar" : needsMemory ? "Toda historia empieza con un recuerdo" : "Un momento para estar cerca"}</h2>
-          <p className="max-w-lg text-base leading-relaxed">{error ? "Puedes abrir el perfil o los recuerdos para consultar su estado y volver a intentarlo desde allí." : needsProfile ? (canManageFamily ? "Añade su nombre y lo que le gusta. Así podrás organizar los recuerdos de la familia." : "La persona cuidadora principal puede completar el perfil. Mientras tanto, puedes consultar el espacio familiar.") : needsMemory ? "Una anécdota o una canción puede abrir una conversación. Comparte algo que les guste recordar." : "La guía de ejemplo propone preguntas sencillas. Puedes detenerte o cambiar de tema en cualquier momento."}</p>
+          <p className="max-w-lg text-base leading-relaxed">{error ? "Puedes abrir el perfil o los recuerdos para consultar su estado y volver a intentarlo desde allí." : needsProfile ? (canManageFamily ? "Añade su nombre y lo que le gusta. Así podrás organizar los recuerdos de la familia." : "La persona cuidadora principal puede completar el perfil. Mientras tanto, puedes consultar el espacio familiar.") : needsMemory ? "Una anécdota o una canción puede abrir una conversación. Comparte algo que les guste recordar." : "La guía usa sus recuerdos y propone preguntas sencillas. Puedes detenerte o cambiar de tema en cualquier momento."}</p>
           <Button onClick={error ? onViewProfile : nextAction} size="lg">{error ? "Revisar perfil familiar" : nextLabel}<ArrowRight aria-hidden="true" className="ml-2 size-4" /></Button>
-          {!needsProfile && !needsMemory && !error && <p className="text-sm text-gray-600">La guía es una demostración y no guarda sesiones ni reacciones.</p>}
+          {!needsProfile && !needsMemory && !error && <p className="text-sm text-gray-600">Las fotos y reseñas se guardan solo en este navegador; no se sincronizan con otros dispositivos.</p>}
         </div>
         <img src="/images/recuerdos.jpg" alt="Un abuelo y dos nietos comparten un álbum familiar" className="h-64 w-full object-cover md:h-full md:min-h-80" />
       </section>

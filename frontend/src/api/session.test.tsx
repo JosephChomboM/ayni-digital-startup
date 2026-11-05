@@ -19,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   window.history.replaceState({}, "", "/");
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -49,7 +50,7 @@ it("returns an authenticated app directly to login after an API 401", async () =
   await act(async () => {
     await expect(apiFetch("/memories")).rejects.toMatchObject({ code: "unauthorized" });
   });
-  expect(screen.getByRole("heading", { name: "Bienvenido de nuevo" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
   expect(localStorage.getItem("ayni_token")).toBeNull();
 });
@@ -57,7 +58,7 @@ it("returns an authenticated app directly to login after an API 401", async () =
 it("opens login when the initial stored session has expired", async () => {
   fetchMock.mockResolvedValue(unauthorized());
   render(<App />);
-  expect(await screen.findByRole("heading", { name: "Bienvenido de nuevo" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
   expect(localStorage.getItem("ayni_token")).toBeNull();
 });
 
@@ -82,4 +83,12 @@ it("shows the signed-in identity and distinguishes the account from the accompan
   fireEvent.click(screen.getAllByRole("button", { name: "Cerrar sesión" }).at(-1)!);
   expect(localStorage.getItem("ayni_token")).toBeNull();
   expect(screen.queryByRole("button", { name: "Abrir mi cuenta" })).not.toBeInTheDocument();
+});
+
+it("restores the plan after checkout using the session return marker", async () => {
+  sessionStorage.setItem("ayni_checkout_return", "settings:plan");
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ user, consent: {} })));
+  render(<App />);
+  expect(await screen.findByRole("heading", { name: "Tu plan familiar" })).toBeInTheDocument();
+  expect(sessionStorage.getItem("ayni_checkout_return")).toBeNull();
 });

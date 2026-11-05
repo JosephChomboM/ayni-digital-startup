@@ -28,3 +28,11 @@ Inspección autenticada y de solo lectura en stage: se comprobó la ausencia de 
 1. Acceso y controles accesibles: AuthPage, cliente API y controles compartidos. Revertir esta unidad restaura el formulario y estilos previos sin modificar contratos backend. Pruebas de AuthPage y suite completa.
 2. Espacio autenticado e identidad: App, HomePage, ProfilePage, SessionGuide y FamilyDashboard con sus pruebas. Revertir esta unidad restaura navegación y pantallas previas; no hay migraciones ni cambios persistentes de datos. Revisión stage de solo lectura y escenario local con datos ficticios descritos arriba.
 3. Bienvenida y compartir: WelcomePage, AyniIcon, CSS local, favicon, fuente con licencia, PNG social y metadatos Vite. Revertir esta unidad restaura la presentación previa sin afectar autenticación ni API. Revisión responsive y compilación con URL social absoluta descritas arriba.
+
+## Integración de main / PR #45
+
+Se integró `f528fbe` conservando la configuración de cuenta, suscripción, subida de fotos locales, guía con recuerdos reales y resumen de reseñas locales añadidos en main. La configuración nueva sigue accesible desde Más opciones; Mi cuenta y Persona y familia conservan las entradas visibles de este PR. El retorno de Stripe acepta tanto el query como el marcador de sessionStorage y limpia el marcador al restaurar el plan.
+
+Las descripciones anteriores de fotos y sesiones pendientes corresponden a la revisión inicial y quedan sustituidas por el comportamiento integrado: fotos en IndexedDB y reseñas en localStorage, solo en este navegador y sin sincronización. La bienvenida, la guía y el resumen explican ese alcance. Las nuevas rutas de imágenes de main se conservan, incluido ODS 3 en PNG. El registro usa la nueva composición de main conservando los campos que corresponden al contrato API y la ayuda de acceso.
+
+Regresiones actualizadas: pausa bloquea avance de la guía; guardar crea una reseña local asociada a la familia; omitir no guarda; total de recuerdos usa total API más fotos locales; retorno de checkout por marcador; identidad y cierre de sesión. No se modificaron datos de stage.
