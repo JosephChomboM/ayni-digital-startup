@@ -101,7 +101,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur-md px-4 py-3 sm:px-8">
         <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <div className="relative flex size-9 shrink-0 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-sm sm:size-10">
+            <div className="relative flex size-9 shrink-0 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-xs sm:size-10">
               <Heart className="size-5 fill-current text-[#e76f51]" />
               <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[#e9c46a]" />
             </div>
@@ -131,7 +131,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             <Button
               size="sm"
               onClick={handleRegister}
-              className="bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs rounded-xl shadow-sm"
+              className="bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs rounded-xl shadow-xs"
             >
               Crear cuenta
             </Button>
@@ -188,7 +188,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           {/* CARRUSEL EMOTIVO */}
           <div aria-roledescription="carrusel" aria-label="Momentos Ayni Digital" className="relative isolate flex h-[280px] flex-col justify-end overflow-hidden rounded-2xl bg-gray-100 text-white sm:h-[380px] lg:col-span-5">
             <img key={CAROUSEL_ITEMS[currentSlide].url} src={CAROUSEL_ITEMS[currentSlide].url} alt="" className="absolute inset-0 -z-10 h-full w-full animate-fade-in object-cover" />
-            <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+            <div className="absolute inset-0 -z-10 bg-linear-to-t from-black/75 via-black/10 to-transparent" />
             <div aria-live="polite" className="space-y-1 px-6 pb-5">
               <p className="text-lg font-semibold">{CAROUSEL_ITEMS[currentSlide].title}</p>
               <p className="text-sm text-white/90">{CAROUSEL_ITEMS[currentSlide].subtitle}</p>
@@ -240,7 +240,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {FEATURE_CARDS.map((item, index) => <article key={item.title} className="group">
-              <div className="relative h-48 overflow-hidden rounded-2xl bg-[#f1faee] sm:h-56"><img src={item.image} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="lazy"/><span className="absolute left-4 top-4 grid size-9 place-items-center rounded-full bg-white text-sm font-bold text-[#2c5f7c] shadow">0{index + 1}</span></div>
+              <div className="relative h-48 overflow-hidden rounded-2xl bg-[#f1faee] sm:h-56"><img src={item.image} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="lazy"/><span className="absolute left-4 top-4 grid size-9 place-items-center rounded-full bg-white text-sm font-bold text-[#2c5f7c] shadow-sm">0{index + 1}</span></div>
               <div className="space-y-2 py-4"><h3 className="text-lg font-bold text-[#264653]">{item.title}</h3><p className="text-sm leading-relaxed text-gray-600">{item.text}</p><details className="group/more pt-1"><summary className="inline-flex cursor-pointer list-none items-center text-sm font-semibold text-[#2c5f7c]">Saber más <ChevronDown className="ml-1 size-4 transition group-open/more:rotate-180"/></summary><p className="mt-2 text-sm leading-relaxed text-gray-600">{item.more}</p></details></div>
             </article>)}
           </div>
@@ -261,7 +261,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             </div>
             <div className="relative min-h-[250px] overflow-hidden rounded-2xl bg-white/5 sm:min-h-[390px]">
               <img key={benefits[benefitSlide].image} src={benefits[benefitSlide].image} alt={benefits[benefitSlide].title} className="absolute inset-0 h-full w-full animate-fade-in object-cover" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/55 via-transparent to-transparent" />
               <p className="absolute bottom-5 left-5 right-5 text-lg font-semibold">{benefits[benefitSlide].title}</p>
             </div>
           </div>

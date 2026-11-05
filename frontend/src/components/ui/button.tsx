@@ -6,13 +6,13 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent font-medium whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent font-medium whitespace-nowrap transition-all outline-hidden select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-[#2c5f7c] text-white hover:bg-[#224a61] shadow-sm",
+        default: "bg-[#2c5f7c] text-white hover:bg-[#224a61] shadow-xs",
         outline: "border-gray-300 bg-white text-[#264653] hover:bg-gray-50",
-        secondary: "bg-[#e76f51] text-white hover:bg-[#d65d3f] shadow-sm",
+        secondary: "bg-[#e76f51] text-white hover:bg-[#d65d3f] shadow-xs",
         ghost: "hover:bg-gray-100 text-[#264653]",
         destructive: "bg-red-600 text-white hover:bg-red-700",
         link: "text-[#2c5f7c] underline-offset-4 hover:underline",

@@ -127,7 +127,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-xl bg-[#2c5f7c] text-white shadow-sm">
+          <div className="flex size-8 items-center justify-center rounded-xl bg-[#2c5f7c] text-white shadow-xs">
             <Heart className="size-4 fill-current text-[#e76f51]" />
           </div>
           <span className="font-extrabold text-[#2c5f7c] text-sm">Ayni Digital</span>
@@ -142,7 +142,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             disabled={loading}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
               mode === "register"
-                ? "bg-[#2c5f7c] text-white shadow-sm"
+                ? "bg-[#2c5f7c] text-white shadow-xs"
                 : "text-gray-500 hover:text-[#264653]"
             }`}
           >
@@ -154,7 +154,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             disabled={loading}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
               mode === "login"
-                ? "bg-[#2c5f7c] text-white shadow-sm"
+                ? "bg-[#2c5f7c] text-white shadow-xs"
                 : "text-gray-500 hover:text-[#264653]"
             }`}
           >
@@ -316,7 +316,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <Button
             type="submit"
             disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented || !hasAcceptedPrivacy))}
-            className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-sm transition-all mt-2"
+            className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-xs transition-all mt-2"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">

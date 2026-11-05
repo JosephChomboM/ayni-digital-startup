@@ -1,6 +1,29 @@
-﻿@tailwind base;
-@tailwind components;
-@tailwind utilities;
+﻿@import 'tailwindcss';
+
+@theme {
+  --color-ayni-green: #0d7a5f;
+  --color-ayni-darkGreen: #0a634d;
+  --color-ayni-lightBg: #f4fbf7;
+  --color-ayni-softGreen: #e8f5e9;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 :root {
   color-scheme: light;

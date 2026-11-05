@@ -25,8 +25,8 @@ export function SessionGuide() {
   ]
 
   return (
-    <Card className="overflow-hidden border border-gray-200 bg-white shadow-sm rounded-2xl">
-      <div className="h-1.5 bg-gradient-to-r from-[#2c5f7c] via-[#e9c46a] to-[#e76f51]" />
+    <Card className="overflow-hidden border border-gray-200 bg-white shadow-xs rounded-2xl">
+      <div className="h-1.5 bg-linear-to-r from-[#2c5f7c] via-[#e9c46a] to-[#e76f51]" />
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -49,7 +49,7 @@ export function SessionGuide() {
             <Button
               onClick={generate}
               disabled={loading}
-              className="bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-sm transition-all"
+              className="bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-xs transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

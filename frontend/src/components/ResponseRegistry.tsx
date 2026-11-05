@@ -27,7 +27,7 @@ export function ResponseRegistry() {
   }
 
   return (
-    <Card className="border border-gray-200 bg-white shadow-sm rounded-2xl">
+    <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="rounded-2xl bg-[#e9c46a]/20 p-3 text-[#2c5f7c]">
