@@ -40,7 +40,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.12"
       - name: Instalar dependencias
@@ -76,8 +76,8 @@ jobs:
 
   # ---------- SEGURIDAD ----------
 
-  security:
-    name: Seguridad
+  security-scans:
+    name: Escaneos de dependencias y secretos
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -87,7 +87,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Librerías de Python con vulnerabilidades conocidas
         working-directory: backend
         run: |
@@ -109,7 +109,7 @@ jobs:
     steps:
       - name: Descargar código
         uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.12"
       - name: Instalar dependencias
@@ -161,6 +161,106 @@ jobs:
       - name: Analizar código
         uses: github/codeql-action/analyze@v4
 
+  security-iac:
+    name: Seguridad de IaC (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v7
+      - name: Analizar Dockerfile y Docker Compose
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: json
+          output: trivy-iac-report.json
+      - name: Guardar informe de IaC
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-iac-report
+          path: trivy-iac-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  security-container:
+    name: Seguridad de imagen backend (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v7
+      - name: Construir imagen local para escaneo
+        run: docker build --tag ayni-api:${{ github.sha }} ./backend
+      - name: Buscar CVE altas y críticas en la imagen
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: image
+          image-ref: ayni-api:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-container-report.json
+      - name: Guardar informe de imagen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-container-report
+          path: trivy-container-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Este es el check requerido por el ruleset actual de main. Al agregar los
+  # escaneos como dependencias, cualquier fallo de seguridad bloquea ese check.
+  security:
+    name: Seguridad
+    if: always()
+    needs:
+      - security-scans
+      - security-regressions
+      - dependency-review
+      - codeql
+      - security-iac
+      - security-container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exigir que pasen todos los controles
+        if: always()
+        env:
+          SECURITY_SCANS: ${{ needs.security-scans.result }}
+          SECURITY_REGRESSIONS: ${{ needs.security-regressions.result }}
+          DEPENDENCY_REVIEW: ${{ needs.dependency-review.result }}
+          CODEQL: ${{ needs.codeql.result }}
+          SECURITY_IAC: ${{ needs.security-iac.result }}
+          SECURITY_CONTAINER: ${{ needs.security-container.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          failed=0
+          for check in SECURITY_SCANS SECURITY_REGRESSIONS CODEQL SECURITY_IAC SECURITY_CONTAINER; do
+            value="${!check}"
+            echo "$check: $value"
+            if [ "$value" != "success" ]; then
+              echo "::error::$check no pasó; el merge queda bloqueado."
+              failed=1
+            fi
+          done
+          echo "DEPENDENCY_REVIEW: $DEPENDENCY_REVIEW"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$DEPENDENCY_REVIEW" != "success" ]; then
+            echo "::error::La revisión de dependencias no pasó; el merge queda bloqueado."
+            failed=1
+          elif [ "$EVENT_NAME" = "push" ] && [ "$DEPENDENCY_REVIEW" != "skipped" ] && [ "$DEPENDENCY_REVIEW" != "success" ]; then
+            echo "::error::Estado inesperado en la revisión de dependencias."
+            failed=1
+          fi
+          exit "$failed"
+
   # ---------- DEPLOY (solo al mergear a main) ----------
   # Render despliega el commit exacto (?ref=) que pasó los tests.
   # Cada ambiente de GitHub guarda sus dos deploy hooks como secretos.
@@ -168,7 +268,7 @@ jobs:
   deploy-stage:
     name: Deploy a stage
     if: github.event_name == 'push'
-    needs: [backend, frontend, security, security-regressions, codeql]
+    needs: [backend, frontend, security, security-regressions, codeql, security-iac, security-container]
     runs-on: ubuntu-latest
     environment: stage
     env:
