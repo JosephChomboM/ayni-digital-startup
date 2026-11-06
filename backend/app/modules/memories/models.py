@@ -124,3 +124,32 @@ class MemoryEntity(Base):
     )
     text: Mapped[str] = mapped_column(Text)
     memory: Mapped[Memory] = relationship(back_populates="entities")
+
+
+class MemoryPhoto(Base):
+    __tablename__ = "memory_photos"
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0 AND size_bytes <= 8388608", name="ck_photos_size"),
+        CheckConstraint(
+            "width > 0 AND height > 0 AND width * height <= 20000000", name="ck_photos_dimensions"
+        ),
+        CheckConstraint(
+            "content_type IN ('image/jpeg', 'image/png', 'image/webp')",
+            name="ck_photos_content_type",
+        ),
+        CheckConstraint(
+            "btrim(bucket) <> '' AND btrim(object_key) <> ''", name="ck_photos_storage_path"
+        ),
+        Index("ix_memory_photos_memory_created_id", "memory_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    memory_id: Mapped[UUID] = mapped_column(ForeignKey("memories.id", ondelete="CASCADE"))
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bucket: Mapped[str] = mapped_column(String(100))
+    object_key: Mapped[str] = mapped_column(String(300), unique=True)
+    content_type: Mapped[str] = mapped_column(String(20))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
