@@ -269,3 +269,11 @@ def test_invitation_response_only_exposes_token_on_creation() -> None:
     assert "invitation_token" not in invitation.model_dump()
     assert created.model_dump(mode="json")["invitation_token"] == token_value
     assert token_value not in repr(created)
+
+
+def test_registration_rejects_family_name_matching_password(
+    registration_data: dict[str, object],
+) -> None:
+    registration_data["family_name"] = registration_data["password"]
+    with pytest.raises(ValidationError, match="distinto de tu contraseña"):
+        RegisterRequest.model_validate(registration_data)

@@ -75,3 +75,7 @@ La aplicación de cuotas a otros módulos y la verificación con Stripe/stage si
 
 ## 6. Eliminación de Cuenta (Pendiente de definición)
 *   **`DELETE /users/me`**: Elimina de forma real la cuenta, sus recuerdos, fotos y respuestas. Falta definir el comportamiento si quien elimina es un familiar o la cuidadora principal.
+
+### Corregir el nombre del grupo familiar
+
+`PATCH /families/me` con `{ "name": "Nombre de la familia" }` devuelve el grupo actualizado. Requiere sesión de la persona cuidadora principal; nunca acepta un ID de familia del cliente. Nombre de 1–100 caracteres, recortado; rechaza un nombre igual a la contraseña de la cuenta. Los familiares invitados reciben 403. No cambia la contraseña ni el perfil del adulto mayor.

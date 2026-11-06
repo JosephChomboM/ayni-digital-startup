@@ -50,6 +50,26 @@ def test_allowed_origins_support_bearer_preflight_and_json_errors(
 
 
 @pytest.mark.usefixtures("cors_environment")
+def test_allowed_origin_can_preflight_patch_with_bearer_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "https://ayni-web-stage.onrender.com")
+    response = create_client().options(
+        "/memories/00000000-0000-0000-0000-000000000001",
+        headers={
+            "Origin": "https://ayni-web-stage.onrender.com",
+            "Access-Control-Request-Method": "PATCH",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://ayni-web-stage.onrender.com"
+    assert "PATCH" in response.headers["access-control-allow-methods"]
+    assert "authorization" in response.headers["access-control-allow-headers"].lower()
+
+
+@pytest.mark.usefixtures("cors_environment")
 @pytest.mark.parametrize("origins", ["", "https://ayni.example"])
 def test_empty_or_unlisted_origins_do_not_authorize_preflight(
     monkeypatch: pytest.MonkeyPatch,

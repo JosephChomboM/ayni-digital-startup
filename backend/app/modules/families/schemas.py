@@ -73,7 +73,18 @@ class RegisterRequest(RequestSchema):
             raise PydanticCustomError(
                 "validation_error", "Indica el nombre de tu familia o usa una invitación."
             )
+        if (
+            self.family_name is not None
+            and self.family_name == self.password.get_secret_value().strip()
+        ):
+            raise PydanticCustomError(
+                "validation_error", "Elige un nombre para tu familia distinto de tu contraseña."
+            )
         return self
+
+
+class FamilyUpdateRequest(RequestSchema):
+    name: ShortText
 
 
 class LoginRequest(RequestSchema):
