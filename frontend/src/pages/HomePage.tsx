@@ -22,6 +22,7 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [exampleTab, setExampleTab] = useState<"anecdote" | "song">("song");
 
   const familyId = currentUser?.family_id;
 
@@ -80,6 +81,43 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
             <span className="min-w-0 flex-1"><span className="block font-semibold">Perfil y familia</span><span className="mt-1 block text-sm text-gray-600">Consulta el perfil. La persona cuidadora puede editarlo e invitar a familiares.</span></span>
             <ArrowRight aria-hidden="true" className="size-5 shrink-0" />
           </button>
+        </div>
+      </section>
+
+      <section aria-labelledby="home-memory-example" className="space-y-6 pt-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+          <h2 id="home-memory-example" className="max-w-xl text-2xl font-bold leading-tight text-[#2c5f7c]">Un recuerdo puede abrir una conversación</h2>
+          <p className="max-w-xl text-sm leading-relaxed text-slate-600 sm:justify-self-end">Mira un ejemplo de cómo una anécdota o una canción pueden dar inicio a un momento en familia.</p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-[#2c5f7c]/15 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#eef4f6] px-5 py-4 sm:px-6">
+            <p className="font-semibold text-[#264653]">Un ejemplo para conversar</p>
+            <span className="text-xs text-slate-500">Contenido ilustrativo</span>
+          </div>
+          <div className="grid min-h-56 sm:grid-cols-[190px_1fr]">
+            <div role="tablist" aria-label="Tipo de recuerdo" className="flex gap-2 border-b border-slate-200 p-3 sm:flex-col sm:border-b-0 sm:border-r sm:p-4">
+              <button type="button" role="tab" aria-selected={exampleTab === "anecdote"} onClick={() => setExampleTab("anecdote")} className={`min-h-11 flex-1 rounded-xl px-3 text-left text-sm font-medium transition-colors sm:flex-none ${exampleTab === "anecdote" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#eef4f6]"}`}>Anécdota</button>
+              <button type="button" role="tab" aria-selected={exampleTab === "song"} onClick={() => setExampleTab("song")} className={`min-h-11 flex-1 rounded-xl px-3 text-left text-sm font-medium transition-colors sm:flex-none ${exampleTab === "song" ? "bg-[#2c5f7c] text-white" : "text-[#264653] hover:bg-[#eef4f6]"}`}>Canción</button>
+            </div>
+            <div role="tabpanel" aria-live="polite" className="flex flex-col justify-center px-5 py-7 sm:px-8 sm:py-9">
+              <h3 className="text-xl font-bold text-[#264653]">{exampleTab === "song" ? "La canción de la sobremesa" : "Los domingos en casa"}</h3>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">Después del almuerzo, mi mamá ponía su canción favorita. Decía que le recordaba sus paseos de juventud y siempre la cantaba bajito.</p>
+              <p className="mt-5 font-semibold text-[#9a4f3c]">{exampleTab === "song" ? "¿Qué canción les gustaría volver a escuchar juntos?" : "¿Qué recuerdo de los domingos les gustaría compartir?"}</p>
+            </div>
+          </div>
+          <p className="border-t border-slate-200 px-5 py-4 text-xs leading-relaxed text-slate-500 sm:px-6">Este ejemplo no contiene datos de una familia real. Tus recuerdos se gestionan desde <button type="button" onClick={onViewMemories} className="font-semibold text-[#2c5f7c] underline underline-offset-2">Subir recuerdos</button>.</p>
+        </div>
+        <div className="grid gap-6 pt-3 lg:grid-cols-2 lg:items-center lg:gap-12">
+          <div className="space-y-3">
+            <h3 className="text-2xl font-bold leading-tight text-[#2c5f7c]">Acompañar, a su propio ritmo</h3>
+            <p className="text-sm leading-7 text-slate-600">La guía ofrece una pregunta a la vez. Pueden conversar, cambiar de tema o hacer una pausa cuando lo necesiten.</p>
+            <button type="button" onClick={onStartSession} className="inline-flex min-h-10 items-center font-semibold text-[#2c5f7c] hover:text-[#e76f51]">Abrir guía de sesión <ArrowRight aria-hidden="true" className="ml-2 size-4" /></button>
+          </div>
+          <aside className="rounded-2xl bg-[#f1f8ef] p-6 sm:p-8">
+            <p className="text-sm font-semibold text-[#264653]">Una pregunta para empezar</p>
+            <p className="mt-3 text-2xl font-medium leading-snug text-[#2c5f7c]">¿Qué lugar recuerdas con cariño?</p>
+            <p className="mt-3 text-sm leading-7 text-slate-600">Escuchen lo que la persona quiera contar. No hace falta recordar fechas ni responder todo.</p>
+          </aside>
         </div>
       </section>
       <p className="max-w-2xl border-t border-[#2c5f7c]/15 pt-5 text-sm leading-relaxed text-[#264653]">Ayni acompaña conversaciones familiares. No es un servicio de salud ni realiza diagnósticos. El bienestar de la persona es lo primero: pueden pausar o terminar cuando quieran.</p>

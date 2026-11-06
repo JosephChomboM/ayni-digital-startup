@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Heart, ArrowLeft, Mail, Lock, Users, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
+import { Heart, ArrowLeft, Mail, Lock, Users, ShieldCheck, Loader2, Phone, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
@@ -26,6 +26,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [registrationMode, setRegistrationMode] = useState<"family" | "invitation">("family");
   const [invitationToken, setInvitationToken] = useState("");
@@ -69,13 +72,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       return;
     }
     if (mode === "register") {
-      if (!firstName.trim() || !lastName.trim() ||
+      if (!firstName.trim() || !lastName.trim() || !phone.trim() || !city.trim() || !district.trim() ||
         (registrationMode === "family" ? !familyName.trim() : !invitationToken.trim())) {
         setError("Completa todos los campos obligatorios para crear tu cuenta.");
         return;
       }
       if (registrationMode === "family" && familyName.trim() === password.trim()) {
-        setError("Elige un nombre para tu familia distinto de tu contraseña.");
+        setError("El nombre del grupo familiar debe ser distinto de tu contraseña.");
         return;
       }
       if (!consent || consentLoading || !hasConsented || !hasAcceptedPrivacy) {
@@ -129,7 +132,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-xl bg-[#2c5f7c] text-white shadow-xs">
-            <Heart className="size-4 fill-current text-[#b94c35]" />
+            <Heart className="size-4 fill-current text-[#e76f51]" />
           </div>
           <span className="font-extrabold text-[#2c5f7c] text-sm">Ayni Digital</span>
         </div>
@@ -138,7 +141,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-7 px-4 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)] lg:items-start lg:gap-14">
         <section className="order-2 mx-auto w-full max-w-xl lg:order-1">
           <div className="mb-7 max-w-lg">
-            <p className="text-sm font-semibold text-[#b94c35]">
+            <p className="text-sm font-semibold text-[#e76f51]">
               {mode === "register" ? "Un espacio para tus recuerdos" : "Tu espacio familiar te espera"}
             </p>
             <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-[#2c5f7c] sm:text-4xl">
@@ -157,10 +160,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 type="button"
                 onClick={() => { reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
                 disabled={loading}
-                aria-pressed={mode === "register"}
-                className={`min-h-11 border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
+                className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "register"
-                    ? "border-[#b94c35] text-[#2c5f7c]"
+                    ? "border-[#e76f51] text-[#2c5f7c]"
                     : "border-transparent text-gray-500 hover:text-[#264653]"
                 }`}
               >
@@ -170,10 +172,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 type="button"
                 onClick={() => { setMode("login"); setError(null); setNotice(null); }}
                 disabled={loading}
-                aria-pressed={mode === "login"}
-                className={`min-h-11 border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
+                className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "login"
-                    ? "border-[#b94c35] text-[#2c5f7c]"
+                    ? "border-[#e76f51] text-[#2c5f7c]"
                     : "border-transparent text-gray-500 hover:text-[#264653]"
                 }`}
               >
@@ -188,13 +189,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
             )}
 
-            {mode === "login" && <details className="text-sm text-[#264653]"><summary className="min-h-11 cursor-pointer py-3 font-semibold">¿No puedes entrar?</summary><p>Comprueba tu correo y contraseña. La recuperación de contraseña todavía no está disponible.</p></details>}
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "register" && (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1"><label htmlFor="auth-first-name" className="text-xs font-bold text-[#264653]">Nombre</label><Input id="auth-first-name" required autoComplete="given-name" maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej. María" className="text-sm" /></div>
                     <div className="space-y-1"><label htmlFor="auth-last-name" className="text-xs font-bold text-[#264653]">Apellido</label><Input id="auth-last-name" required autoComplete="family-name" maxLength={60} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ej. Martínez" className="text-sm" /></div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="auth-phone" className="text-xs font-bold text-[#264653]">Teléfono</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 size-4 text-gray-400" />
+                      <Input
+                        id="auth-phone"
+                        type="tel"
+                        required
+                        inputMode="tel"
+                        autoComplete="tel"
+                        maxLength={20}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+51 987 654 321"
+                        className="pl-9 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1"><label htmlFor="auth-city" className="text-xs font-bold text-[#264653]">Ciudad</label><Input id="auth-city" required autoComplete="address-level2" maxLength={80} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Lima" className="text-sm"/></div>
+                    <div className="space-y-1"><label htmlFor="auth-district" className="text-xs font-bold text-[#264653]">Distrito</label><Input id="auth-district" required autoComplete="address-level3" maxLength={80} value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Ej. Surco" className="text-sm"/></div>
                   </div>
 
                   <div className="space-y-1">
@@ -205,8 +229,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       onChange={(e) => setRegistrationMode(e.target.value as "family" | "invitation")}
                       className="w-full rounded-xl border border-gray-300 px-3 py-2 text-xs"
                     >
-                      <option value="family">Crear y gestionar mi familia</option>
-                      <option value="invitation">Unirme con una invitación</option>
+                      <option value="family">Cuidador principal (hijo/a, cónyuge)</option>
+                      <option value="invitation">Familiar colaborador (nieto/a, hermano/a)</option>
                     </select>
                   </div>
 
@@ -218,7 +242,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       <Users className="absolute left-3 top-3 size-4 text-gray-400" />
                       <Input
                         id="auth-family"
-                        autoComplete="off"
                         required
                         maxLength={registrationMode === "family" ? 100 : undefined}
                         value={registrationMode === "family" ? familyName : invitationToken}
@@ -238,7 +261,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <Mail className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
                     id="auth-email"
-                    autoComplete="email"
                     type="email"
                     required
                     value={email}
@@ -303,7 +325,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <Button
                 type="submit"
                 disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented || !hasAcceptedPrivacy))}
-                className="w-full bg-[#b94c35] hover:bg-[#9e3f2c] text-white font-bold text-xs py-3 rounded-lg shadow-xs transition-all mt-2"
+                className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-xs transition-all mt-2"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -318,9 +340,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </form>
 
             <div className="pt-2 border-t border-gray-100 flex flex-col gap-3">
+              <button type="button" disabled title="El acceso con Google requiere configuración del backend" className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>Continuar con Google · Próximamente</button>
               <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
                 <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
-                <span>Los recuerdos de tu cuenta se consultan dentro de tu familia. Las fotos se guardan solo en este navegador.</span>
+                <span>Tus datos y archivos familiares están protegidos de forma privada.</span>
               </div>
             </div>
           </div>
