@@ -1,7 +1,8 @@
 # Fotos familiares privadas — contrato de backend
 
 Tarea: [AYNI-45](https://damatmfr-1790533434032.atlassian.net/browse/AYNI-45).
-Rama: `hats/ayni-45-fotos-privadas`. Implementado en esta rama; PR y despliegue pendientes.
+Rama: `hats/ayni-45-fotos-privadas`. Implementado y probado con Supabase real desde local;
+PR, integración web y despliegue pendientes.
 
 ## Alcance
 
@@ -97,9 +98,14 @@ en Render. Mantener separado el proyecto de pruebas del de producción. Reinicia
 de configurarlo y aplicar `alembic upgrade head` al desplegar. No modificar config.py.
 La configuración aislada de fotos vive en memories/photo_settings.py.
 
-Antes de cerrar AYNI-45, verificar una carga real, listado y borrado contra ese bucket privado,
-y comprobar el acceso desde dos dispositivos o cuentas familiares. La suite local utiliza
-un proveedor de Storage simulado; no acredita esa prueba real ni un despliegue.
+El 5 de noviembre de 2026 se verificaron desde la API local las cargas reales de JPG, PNG y
+WebP, sus descargas firmadas, rechazo de acceso público, aislamiento y borrado completo.
+Las 16 comprobaciones pasaron y se retiraron todos los datos sintéticos de la prueba.
+Evidencia y alcance: [QA de fotos](qa/AYNI-45.md).
+
+Antes de cerrar AYNI-45 quedan la integración web, el despliegue y la comprobación desde dos
+dispositivos. La suite automatizada usa Storage simulado para no depender de claves en CI;
+la prueba real anterior se ejecutó por separado.
 
 ## Integración para frontend
 

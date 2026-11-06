@@ -22,7 +22,8 @@ Módulo encargado de gestionar el acceso y la red de apoyo. El consentimiento le
 ## 2. Baúl de Recuerdos
 
 Anécdotas y canciones implementadas en `main`. Fotos adjuntas implementadas en
-`hats/ayni-45-fotos-privadas`; PR, configuración de Supabase y prueba real pendientes.
+`hats/ayni-45-fotos-privadas`; prueba local con Supabase real aprobada. PR, integración web
+y despliegue pendientes.
 
 * **`POST /memories`**: JSON con type `anecdote` (title, text) o `song` (title, url),
   más is_positive/is_sensitive. Para canciones solo videos de YouTube o pistas de Spotify.
