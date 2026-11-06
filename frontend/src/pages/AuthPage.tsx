@@ -77,6 +77,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setError("Completa todos los campos obligatorios para crear tu cuenta.");
         return;
       }
+      if (registrationMode === "family" && familyName.trim() === password.trim()) {
+        setError("El nombre del grupo familiar debe ser distinto de tu contraseña.");
+        return;
+      }
       if (!consent || consentLoading || !hasConsented || !hasAcceptedPrivacy) {
         setError("Lee y acepta el consentimiento y el tratamiento de datos personales para continuar.");
         return;
@@ -218,7 +222,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#264653]">Selecciona tu rol</label>
+                    <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#264653]">¿Cómo vas a participar?</label>
                     <select
                       id="auth-registration-mode"
                       value={registrationMode}
@@ -337,7 +341,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             <div className="pt-2 border-t border-gray-100 flex flex-col gap-3">
               <button type="button" disabled title="El acceso con Google requiere configuración del backend" className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>Continuar con Google · Próximamente</button>
-              <p className="text-center text-xs text-gray-500">El acceso con Google todavía necesita integración del equipo backend.</p>
               <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
                 <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
                 <span>Tus datos y archivos familiares están protegidos de forma privada.</span>

@@ -50,6 +50,9 @@ async function fillRegistration(): Promise<void> {
   await screen.findByRole("checkbox", { name: /Acepto el consentimiento mostrado/ });
   fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Persona" } });
   fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "de prueba" } });
+  fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+51 987 654 321" } });
+  fireEvent.change(screen.getByLabelText("Ciudad"), { target: { value: "Lima" } });
+  fireEvent.change(screen.getByLabelText("Distrito"), { target: { value: "Surco" } });
   fireEvent.change(screen.getByLabelText("Nombre del grupo familiar"), { target: { value: "Familia de prueba" } });
   fillCredentials();
   fireEvent.click(screen.getByRole("checkbox", { name: /Acepto el consentimiento mostrado/ }));
@@ -75,9 +78,9 @@ describe("AuthPage families contract", () => {
     const onSuccess = vi.fn();
     render(<AuthPage onBack={vi.fn()} onSuccess={onSuccess} />);
     await fillRegistration();
-    expect(screen.queryByLabelText("Teléfono")).toBeNull();
-    expect(screen.queryByLabelText("Ciudad")).toBeNull();
-    expect(screen.queryByLabelText("Distrito")).toBeNull();
+    expect(screen.getByLabelText("Teléfono")).toHaveValue("+51 987 654 321");
+    expect(screen.getByLabelText("Ciudad")).toHaveValue("Lima");
+    expect(screen.getByLabelText("Distrito")).toHaveValue("Surco");
     expect(screen.getByText(texts.text).textContent).toBe(texts.text);
     expect(screen.getByText(texts.onboarding_notice).textContent).toBe(texts.onboarding_notice);
     submit();
