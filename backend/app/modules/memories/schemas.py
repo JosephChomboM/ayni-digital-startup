@@ -153,3 +153,23 @@ class MemoryListResponse(ResponseSchema):
     total: int = Field(ge=0)
     limit: int = Field(ge=1, le=100)
     offset: int = Field(ge=0)
+
+
+class PhotoResponse(BaseModel):
+    id: UUID
+    memory_id: UUID
+    created_by: UUID
+    content_type: str
+    size_bytes: int
+    width: int
+    height: int
+    created_at: AwareDatetime
+    url: str
+    url_expires_at: AwareDatetime
+
+
+class PhotoListResponse(BaseModel):
+    items: list[PhotoResponse]
+    total: int
+    limit: int
+    offset: int
