@@ -133,6 +133,7 @@ class MemoryEntityResponse(ResponseSchema):
 
 
 class MemoryResponse(ResponseSchema):
+    deletion_pending: bool = False
     id: UUID
     elder_profile_id: UUID
     created_by: UUID

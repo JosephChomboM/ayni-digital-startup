@@ -293,3 +293,64 @@ def test_deleting_memory_also_removes_private_photo_objects(
     response = client.delete(f"/memories/{memory.id}", headers=headers(caregiver_account))
     assert response.status_code == 204
     assert not storage.objects
+
+
+def test_memory_deletion_failure_stays_pending_and_can_be_retried(
+    client: TestClient,
+    storage: FakePhotoStorage,
+    caregiver_account: SimpleNamespace,
+    memory: MemoryResponse,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.memories.models import MemoryPhoto
+    from app.modules.memories.photo_settings import photo_storage_error
+
+    # Synthetic paid-plan-sized fixture; no images or external services required.
+    with Session(engine) as session, session.begin():
+        for _ in range(101):
+            photo_id = uuid4()
+            key = f"{memory.id}/{photo_id}.png"
+            storage.objects[key] = b"synthetic"
+            session.add(
+                MemoryPhoto(
+                    id=photo_id,
+                    memory_id=memory.id,
+                    created_by=caregiver_account.user_id,
+                    bucket="fotos",
+                    object_key=key,
+                    content_type="image/png",
+                    size_bytes=9,
+                    width=1,
+                    height=1,
+                )
+            )
+    original_remove = storage.remove
+    calls = 0
+
+    def fail_second_batch(bucket: str, keys: Sequence[str]) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise photo_storage_error()
+        original_remove(bucket, keys)
+
+    monkeypatch.setattr(storage, "remove", fail_second_batch)
+    auth = headers(caregiver_account)
+    assert client.delete(f"/memories/{memory.id}", headers=auth).status_code == 503
+    assert len(storage.objects) == 1
+    listing = client.get("/memories", headers=auth).json()
+    item = next(item for item in listing["items"] if item["id"] == str(memory.id))
+    assert item["deletion_pending"] is True
+    blocked = client.get(f"/memories/{memory.id}/photos", headers=auth)
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "memory_deletion_pending"
+    assert (
+        client.patch(f"/memories/{memory.id}", headers=auth, json={"title": "Cambio"}).status_code
+        == 409
+    )
+
+    monkeypatch.setattr(storage, "remove", original_remove)
+    # A fresh request/session resumes the durable intent, including absent objects.
+    assert client.delete(f"/memories/{memory.id}", headers=auth).status_code == 204
+    assert not storage.objects
+    assert client.get(f"/memories/{memory.id}", headers=auth).status_code == 404
