@@ -51,13 +51,27 @@ class MemoriesService:
         )
 
     def _require_memory(
-        self, memory_id: UUID, profile_id: UUID, *, for_update: bool = False
+        self,
+        memory_id: UUID,
+        profile_id: UUID,
+        *,
+        for_update: bool = False,
+        allow_deleting: bool = False,
     ) -> Memory:
         memory = self.repository.get_memory(
             memory_id, elder_profile_id=profile_id, for_update=for_update
         )
         if memory is None:
             raise self._not_found()
+        if memory.deletion_pending and not allow_deleting:
+            raise MemoriesError(
+                code="memory_deletion_pending",
+                status_code=409,
+                message=(
+                    "Este recuerdo tiene un borrado pendiente. "
+                    "Vuelve a eliminarlo para completarlo."
+                ),
+            )
         return memory
 
     @staticmethod
@@ -131,8 +145,18 @@ class MemoriesService:
 
     def delete_memory(self, actor_id: UUID, memory_id: UUID) -> None:
         profile_id, is_caregiver = self._context(actor_id)
+        # Persist intent before irreversible Storage calls. A failed batch or
+        # process interruption can then be retried without exposing broken photos.
         with self.session.begin():
-            memory = self._require_memory(memory_id, profile_id, for_update=True)
+            memory = self._require_memory(
+                memory_id, profile_id, for_update=True, allow_deleting=True
+            )
+            self._require_editor(memory, actor_id, is_caregiver)
+            memory.deletion_pending = True
+        with self.session.begin():
+            memory = self._require_memory(
+                memory_id, profile_id, for_update=True, allow_deleting=True
+            )
             self._require_editor(memory, actor_id, is_caregiver)
             self._remove_photo_objects(
                 self.repository.list_photos(memory_id, elder_profile_id=profile_id)
