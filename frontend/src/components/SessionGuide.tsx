@@ -75,11 +75,10 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
       if (!active) return;
       setPhotos(localPhotos);
       setSelectedPhotoIds(localPhotos.map((photo) => photo.id));
-      setMemories(response.items);
-      const firstAnecdote = response.items.find((memory) => memory.type === "anecdote");
-      if (firstAnecdote) setAnecdoteId(firstAnecdote.id);
-      const firstSong = response.items.find((memory) => memory.type === "song");
-      if (firstSong) setSongId(firstSong.id);
+      const eligibleMemories = response.items.filter((memory) => memory.is_positive && !memory.is_sensitive);
+      setMemories(eligibleMemories);
+      setAnecdoteId(eligibleMemories.find((memory) => memory.type === "anecdote")?.id ?? "");
+      setSongId(eligibleMemories.find((memory) => memory.type === "song")?.id ?? "");
       setLoadError("");
     }).catch((error: unknown) => {
       if (active) setLoadError(error instanceof Error ? error.message : "No pudimos cargar los recuerdos.");
