@@ -92,3 +92,91 @@ it("restores the plan after checkout using the session return marker", async () 
   expect(await screen.findByRole("heading", { name: "Tu plan familiar" })).toBeInTheDocument();
   expect(sessionStorage.getItem("ayni_checkout_return")).toBeNull();
 });
+
+function completeLogin(): void {
+  fireEvent.change(screen.getByLabelText("Correo Electrónico"), { target: { value: user.email } });
+  fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "test-password-123" } });
+  fireEvent.submit(screen.getByLabelText("Contraseña").closest("form")!);
+}
+
+function successfulLogin(): Response {
+  return new Response(JSON.stringify({ access_token: "new-session-token", token_type: "bearer", user }));
+}
+
+it.each(["success", "cancel", "marker"])("recupera el plan tras una sesión vencida con retorno %s", async (source) => {
+  if (source === "marker") sessionStorage.setItem("ayni_checkout_return", "settings:plan");
+  else window.history.replaceState({}, "", `/?billing=${source}`);
+  fetchMock.mockResolvedValueOnce(unauthorized());
+  render(<App />);
+  await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" });
+  expect(localStorage.getItem("ayni_token")).toBeNull();
+
+  fetchMock.mockResolvedValueOnce(successfulLogin());
+  completeLogin();
+
+  expect(await screen.findByRole("heading", { name: "Tu plan familiar" })).toBeInTheDocument();
+  expect(localStorage.getItem("ayni_token")).toBe("new-session-token");
+  expect(sessionStorage.getItem("ayni_checkout_return")).toBeNull();
+  const [url, options] = fetchMock.mock.calls.at(-1)!;
+  expect(url).toBe("https://api.example.test/auth/login");
+  expect(options?.headers).not.toHaveProperty("Authorization");
+  expect(JSON.parse(options?.body as string)).toEqual({ email: user.email, password: "test-password-123" });
+});
+
+it("conserva el retorno al plan si falla el acceso y permite reintentar", async () => {
+  sessionStorage.setItem("ayni_checkout_return", "settings:plan");
+  fetchMock.mockResolvedValueOnce(unauthorized());
+  render(<App />);
+  await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" });
+
+  fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+  completeLogin();
+  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos conectar.");
+  expect(sessionStorage.getItem("ayni_checkout_return")).toBe("settings:plan");
+  expect(localStorage.getItem("ayni_token")).toBeNull();
+
+  fetchMock.mockResolvedValueOnce(successfulLogin());
+  completeLogin();
+  expect(await screen.findByRole("heading", { name: "Tu plan familiar" })).toBeInTheDocument();
+  expect(sessionStorage.getItem("ayni_checkout_return")).toBeNull();
+});
+
+it("rechaza una respuesta de acceso sin token y conserva el destino pendiente", async () => {
+  sessionStorage.setItem("ayni_checkout_return", "settings:plan");
+  fetchMock.mockResolvedValueOnce(unauthorized());
+  render(<App />);
+  await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" });
+  fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ user, token_type: "bearer" })));
+  completeLogin();
+  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos iniciar tu sesión.");
+  expect(localStorage.getItem("ayni_token")).toBeNull();
+  expect(sessionStorage.getItem("ayni_checkout_return")).toBe("settings:plan");
+  expect(screen.queryByRole("heading", { name: "Tu plan familiar" })).toBeNull();
+});
+
+it("abre el inicio después de acceder si no hay un retorno de pago pendiente", async () => {
+  fetchMock.mockResolvedValueOnce(unauthorized());
+  render(<App />);
+  await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" });
+  fetchMock.mockResolvedValueOnce(successfulLogin());
+  completeLogin();
+  await screen.findByRole("button", { name: "Cerrar sesión" });
+  expect(screen.queryByRole("heading", { name: "Tu plan familiar" })).toBeNull();
+});
+
+it("ignora una respuesta antigua de sesión recibida después de un 401", async () => {
+  let resolveSession!: (response: Response) => void;
+  fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveSession = resolve; }));
+  render(<App />);
+  fetchMock.mockResolvedValueOnce(unauthorized());
+  await act(async () => {
+    await expect(apiFetch("/memories")).rejects.toMatchObject({ status: 401 });
+  });
+  await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" });
+  await act(async () => {
+    resolveSession(new Response(JSON.stringify({ user, consent: {} })));
+  });
+  expect(screen.getByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
+  expect(localStorage.getItem("ayni_token")).toBeNull();
+});
