@@ -30,6 +30,21 @@ class PhotoQuotaPolicy:
             )
 
 
+@dataclass(frozen=True)
+class SessionQuotaPolicy:
+    maximum: int | None
+    window_days: int = 7
+
+    def require_capacity(self, current_count: int) -> None:
+        if self.maximum is not None and current_count >= self.maximum:
+            raise BillingError(
+                code="session_limit_reached",
+                status_code=409,
+                message="Tu familia ya preparó una guía en los últimos siete días. "
+                "Puedes volver a consultar el historial o revisar el Plan Familia.",
+            )
+
+
 class BillingService:
     def __init__(self, session: Session, gateway: BillingGateway | None = None) -> None:
         self.gateway = gateway or StripeGateway()
@@ -71,6 +86,10 @@ class BillingService:
     def get_photo_quota(self, actor_id: UUID) -> PhotoQuotaPolicy:
         status = self.get_status(actor_id)
         return PhotoQuotaPolicy(maximum=None if status.plan == "family" else 10)
+
+    def get_session_quota(self, actor_id: UUID) -> SessionQuotaPolicy:
+        status = self.get_status(actor_id)
+        return SessionQuotaPolicy(maximum=None if status.plan == "family" else 1)
 
     @staticmethod
     def _existing_subscription() -> BillingError:

@@ -261,3 +261,36 @@ class MemoriesRepository:
     def delete_photo(self, photo: MemoryPhoto) -> None:
         self.session.delete(photo)
         self.session.flush()
+
+    @staticmethod
+    def _session_eligible(profile_id: UUID) -> list[ColumnElement[bool]]:
+        return [
+            Memory.elder_profile_id == profile_id,
+            Memory.is_positive.is_(True),
+            Memory.is_sensitive.is_(False),
+            Memory.deletion_pending.is_(False),
+        ]
+
+    def select_session_memories(self, profile_id: UUID) -> list[Memory]:
+        return list(
+            self.session.scalars(
+                select(Memory)
+                .where(*self._session_eligible(profile_id))
+                .order_by(Memory.id)
+                .limit(3)
+                .with_for_update()
+            )
+        )
+
+    def available_session_memory_ids(
+        self, profile_id: UUID, memory_ids: Sequence[UUID]
+    ) -> set[UUID]:
+        if not memory_ids:
+            return set()
+        return set(
+            self.session.scalars(
+                select(Memory.id).where(
+                    *self._session_eligible(profile_id), Memory.id.in_(memory_ids)
+                )
+            )
+        )

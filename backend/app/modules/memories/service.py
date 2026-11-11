@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -24,6 +26,17 @@ from app.modules.memories.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SessionMemoryCandidate:
+    id: UUID
+    elder_profile_id: UUID
+    type: str
+    title: str
+    is_positive: bool
+    is_sensitive: bool
+    deletion_pending: bool
 
 
 class MemoriesError(ApplicationError):
@@ -302,3 +315,30 @@ class MemoriesService:
                 )
             self._remove_photo_objects([photo])
             self.repository.delete_photo(photo)
+
+    def select_session_memories(self, elder_profile_id: UUID) -> list[SessionMemoryCandidate]:
+        """Trusted module interface; caller derives the profile and owns the transaction.
+
+        Locks eligible rows until the caller persists the generated session.
+        Never expose the profile argument directly to an HTTP client.
+        """
+        if not self.session.in_transaction():
+            raise RuntimeError("Session memory selection requires a transaction")
+        return [
+            SessionMemoryCandidate(
+                id=memory.id,
+                elder_profile_id=memory.elder_profile_id,
+                type=str(memory.type),
+                title=memory.title,
+                is_positive=memory.is_positive,
+                is_sensitive=memory.is_sensitive,
+                deletion_pending=memory.deletion_pending,
+            )
+            for memory in self.repository.select_session_memories(elder_profile_id)
+        ]
+
+    def available_session_memory_ids(
+        self, elder_profile_id: UUID, memory_ids: Sequence[UUID]
+    ) -> set[UUID]:
+        """Check current eligibility without exposing content from another family."""
+        return self.repository.available_session_memory_ids(elder_profile_id, memory_ids)
