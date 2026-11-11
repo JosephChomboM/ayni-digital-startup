@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -71,6 +72,27 @@ class SessionsRepository:
                 select(func.count())
                 .select_from(FamilySession)
                 .where(FamilySession.elder_profile_id == elder_profile_id)
+            )
+            or 0
+        )
+
+    def lock_generation(self, profile_id: UUID) -> None:
+        self.session.execute(
+            select(
+                func.pg_advisory_xact_lock(
+                    func.hashtextextended("ayni-sessions:" + str(profile_id), 0)
+                )
+            )
+        )
+
+    def count_since(self, profile_id: UUID, since: datetime) -> int:
+        return (
+            self.session.scalar(
+                select(func.count())
+                .select_from(FamilySession)
+                .where(
+                    FamilySession.elder_profile_id == profile_id, FamilySession.created_at > since
+                )
             )
             or 0
         )

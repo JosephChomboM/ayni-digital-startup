@@ -1,7 +1,8 @@
-from typing import Literal
+from datetime import UTC
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class GuideMemory(BaseModel):
@@ -34,3 +35,46 @@ class SessionGuide(BaseModel):
     duration_minutes: int = 15
     memory_ids: tuple[UUID, ...]
     steps: tuple[GuideStep, ...]
+
+
+UTCDateTime = Annotated[AwareDatetime, AfterValidator(lambda value: value.astimezone(UTC))]
+
+
+class GenerateSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class SessionListRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+class SessionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    elder_profile_id: UUID
+    created_by: UUID | None
+    created_at: UTCDateTime
+    template_version: str
+    duration_minutes: int
+
+
+class SessionStepResponse(BaseModel):
+    position: int
+    duration_minutes: int
+    instruction: str
+    source_memory_id: UUID | None
+    memory_id: UUID | None
+    memory_available: bool
+
+
+class SessionDetail(SessionSummary):
+    steps: list[SessionStepResponse]
+
+
+class SessionListResponse(BaseModel):
+    items: list[SessionSummary]
+    total: int
+    limit: int
+    offset: int
