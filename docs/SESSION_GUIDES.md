@@ -29,8 +29,8 @@ Sin recuerdos permitidos se lanza ApplicationError 409, code `no_eligible_memori
 - Mantener errores comunes detail.code/detail.message y permisos por familia.
 - Coordinar con Damarys la conexión de la pantalla existente; no duplicarla.
 
-Implementados: núcleo de plantillas, modelos y migración con pruebas de persistencia.
-Pendientes: interfaz pública de memories, cuota en billing, repository, servicio de aplicación,
+Implementados: núcleo de plantillas, modelos, migración y repository con pruebas de persistencia e aislamiento.
+Pendientes: interfaz pública de memories, cuota en billing, servicio de aplicación,
 schemas HTTP, router y pruebas de los endpoints.
 AYNI-48 cubre recuperar historial y detalle persistidos; no se declara completada aquí.
 
@@ -50,3 +50,10 @@ el alcance definitivo de eliminación de cuenta se coordina en AYNI-52.
 
 La rama de borrado de fotos tiene otra migración local. Antes de integrar ambas ramas
 hay que reconciliar sus revisiones de Alembic y comprobar una sola cabeza en el resultado.
+
+
+SessionsRepository guarda la guía en la transacción del servicio y consulta siempre
+por elder_profile_id, con historial paginado y orden estable de fecha/UUID.
+Es una interfaz interna: el servicio de aplicación deberá autenticar, validar los
+recuerdos mediante memories.service y aplicar la cuota antes de llamarla.
+Todavía no existe un endpoint que permita generar o consultar estas tablas.
