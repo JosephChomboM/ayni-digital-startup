@@ -1,7 +1,7 @@
 # AYNI-46 y AYNI-48 — Guías familiares persistentes
 
 Estado: backend implementado en la rama local `hats/ayni-46-session-templates`.
-Sin push, PR ni despliegue todavía. La pantalla SessionGuide de Damarys no se modifica.
+Pendiente de revisión, integración y despliegue. La pantalla SessionGuide de Damarys no se modifica.
 Esta entrega no implementa respuestas, finalización de actividades ni su dashboard.
 
 ## Contrato HTTP para integrar con frontend
@@ -84,10 +84,10 @@ Revisiones: 0f40e3d7e94d crea sesiones/pasos; ca074ba1656f une esa revisión con
 fab6d11fe74d (borrado pendiente de fotos). El resultado tiene una sola cabeza.
 Ejecutar `alembic upgrade head` al desplegar. Ninguna tabla usa create_all.
 
-## Integración y QA pendientes de publicación
+## Integración y QA pendientes
 
 El backend está implementado y probado; la historia no se marca como terminada en Jira
-por tener código local. Faltan revisión del equipo, publicación y validación en stage.
+por tener código local. Faltan revisión del equipo, integración y validación en stage.
 Damarys conecta su pantalla existente: genera solo tras una acción explícita, conserva
 el id devuelto y recupera detalle/historial desde GET. No genera automáticamente al abrir
 o recargar la pantalla. Debe mostrar carga, vacío y errores como estados distintos,
