@@ -1,6 +1,6 @@
 # AYNI-46 — Núcleo de guías familiares
 
-Estado: generador interno en rama local; sin endpoints, tablas ni conexión web todavía.
+Estado: generador interno en rama local; con tablas de persistencia; sin endpoints ni conexión web todavía.
 La pantalla SessionGuide existente de Damarys se conserva sin cambios.
 
 ## Interfaz implementada
@@ -29,6 +29,24 @@ Sin recuerdos permitidos se lanza ApplicationError 409, code `no_eligible_memori
 - Mantener errores comunes detail.code/detail.message y permisos por familia.
 - Coordinar con Damarys la conexión de la pantalla existente; no duplicarla.
 
-Pendientes: interfaz de selección pública de memories, cuota en billing, modelos y migración,
-repository, servicio de aplicación, schemas HTTP, router y pruebas de integración.
+Implementados: núcleo de plantillas, modelos y migración con pruebas de persistencia.
+Pendientes: interfaz pública de memories, cuota en billing, repository, servicio de aplicación,
+schemas HTTP, router y pruebas de los endpoints.
 AYNI-48 cubre recuperar historial y detalle persistidos; no se declara completada aquí.
+
+
+## Persistencia de AYNI-46
+
+FamilySession guarda perfil, autor, fecha, duración y versión de plantilla.
+SessionItem conserva orden, minutos e instrucciones originales. Se almacena el ID
+original del recuerdo y un vínculo vivo que pasa a null si el recuerdo se elimina.
+No se copian títulos, textos, enlaces de canciones ni URLs firmadas: un recuerdo
+eliminado podrá mostrarse como no disponible, sin regenerar los pasos del historial.
+Editar el contenido de un recuerdo no modifica las instrucciones ya guardadas.
+
+Al eliminar el perfil se eliminan físicamente sesiones y pasos. Eliminar solo al autor
+deja su ID en null para no borrar el historial compartido de los demás familiares;
+el alcance definitivo de eliminación de cuenta se coordina en AYNI-52.
+
+La rama de borrado de fotos tiene otra migración local. Antes de integrar ambas ramas
+hay que reconciliar sus revisiones de Alembic y comprobar una sola cabeza en el resultado.
