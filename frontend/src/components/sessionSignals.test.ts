@@ -12,11 +12,14 @@ it.each([
   expect(requestsVisualContext(text)).toBe(expected);
 });
 
-it("prioriza voces naturales locales en español y excluye las voces remotas", () => {
+it("prioriza acentos locales y evita que una voz de personaje gane por calidad", () => {
   const voice = (name: string, lang: string, localService = true) => ({ name, lang, localService } as SpeechSynthesisVoice);
   const voices = [voice("Española", "es-ES"), voice("Peruana", "es-PE"),
-    voice("Natural mexicana", "es-MX"), voice("Natural remota", "es-PE", false), voice("English", "en-US")];
-  expect(spanishVoices(voices).map(v => v.name)).toEqual(["Natural mexicana", "Peruana", "Española"]);
+    voice("Paulina", "es-MX"), voice("Natural mexicana", "es-MX"),
+    voice("Natural remota", "es-PE", false), voice("English", "en-US"),
+    voice("Natural de Estados Unidos", "es-US"), voice("Eddy (Premium)", "es-MX")];
+  expect(spanishVoices(voices).map(v => v.name))
+    .toEqual(["Peruana", "Natural mexicana", "Paulina", "Española", "Natural de Estados Unidos", "Eddy (Premium)"]);
 });
 
 describe("spoken session preferences", () => {
