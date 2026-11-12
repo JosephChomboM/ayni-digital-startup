@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { History, Settings2, X, AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
 import type { Memory } from "../api/memories";
 import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, transcribeAudio } from "../api/sessions";
@@ -19,6 +19,7 @@ import { Button } from "./ui/button";
 export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
 interface GuidedConversationProps {
+  onBack?: () => void;
   sessionId: string;
   activeMemoryId?: string;
   memoryOptions?: { id: string; title: string }[];
@@ -38,7 +39,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, theme, onPause, onResume, onNextActivity, onFinish,
+  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, theme, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
   const liveScene = true;
@@ -48,6 +49,8 @@ export function GuidedConversation({
   const lastAwayAt = useRef(-Infinity);
   const lastHandAt = useRef(-Infinity);
   const [bodyTracking, setBodyTracking] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolsPanel, setToolsPanel] = useState("history");
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
   const [failedTurns, setFailedTurns] = useState(0);
@@ -371,9 +374,11 @@ export function GuidedConversation({
     <header className="conversation-bar">
       <div className="min-w-0">
         <h2 ref={heading} tabIndex={-1} className="focus:outline-none">Conversación con Ayni</h2>
-        <p className="tabular-nums">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
+        <p className="tabular-nums"><span>{elapsed}</span><span className="session-bar-state"> · Sesión {paused ? "en pausa" : "en curso"}</span></p>
       </div>
       <div className="flex items-center gap-1">
+        {onBack && <button type="button" className="bar-action" aria-label="Volver al historial" title="Volver al historial" onClick={onBack}><History size={18}/></button>}
+        <button type="button" className="bar-icon session-tools-toggle" aria-label="Abrir opciones de sesión" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}><Settings2 size={20}/></button>
         <button type="button" title={sound ? "Silenciar a Ayni" : "Activar voz"} aria-label={sound ? "Silenciar a Ayni" : "Activar voz"}
           className="bar-icon" onClick={toggleSound}>
           {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
@@ -462,7 +467,12 @@ export function GuidedConversation({
         </form>
       </div>
 
-      <aside className="companion-tools" aria-label="Herramientas para quien acompaña">
+      <aside className="companion-tools" data-open={toolsOpen || undefined} data-panel={toolsPanel} aria-label="Herramientas para quien acompaña">
+        <div className="session-tools-tabs" role="group" aria-label="Panel de sesión">
+          <button type="button" aria-pressed={toolsPanel === "history"} onClick={() => setToolsPanel("history")}>Conversación</button>
+          <button type="button" aria-pressed={toolsPanel === "options"} onClick={() => setToolsPanel("options")}>Opciones</button>
+          <button type="button" className="session-tools-close" aria-label="Cerrar opciones de sesión" onClick={() => setToolsOpen(false)}><X size={18}/></button>
+        </div>
         <h3>Para quien acompaña</h3>
         {Boolean(memoryOptions?.length) && <label className="tool-field">Recuerdo activo
           <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
@@ -499,7 +509,7 @@ export function GuidedConversation({
         <details className="tool-block">
           <summary>Opciones de dictado</summary>
           <label className="tool-check"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
-          <p className="tool-hint">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español con el modelo de mayor precisión. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
+          <p className="tool-hint">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español con el modelo de mayor precisión. Consume cuota de audio y solicitudes de Groq cada vez que hablas. No cambia la voz de Ayni. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
           <label className="tool-check"><input type="checkbox" checked={reviewVoice} onChange={(event) => setReviewVoice(event.target.checked)} />Revisar el dictado antes de enviarlo</label>
         </details>
       </aside>

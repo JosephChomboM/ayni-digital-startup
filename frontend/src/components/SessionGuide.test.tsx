@@ -310,3 +310,16 @@ it("viste a Ayni y ambienta la sala con los gustos del perfil",async()=>{
  await begin();
  expect(screen.getByText(/Ayni lleva gorro y mandil de cocina/)).toBeInTheDocument();
 });
+it("reúne las opciones en el panel y conserva la conversación al alternar", async () => {
+ await begin();
+ fireEvent.click(screen.getByRole("button",{name:"Abrir opciones de sesión"}));
+ expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","true");
+ fireEvent.click(screen.getByRole("button",{name:"Opciones"}));
+ expect(screen.getByRole("button",{name:"Opciones"})).toHaveAttribute("aria-pressed","true");
+ fireEvent.click(screen.getByRole("button",{name:"Conversación"}));
+ expect(screen.getByRole("log")).toHaveTextContent("Hola, ¿qué disfrutaban de sus paseos?");
+ fireEvent.click(screen.getByRole("button",{name:"Cerrar opciones de sesión"}));
+ expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","false");
+ fireEvent.click(screen.getByRole("button",{name:"Volver al historial"}));
+ await screen.findByRole("heading",{name:"Guía de sesión"});
+});
