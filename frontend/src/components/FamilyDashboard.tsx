@@ -10,6 +10,7 @@ import type { LocalFamilyPhoto } from "../api/localMedia";
 import { getFamilySessionFeedback } from "../api/sessionFeedback";
 import type { SessionFeedback } from "../api/sessionFeedback";
 import { Button } from "./ui/button";
+import { ReactionHistory } from "./ReactionHistory";
 
 interface FamilyDashboardProps {
   currentUser: User;
@@ -97,6 +98,8 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
       </header>
 
       {loadError && <p role="alert" className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-900">{loadError} Puedes actualizar la página para volver a intentar.</p>}
+
+      <ReactionHistory familyId={currentUser.family_id} />
 
       <section aria-label="Resumen familiar" className="grid gap-7 sm:grid-cols-3">
         <Metric label="Aportes tuyos" value={loading ? "…" : ownContributionCount} detail="Recuerdos y fotos aportados por ti" />
