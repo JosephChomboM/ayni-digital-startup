@@ -11,6 +11,8 @@ import { recommendMemory, generateSession, getRecordedReaction, getSession, list
 import type { Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
 import { GuidedConversation } from "./GuidedConversation";
 import type { StageScene } from "./CompanionScene";
+import { themeFor } from "./companionTheme";
+import { getElderProfile } from "../api/families";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
@@ -64,6 +66,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoSourceIds, setPhotoSourceIds] = useState<string[]>([]);
+  const [interests, setInterests] = useState<string[]>([]);
   const [anecdoteId, setAnecdoteId] = useState("");
   const [songId, setSongId] = useState("");
   const [withDevices, setWithDevices] = useState(false);
@@ -173,6 +176,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
       const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       const previousReaction = await getRecordedReaction(saved.id);
+      // Los gustos solo ambientan la sala; si el perfil no carga, Ayni sale con su look de siempre.
+      setInterests(await getElderProfile().then((profile) => profile.interests).catch(() => []));
       setMemories(allowed);
       setPhotos(sessionPhotos);
       setPhotoSourceIds(photoSources.map((memory) => memory.id));
@@ -314,6 +319,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
         scene={scene}
         activities={availableActivities}
         songMemory={selectedSong}
+        theme={themeFor(interests, memories.map((item) => item.title))}
         onPause={() => setPaused(true)}
         onResume={() => setPaused(false)}
         onNextActivity={nextActivity}

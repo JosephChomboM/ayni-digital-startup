@@ -8,6 +8,7 @@ import type { ChatInput } from "../api/sessions";
 import type { CompanionState } from "./AyniCompanion";
 import { CompanionScene } from "./CompanionScene";
 import type { StageScene } from "./CompanionScene";
+import type { CompanionTheme } from "./companionTheme";
 import { SessionCamera } from "./SessionCamera";
 import { SongContext } from "./SongContext";
 import { interpretReply, requestsVisualContext, visualSource, speakLocally } from "./sessionSignals";
@@ -29,6 +30,7 @@ interface GuidedConversationProps {
   scene?: StageScene;
   activities: SessionActivity[];
   songMemory?: Memory;
+  theme?: CompanionTheme;
   onPause: (message: string) => void;
   onResume: () => void;
   onNextActivity: (preferred?: SessionActivity) => string;
@@ -36,7 +38,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, onPause, onResume, onNextActivity, onFinish,
+  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, theme, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
   const liveScene = true;
@@ -384,7 +386,7 @@ export function GuidedConversation({
       </div>
     </header>
 
-    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} camera={<div className="camera-dock">
+    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} theme={theme} camera={<div className="camera-dock">
       <div className="camera-head">
         <h3>Tu cámara</h3>
         <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
