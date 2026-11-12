@@ -12,6 +12,9 @@ const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmar
 const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const HAND_LINKS: [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
   [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]];
+// Pocos puntos de la cara: contorno, cejas, ojos, nariz y boca, para no taparla.
+const FACE_POINTS = [10, 297, 284, 389, 454, 361, 397, 378, 152, 149, 172, 132, 234, 162, 54, 67,
+  70, 105, 107, 336, 334, 300, 33, 159, 133, 145, 362, 386, 263, 374, 1, 61, 0, 291, 17];
 // Solo la parte superior del cuerpo: en casa la persona suele estar sentada.
 const BODY_LINKS: [number, number][] = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24]];
 
@@ -23,7 +26,7 @@ const expressions: Record<Expression, { label: string; Icon: typeof Smile }> = {
   calm: { label: "Tranquilo", Icon: Meh },
 };
 
-function drawTracking(canvas: HTMLCanvasElement | null, face: NormalizedLandmark[], hands: NormalizedLandmark[][], body: NormalizedLandmark[]) {
+function drawTracking(canvas: HTMLCanvasElement | null, video: HTMLVideoElement | null, face: NormalizedLandmark[], hands: NormalizedLandmark[][], body: NormalizedLandmark[]) {
   const context = canvas?.getContext?.("2d");
   if (!canvas || !context) return;
   const ratio = window.devicePixelRatio || 1;
@@ -31,7 +34,14 @@ function drawTracking(canvas: HTMLCanvasElement | null, face: NormalizedLandmark
   const height = Math.round(canvas.clientHeight * ratio);
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
   context.clearRect(0, 0, width, height);
-  const at = (point: NormalizedLandmark) => [point.x * width, point.y * height] as const;
+  // Los puntos vienen normalizados al cuadro del video; se proyectan sobre la zona donde
+  // el video se ve realmente (object-fit: contain), aunque el marco tenga otra proporción.
+  const sourceWidth = video?.videoWidth || width;
+  const sourceHeight = video?.videoHeight || height;
+  const scale = Math.min(width / sourceWidth, height / sourceHeight);
+  const offsetX = (width - sourceWidth * scale) / 2;
+  const offsetY = (height - sourceHeight * scale) / 2;
+  const at = (point: NormalizedLandmark) => [offsetX + point.x * sourceWidth * scale, offsetY + point.y * sourceHeight * scale] as const;
   // Solo el cuerpo trae una visibilidad útil; en cara y manos MediaPipe la deja en 0.
   const seen = (point: NormalizedLandmark, checked: boolean) => !checked || (point.visibility ?? 1) >= 0.5;
   const lines = (points: NormalizedLandmark[], links: [number, number][], color: string, checked = false) => {
@@ -65,7 +75,7 @@ function drawTracking(canvas: HTMLCanvasElement | null, face: NormalizedLandmark
     lines(hand, HAND_LINKS, "#edce84dd");
     dots(hand, "#fff3c4", 2.6);
   }
-  if (face.length) dots(face, "#d6efbbd9", 1.15);
+  if (face.length) dots(FACE_POINTS.map((index) => face[index]).filter(Boolean), "#d6efbbe6", 1.9);
 }
 const wasmAssets = {
   simd: {
@@ -116,7 +126,6 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
   }, [captureRef]);
   const [status, setStatus] = useState("Esperando permiso de cámara…");
   const [ratio, setRatio] = useState("4 / 3");
-  const [face, setFace] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const handleCue = useEffectEvent(onCue);
   const turnAvailable = useEffectEvent(canFollowExpression);
   const observe = useEffectEvent(async () => {
@@ -154,9 +163,12 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
     let timer: number | undefined;
     let lastVideoTime = -1;
     const trackCue = createFaceCueTracker();
+    const square = document.createElement("canvas");
+    const fit = () => { if (video.videoWidth && video.videoHeight) setRatio(`${video.videoWidth} / ${video.videoHeight}`); };
 
     function stop() {
       stopped = true;
+      video?.removeEventListener("resize", fit);
       window.clearTimeout(timer);
       stream?.getTracks().forEach((track) => {
         track.removeEventListener("ended", cameraEnded);
@@ -169,7 +181,7 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
       handDetector = undefined;
       poseDetector?.close();
       poseDetector = undefined;
-      drawTracking(overlay.current, [], [], []);
+      drawTracking(overlay.current, null, [], [], []);
       if (video) video.srcObject = null;
     }
 
@@ -192,7 +204,6 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
 
     function cameraEnded() {
       stop();
-      setFace(null);
       setExpression(null);
       setStatus("La cámara se desconectó. Puedes seguir conversando sin video.");
     }
@@ -201,7 +212,6 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
       window.clearTimeout(timer);
       detector?.close();
       detector = undefined;
-      setFace(null);
       setExpression(null);
       setStatus("Vista en vivo. El seguimiento no pudo iniciar.");
     }
@@ -212,7 +222,23 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
         if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
           lastVideoTime = video.currentTime;
           const now = performance.now();
-          const result = detector.detectForVideo(video, now);
+          // MediaPipe ubica mal los puntos en video no cuadrado: se analiza un cuadro
+          // cuadrado con bordes de relleno y luego se devuelven al cuadro del video.
+          const side = Math.max(video.videoWidth, video.videoHeight);
+          const padX = (side - video.videoWidth) / 2;
+          const padY = (side - video.videoHeight) / 2;
+          const squareContext = side ? square.getContext("2d") : null;
+          let input: HTMLVideoElement | HTMLCanvasElement = video;
+          let back = (point: NormalizedLandmark) => point;
+          if (squareContext && video.videoWidth && video.videoHeight) {
+            if (square.width !== side) { square.width = side; square.height = side; }
+            squareContext.fillStyle = "#000";
+            squareContext.fillRect(0, 0, side, side);
+            squareContext.drawImage(video, padX, padY, video.videoWidth, video.videoHeight);
+            input = square;
+            back = (point) => ({ ...point, x: (point.x * side - padX) / video.videoWidth, y: (point.y * side - padY) / video.videoHeight });
+          }
+          const result = detector.detectForVideo(input, now);
           const scores = result.faceBlendshapes[0]?.categories ?? [];
           const score = (name: string) => scores.find((item) => item.categoryName === name)?.score ?? 0;
           // Suaviza los valores para que la etiqueta no parpadee entre cuadros.
@@ -231,29 +257,22 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
               observation = "brow";
             }
           }
-          const points = result.faceLandmarks.length === 1 ? result.faceLandmarks[0] : [];
+          const points = result.faceLandmarks.length === 1 ? result.faceLandmarks[0].map(back) : [];
           setExpression(points.length ? readExpression(steady) : null);
           let hands: NormalizedLandmark[][] = [];
           let body: NormalizedLandmark[] = [];
           if (trackBody.current) {
             void loadBody();
-            hands = handDetector?.detectForVideo(video, now).landmarks ?? [];
-            body = poseDetector?.detectForVideo(video, now).landmarks[0] ?? [];
+            hands = (handDetector?.detectForVideo(input, now).landmarks ?? []).map((hand) => hand.map(back));
+            body = (poseDetector?.detectForVideo(input, now).landmarks[0] ?? []).map(back);
           }
-          drawTracking(overlay.current, points, hands, body);
+          drawTracking(overlay.current, video, points, hands, body);
           // Mano levantada por encima del hombro durante un momento: Ayni lo nota.
           const raised = [[15, 11], [16, 12]].some(([wrist, shoulder]) => body[wrist] && body[shoulder] &&
             (body[wrist].visibility ?? 0) > 0.5 && body[wrist].y < body[shoulder].y - 0.08);
           if (!raised) { raisedSince = 0; raisedSent = false; }
           else if (!raisedSince) raisedSince = now;
           else if (!raisedSent && now - raisedSince >= 1200) { raisedSent = true; handleCue("hand"); }
-          if (points.length) {
-            const left = Math.max(0, Math.min(...points.map((point) => point.x)) - 0.025);
-            const right = Math.min(1, Math.max(...points.map((point) => point.x)) + 0.025);
-            const top = Math.max(0, Math.min(...points.map((point) => point.y)) - 0.025);
-            const bottom = Math.min(1, Math.max(...points.map((point) => point.y)) + 0.025);
-            setFace({ x: (1 - right) * 100, y: top * 100, width: (right - left) * 100, height: (bottom - top) * 100 });
-          } else setFace(null);
           setStatus(statusText[observation]);
           const cue = trackCue(observation, now, turnAvailable());
           if (cue) handleCue(cue);
@@ -290,7 +309,9 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
         return;
       }
       if (stopped || !video) return;
-      if (video.videoWidth && video.videoHeight) setRatio(`${video.videoWidth} / ${video.videoHeight}`);
+      fit();
+      // La cámara puede cambiar de resolución después de empezar.
+      video.addEventListener("resize", fit);
       setStatus("Vista en vivo. Preparando el seguimiento…");
       try {
         vision = await import("@mediapipe/tasks-vision");
@@ -318,7 +339,6 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
     function onVisibilityChange() {
       if (document.hidden && !stopped) {
         stop();
-        setFace(null);
         setExpression(null);
         setStatus("La cámara se apagó al salir de esta pestaña. Pueden volver a activarla.");
       }
@@ -337,11 +357,11 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
     <div className="camera-frame" style={{ aspectRatio: ratio }}>
       <video ref={preview} muted playsInline aria-label="Vista de la cámara" />
       <canvas ref={overlay} aria-hidden="true" />
-      {face && <div aria-hidden="true" className="camera-face"
-        style={{ left: `${face.x}%`, top: `${face.y}%`, width: `${face.width}%`, height: `${face.height}%` }} />}
-      {shown && <p className="camera-expression" aria-live="polite"><shown.Icon aria-hidden="true" />{shown.label}</p>}
     </div>
-    <p role="status" className="camera-status">{status}</p>
+    <div className="camera-meta">
+      {shown && <p className="camera-expression" aria-live="polite"><shown.Icon aria-hidden="true" />{shown.label}</p>}
+      <p role="status" className="camera-status">{status}</p>
+    </div>
     {onAnalyzeFrame && <button type="button" disabled={analyzing} className="camera-analyze" title="Comparte una captura con Groq. El video continuo permanece en tu dispositivo." onClick={async () => {
       if (!preview.current) return;
       try { onAnalyzeFrame(await imageForConversation(preview.current)); }
