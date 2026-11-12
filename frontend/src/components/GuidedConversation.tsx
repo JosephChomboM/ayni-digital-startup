@@ -5,7 +5,7 @@ import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, clearScene, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
-import { interpretReply, requestsVisualContext, spanishVoices, speakLocally } from "./sessionSignals";
+import { interpretReply, preferredVoiceURI, requestsVisualContext, saveVoicePreference, spanishVoiceLabel, spanishVoices, speakLocally } from "./sessionSignals";
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
 import { Button } from "./ui/button";
@@ -38,7 +38,7 @@ export function GuidedConversation({
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
   const [voices, setVoices] = useState(() => spanishVoices(window.speechSynthesis?.getVoices() ?? []));
-  const [voiceURI, setVoiceURI] = useState("");
+  const [voiceURI, setVoiceURI] = useState(preferredVoiceURI);
   const [failedTurns, setFailedTurns] = useState(0);
   const [line, setLine] = useState(SESSION_GREETING);
   const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
@@ -430,15 +430,17 @@ export function GuidedConversation({
         {dictation.state === "recording" && <Button type="button" variant="outline" onClick={dictation.finish}>Listo, ya hablé</Button>}
         <details className="text-sm"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Opciones de voz</summary>
           <label className="block py-2">Voz de Ayni
-            <select aria-label="Voz de Ayni" className="mt-1 block w-full rounded border p-2" value={voiceURI} onChange={(event) => {
-              setVoiceURI(event.target.value);
-              if (sound && speakLocally("Hola, soy Ayni. Conversemos a tu ritmo.", setSpeaking, event.target.value)) {
+            <select aria-label="Voz de Ayni" className="mt-1 block w-full rounded border p-2" value={voices.some((voice) => voice.voiceURI === voiceURI) ? voiceURI : ""} onChange={(event) => {
+              const selectedVoice = event.target.value;
+              setVoiceURI(selectedVoice);
+              saveVoicePreference(selectedVoice);
+              if (sound && speakLocally("Hola, soy Ayni. Qué gusto conversar contigo. ¿Qué te gustaría recordar hoy?", setSpeaking, selectedVoice)) {
                 setSpeaking(true);
                 setVoiceNotice("");
               }
             }}>
-              <option value="">Automática: mejor voz local disponible</option>
-              {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)}
+              <option value="">{voices[0] ? `Automática · ${spanishVoiceLabel(voices[0])}` : "Automática"}</option>
+              {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{spanishVoiceLabel(voice)}</option>)}
             </select>
           </label>
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
