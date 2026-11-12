@@ -103,7 +103,7 @@ export function App() {
         <button onClick={() => setView("home")} aria-label="Ayni Digital, ir al inicio" className="brand-button"><Brand /></button>
         <p className="sidebar-eyebrow">NUESTRO ESPACIO</p>
         <nav aria-label="Tu espacio familiar" className="app-navigation">
-          {([["home", "Inicio", House], ["profile", "Perfil familiar", Users], ["memories", "Subir recuerdos", Images], ["session", "Guía de sesión", MessageCircle], ["dashboard", "Dashboard", ChartNoAxesCombined], ["billing", "Plan", Leaf]] as const).map(([destination, label, Icon]) =>
+          {([["home", "Inicio", House], ["profile", "Perfil familiar", Users], ["memories", "Recuerdos", Images], ["session", "Guía de sesión", MessageCircle], ["dashboard", "Dashboard", ChartNoAxesCombined], ["billing", "Plan", Leaf]] as const).map(([destination, label, Icon]) =>
             <button key={destination} onClick={() => setView(destination)} aria-current={view === destination ? "page" : undefined}><Icon aria-hidden="true" size={20}/><span>{label}</span>{view === destination && <i aria-hidden="true"/>}</button>)}
         </nav>
         <div className="sidebar-companion"><AyniCompanion decorative/><strong>Un recuerdo puede<br/>acercarnos mucho.</strong><span>Aquí, a su ritmo.</span></div>

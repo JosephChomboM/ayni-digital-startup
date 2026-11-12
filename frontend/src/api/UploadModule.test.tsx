@@ -107,6 +107,7 @@ it("searches through the API, resets pagination and can clear the search", async
   records = Array.from({ length: 101 }, (_, index) => memory({ title: `Recuerdo ${index}` }));
   records[0] = memory({ title: "Vacaciones", entities: [{ kind: "place", text: "Lima" }] });
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   fireEvent.click(await screen.findByRole("button", { name: "Siguiente" }));
   await screen.findByText("Recuerdo 100");
   fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: " Lima " } });
@@ -124,6 +125,7 @@ it("searches through the API, resets pagination and can clear the search", async
 
 it("distinguishes no search results from an API failure", async () => {
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   await screen.findByText("Todavía no hay recuerdos para mostrar.");
   fireEvent.change(screen.getByLabelText("Buscar recuerdos"), { target: { value: "Ausente" } });
   fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
@@ -149,6 +151,8 @@ it("saves an anecdote with title, text and both explicit marks", async () => {
   expect(JSON.parse(postCalls()[0][1]?.body as string)).toEqual({
     type: "anecdote", title: "Un paseo", text: "Paseamos en familia.", is_positive: true, is_sensitive: true,
   });
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
+  fireEvent.click(screen.getByRole("button", { name: "Agregar recuerdo" }));
   expect(screen.getByLabelText("Título del recuerdo")).toHaveValue("");
 });
 
@@ -203,7 +207,7 @@ it("saves selected photos with an anecdote and clears the selection after confir
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { configurable: true, value: () => ({ drawImage: vi.fn() }) });
   Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", { configurable: true, value: (callback: (blob: Blob | null) => void) => callback(new Blob(["rasterized"], { type: "image/png" })) });
   render(<UploadModule />);
-  await screen.findByText("Todavía no hay recuerdos para mostrar.");
+  await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeEnabled());
   const file = new File(["image"], "<img src=x onerror=alert(1)>.jpg", { type: "image/jpeg" });
   fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } });
   expect(await screen.findByText("1 foto seleccionada; se guardarán junto con el recuerdo.")).toBeInTheDocument();
@@ -211,7 +215,7 @@ it("saves selected photos with an anecdote and clears the selection after confir
   fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseamos en familia." } });
   fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
   fireEvent.click(await screen.findByRole("button", { name: "OK" }));
-  expect(await screen.findByText("Las fotos se guardarán de forma privada y podrás verlas desde otros dispositivos de tu familia.")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Título del recuerdo")).toBeNull();
   expect(screen.getByText("Foto familiar")).toBeInTheDocument();
   expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();
@@ -222,6 +226,7 @@ it("saves selected photos with an anecdote and clears the selection after confir
   expect(new Headers(call?.[1]?.headers).has("Content-Type")).toBe(false);
   cleanup();
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   expect(await screen.findByRole("img", { name: "Foto familiar guardada" })).toHaveAttribute("src", "https://signed.example.test/photo");
   fireEvent.click(screen.getByRole("button", { name: "Eliminar foto familiar" }));
   await waitFor(() => expect(screen.queryByRole("img", { name: "Foto familiar guardada" })).toBeNull());
@@ -232,6 +237,7 @@ it("loads actual contributions, hides sensitive records and respects member perm
   actor.role = "familiar";
   records = [memory({ title: "Compartido", created_by: crypto.randomUUID() }), memory({ title: "Delicado", is_sensitive: true })];
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   await screen.findByText("Compartido");
   expect(screen.queryByText("Delicado")).toBeNull();
   expect(screen.queryByRole("button", { name: "Editar Compartido" })).toBeNull();
@@ -244,6 +250,7 @@ it("reads, edits and deletes through real detail, PATCH and DELETE routes", asyn
   const original = memory();
   records = [original];
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   fireEvent.click(await screen.findByRole("button", { name: "Editar Un paseo" }));
   await waitFor(() => expect(screen.getByLabelText("Título del recuerdo")).toHaveValue("Un paseo"));
   fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Paseo actualizado" } });
@@ -284,7 +291,7 @@ it("retries only remaining photos without creating a duplicate memory or reporti
     return backend(input, options);
   });
   render(<UploadModule />);
-  await screen.findByText("Todavía no hay recuerdos para mostrar.");
+  await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeEnabled());
   const files = [new File(["one"], "one.jpg", { type: "image/jpeg" }), new File(["two"], "two.jpg", { type: "image/jpeg" })];
   fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files } });
   await screen.findByText("2 fotos seleccionadas; se guardarán junto con el recuerdo.");
@@ -309,6 +316,7 @@ it("shows remote photos to a family member without offering deletion of another 
   photoRecords = [{ id: "photo", memory_id: records[0].id, created_by: records[0].created_by,
     url: "https://signed.example.test/original" }];
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   expect(await screen.findByRole("img", { name: "Foto familiar guardada" })).toHaveAttribute("src", "https://signed.example.test/original");
   expect(screen.queryByRole("button", { name: "Eliminar foto familiar" })).toBeNull();
   photoRecords[0].url = "https://signed.example.test/renewed";
@@ -319,8 +327,27 @@ it("shows remote photos to a family member without offering deletion of another 
 it("keeps a pending deletion retryable and never requests its unavailable photo links", async () => {
   records = [memory({ deletion_pending: true })];
   render(<UploadModule />);
+  fireEvent.click(screen.getByRole("button", { name: "Mis recuerdos" }));
   await screen.findByText("Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.");
   expect(screen.getByRole("button", { name: "Editar Un paseo" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Eliminar Un paseo" })).toBeEnabled();
   expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/photos"))).toBe(false);
+});
+
+it("separa agregar y listar, conserva el borrador y devuelve la edición a la lista", async () => {
+ records=[memory()];
+ render(<UploadModule/>);
+ fireEvent.change(screen.getByLabelText("Título del recuerdo"),{target:{value:"Borrador familiar"}});
+ expect(screen.queryByLabelText("Buscar recuerdos")).toBeNull();
+ fireEvent.click(screen.getByRole("button",{name:"Mis recuerdos"}));
+ await screen.findByText("Un paseo");
+ expect(screen.queryByLabelText("Título del recuerdo")).toBeNull();
+ fireEvent.click(screen.getByRole("button",{name:"Agregar recuerdo"}));
+ expect(screen.getByLabelText("Título del recuerdo")).toHaveValue("Borrador familiar");
+ fireEvent.click(screen.getByRole("button",{name:"Mis recuerdos"}));
+ fireEvent.click(await screen.findByRole("button",{name:"Editar Un paseo"}));
+ await waitFor(()=>expect(screen.getByLabelText("Título del recuerdo")).toHaveValue("Un paseo"));
+ expect(screen.queryByLabelText("Buscar recuerdos")).toBeNull();
+ fireEvent.click(screen.getByRole("button",{name:"Cancelar edición"}));
+ expect(await screen.findByLabelText("Buscar recuerdos")).toBeInTheDocument();
 });
