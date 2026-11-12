@@ -6,9 +6,9 @@ export type SpokenChoice = ConversationTopic | SessionActivity | "pause" | "end"
 export function requestsVisualContext(text: string): boolean {
   const phrase = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   if (/\b(?:no|sin)\s+(?:mires|mirar|analices|analizar|describas|describir)\b/.test(phrase)) return false;
-  return /\b(?:mira|mire|miren|observa|fijate|veamos)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:aca|aqui|esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
+  return /\b(?:mira|mire|miren|observa|fijate|veamos)\s+(?:(?:en|la|el|esta|este|esa|ese|mi|mis|tu)\s+)*(?:aca|aqui|esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
     /\b(?:te muestro|te estoy mostrando|que ves|que es lo que ves)\b/.test(phrase) ||
-    /\b(?:describe|describeme|analiza|puedes ver|alcanzas a ver)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
+    /\b(?:describe|describeme|analiza|puedes ver|alcanzas a ver)\s+(?:(?:en|la|el|esta|este|esa|ese|mi|mis|tu)\s+)*(?:esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
     /\b(?:que (?:hay|aparece|se ve)|de que color es)\b[^.?!]*\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
 }
 
@@ -22,7 +22,8 @@ export function interpretReply(transcript: string): SpokenChoice {
   if (/^(?:cambiar de (?:recuerdo|actividad)|otra actividad)[.! ]*$/.test(reply) ||
       /^(?:quiero cambiar de (?:recuerdo|actividad)|pasemos a otra actividad)\b/.test(reply)) return "next";
   if (/^(?:quiero escuchar (?:la cancion|musica)|escuchemos la cancion|pasemos a la cancion)\b/.test(reply)) return "song";
-  if (/^(?:quiero ver (?:la foto|una foto)|miremos (?:la foto|una foto))\b/.test(reply)) return "photo";
+  if (/^(?:quiero ver (?:la foto|una foto)|miremos (?:la foto|una foto))\b/.test(reply) ||
+      (!requestsVisualContext(reply) && /\b(?:tienes|hay|tenemos|muestrame|ensename|puedes mostrarme|quiero ver|ver)\b[^.?!]*\bfotos?\b/.test(reply))) return "photo";
   if (/^(?:quiero (?:escuchar|leer) la anecdota|volvamos a la anecdota)\b/.test(reply)) return "anecdote";
   if (/\b(?:no (?:me acuerdo|recuerdo|se)|me cuesta recordar)\b/.test(reply)) return "ease";
   if (/\b(?:lugar|parque|playa|casa|calle|barrio|ciudad)\b/.test(reply)) return "place";

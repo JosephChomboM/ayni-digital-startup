@@ -293,3 +293,61 @@ def test_song_metadata_is_confirmed_by_editor_and_invalidated_when_url_changes(
     )
     assert changed.status_code == 200
     assert client.get(path, headers=auth(caregiver_account)).json()["status"] == "unavailable"
+
+
+def test_chat_receives_the_prompt_ayni_showed_locally(
+    client, caregiver_account, memory_profile_id, assistant_provider
+):
+    guide = generate(client, caregiver_account, seed(caregiver_account)).json()
+    prompt = "Pasemos a la canción. ¿En qué momento solías escucharla?"
+    response = client.post(
+        f"/sessions/{guide['id']}/chat",
+        headers=auth(caregiver_account),
+        json={"text": "cuando estaba descansando", "previous_prompt": prompt},
+    )
+    assert response.status_code == 200
+    assert assistant_provider[-1][2][-1] == {"role": "assistant", "content": prompt}
+    too_long = client.post(
+        f"/sessions/{guide['id']}/chat",
+        headers=auth(caregiver_account),
+        json={"text": "hola", "previous_prompt": "x" * 301},
+    )
+    assert too_long.status_code == 422
+
+
+def test_chat_can_talk_about_a_family_photo_memory_outside_the_guide(
+    client, caregiver_account, memory_profile_id, assistant_provider
+):
+    guide = generate(client, caregiver_account, seed(caregiver_account)).json()
+    with Session(engine) as session:
+        service = MemoriesService(session)
+        outside = service.create_memory(
+            caregiver_account.user_id,
+            AnecdoteCreateRequest(
+                type="anecdote", title="Mis ollas", text="Mi colección de ollas.", is_positive=True
+            ),
+        ).id
+        sensitive = service.create_memory(
+            caregiver_account.user_id,
+            AnecdoteCreateRequest(
+                type="anecdote", title="Tema difícil", text="No usar.", is_sensitive=True
+            ),
+        ).id
+    path = f"/sessions/{guide['id']}/chat"
+    ok = client.post(
+        path,
+        headers=auth(caregiver_account),
+        json={"text": "¿Qué ves?", "active_memory_id": str(outside)},
+    )
+    assert ok.status_code == 200
+    assert any("Mis ollas" in item for item in assistant_provider[-1][1])
+
+    calls = len(assistant_provider)
+    blocked = client.post(
+        path,
+        headers=auth(caregiver_account),
+        json={"text": "Hola", "active_memory_id": str(sensitive)},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "conversation_memory_unavailable"
+    assert len(assistant_provider) == calls

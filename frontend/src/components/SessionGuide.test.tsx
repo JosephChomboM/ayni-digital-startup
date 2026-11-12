@@ -61,13 +61,30 @@ it("adjunta la cámara actual a lo que digo sin pulsar el botón de imagen", asy
  expect(speech.capture).toHaveBeenCalledOnce();
  expect(sendMessage).toHaveBeenLastCalledWith("guide", expect.objectContaining({ text:"Mira acá, ¿de qué color es lo que te muestro?", image:"data:image/jpeg;base64,current", image_consent:true }), expect.any(AbortSignal));
 });
-it("al desactivar el contexto visual no captura las respuestas", async () => {
+it("el contexto visual queda siempre activo y no se puede apagar por accidente", async () => {
  await begin("Empezar con Ayni");
- fireEvent.click(screen.getByRole("checkbox", { name:"Contexto visual en vivo" }));
- act(() => speech.receive?.("Hablemos de nuestro paseo"));
+ expect(screen.queryByRole("checkbox", { name:"Contexto visual en vivo" })).not.toBeInTheDocument();
+ act(() => speech.receive?.("¿Puedes ver mi cámara?"));
  await screen.findByText(answer.text);
- expect(speech.capture).not.toHaveBeenCalled();
- expect(vi.mocked(sendMessage).mock.calls.at(-1)![1].image).toBeUndefined();
+ expect(speech.capture).toHaveBeenCalledOnce();
+});
+it("si la persona sale del cuadro Ayni avisa que sigue ahí sin llamar a la IA", async () => {
+ await begin("Empezar con Ayni");
+ const calls = vi.mocked(sendMessage).mock.calls.length;
+ const now = performance.now();
+ vi.spyOn(performance, "now").mockReturnValue(now + 60_000);
+ fireEvent.click(screen.getByRole("button", { name:"Simular salida de cuadro" }));
+ expect(await screen.findByText("Aquí sigo contigo. Cuando quieras, seguimos conversando.")).toBeInTheDocument();
+ expect(sendMessage).toHaveBeenCalledTimes(calls);
+ vi.restoreAllMocks();
+});
+it("envía a la IA lo que Ayni dijo en pantalla al cambiar de actividad", async () => {
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name:"Cambiar actividad" }));
+ fireEvent.change(screen.getByRole("textbox", {name:"Tu respuesta"}), {target:{value:"cuando estaba descansando"}});
+ fireEvent.click(screen.getByRole("button", {name:"Enviar"}));
+ await screen.findByText(answer.text);
+ expect(vi.mocked(sendMessage).mock.calls.at(-1)![1].previous_prompt).toBe("Hablemos de la anécdota. ¿Qué parte te gustaría contar?");
 });
 it("con cámara encendida conversa sin capturas cuando no se pide mirar", async () => {
  await begin("Empezar con Ayni");

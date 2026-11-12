@@ -7,7 +7,7 @@ it.each([
   ["Te estoy mostrando algo", true], ["¿Puedes ver lo que sostengo?", true],
   ["Me gustaba caminar en el parque", false], ["¿Qué hay para conversar?", false],
   ["Mira, me gustaban los helados", false], ["No mires la imagen", false],
-  ["No recuerdo qué hacíamos", false],
+  ["No recuerdo qué hacíamos", false], ["¿Puedes ver mi cámara?", true],
 ])("solo usa la cámara ante una petición visual: %s", (text, expected) => {
   expect(requestsVisualContext(text)).toBe(expected);
 });
@@ -30,6 +30,9 @@ describe("spoken session preferences", () => {
     ["Pasemos a otra actividad", "next"],
     ["Quiero escuchar música", "song"],
     ["Quiero ver una foto", "photo"],
+    ["¿Tienes alguna foto guardada de mis recuerdos?", "photo"],
+    ["Muéstrame las fotos del paseo", "photo"],
+    ["Mira esta foto que te muestro", "detail"],
     ["No me acuerdo de ese lugar", "ease"],
     ["Fuimos al parque", "place"],
     ["Ese día bailamos juntos", "activity"],

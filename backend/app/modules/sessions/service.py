@@ -157,17 +157,30 @@ class SessionsService:
     def chat(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SessionMessageResponse:
         context = self._chat_context(actor_id, session_id)
         if data.active_memory_id:
-            guide = self.get_session(actor_id, session_id)
-            if data.active_memory_id not in {
-                step.memory_id for step in guide.steps if step.memory_available
-            }:
+            # get_memory ya limita el recuerdo al perfil de la familia autenticada; además
+            # puede venir de una foto fuera de la guía, siempre que sea positivo y no sensible.
+            try:
+                active = self.memories.get_memory(actor_id, data.active_memory_id)
+            except ApplicationError:
+                active = None
+            if (
+                active is None
+                or not active.is_positive
+                or active.is_sensitive
+                or active.deletion_pending
+            ):
                 raise ApplicationError(
                     code="conversation_memory_unavailable",
                     status_code=409,
-                    message="Ese recuerdo no pertenece a esta guía o ya no está disponible.",
+                    message="Ese recuerdo ya no está disponible para conversar.",
                 )
-            active = self.memories.get_memory(actor_id, data.active_memory_id)
-            context.append("La actividad que están viendo ahora es: " + active.title)
+            context.append(
+                (
+                    "La actividad que están viendo ahora es: "
+                    + active.title
+                    + (": " + active.text if active.text else "")
+                )[:1800]
+            )
         with self.session.begin():
             # Serializa turnos de la misma guía y evita duplicados al reintentar.
             self.repository.lock_generation(session_id)
@@ -220,6 +233,10 @@ class SessionsService:
                         item.observations
                     )
                 history.append({"role": item.role, "content": content})
+            prompt = (data.previous_prompt or "").strip()
+            if prompt and (not history or history[-1]["content"] != prompt):
+                # Ayni dijo esto en pantalla (cambio de actividad, pausa) sin pasar por el servidor.
+                history.append({"role": "assistant", "content": prompt})
             reply = generate_reply(data, context=context, history=history)
             position = len(messages)
             text = redact_contacts(data.text.strip())

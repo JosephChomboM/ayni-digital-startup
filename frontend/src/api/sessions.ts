@@ -38,6 +38,7 @@ export interface ChatInput {
   cue?: "smile" | "brow";
   use_scene?: boolean;
   active_memory_id?: string;
+  previous_prompt?: string;
 }
 
 export type Reaction = "receptivo" | "emocionado" | "indiferente" | "agitado";

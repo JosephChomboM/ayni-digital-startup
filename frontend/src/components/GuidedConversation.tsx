@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
 import type { Memory } from "../api/memories";
 import { ApiError } from "../api/client";
-import { getMessages, sendMessage, imageForConversation, clearScene, transcribeAudio } from "../api/sessions";
+import { getMessages, sendMessage, imageForConversation, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
 import type { CompanionState } from "./AyniCompanion";
 import { CompanionScene } from "./CompanionScene";
@@ -38,9 +38,12 @@ interface GuidedConversationProps {
 export function GuidedConversation({
   sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
-  const [liveScene, setLiveScene] = useState(withDevices);
+  // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
+  const liveScene = true;
   const cameraCapture = useRef<(() => Promise<string>) | null>(null);
-  const [sceneNotice, setSceneNotice] = useState("");
+  // Lo que Ayni dijo localmente (cambio de actividad, pausa) y que el servidor aún no conoce.
+  const localPrompt = useRef<string | null>(null);
+  const lastAwayAt = useRef(-Infinity);
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
   const [failedTurns, setFailedTurns] = useState(0);
@@ -86,7 +89,8 @@ export function GuidedConversation({
     }
   }
 
-  function show(text: string) {
+  function show(text: string, local = true) {
+    if (local) localPrompt.current = text;
     lastTurnAt.current = performance.now();
     setLine(text);
     append("ayni", text);
@@ -106,7 +110,7 @@ export function GuidedConversation({
     setPending(true);
     setAiError("");
     setRecovering(false);
-    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
+    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, ...(localPrompt.current ? { previous_prompt: localPrompt.current.slice(0, 300) } : {}), ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
       if (!retry?.image && !image && !cue && requestsVisualContext(text)) {
         if (camera && liveScene && cameraCapture.current) {
@@ -120,7 +124,7 @@ export function GuidedConversation({
           setSuggestion("continue");
           show(camera && liveScene
             ? "La cámara todavía no me muestra la imagen. ¿Puedes enseñármela otra vez?"
-            : "Si quieres que mire algo, activa la cámara y el contexto visual o usa Analizar foto con IA.");
+            : "Si quieres que mire algo, enciende la cámara o usa Analizar foto con IA.");
           return;
         }
       }
@@ -132,7 +136,8 @@ export function GuidedConversation({
       setFailedTurns(0);
       setSuggestion(result.suggestion);
       setObservations(image ? result.observations : []);
-      show(result.text);
+      show(result.text, false);
+      localPrompt.current = null;
     } catch (cause) {
       if (controller.signal.aborted) return;
       if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && cause.status !== 429) {
@@ -205,8 +210,14 @@ export function GuidedConversation({
   }
 
   function onCameraCue(cue: FaceCue) {
-    // A glance away should never stop the session or switch off the preview.
-    if (cue === "away" || liveScene) return;
+    if (cue === "away") {
+      // Salir del cuadro nunca detiene la sesión: Ayni solo avisa que sigue ahí, sin insistir.
+      const now = performance.now();
+      if (paused || request.current || input.trim() || now - lastAwayAt.current < 90_000 || now - lastTurnAt.current < 8000) return;
+      lastAwayAt.current = now;
+      show("Aquí sigo contigo. Cuando quieras, seguimos conversando.");
+      return;
+    }
     if (!canFollowExpression()) return;
     lastExpressionAt.current = performance.now();
     void follow("", undefined, cue);
@@ -380,6 +391,18 @@ export function GuidedConversation({
               onClick={() => changeActivity(kind)}><Icon aria-hidden="true" />{label}</button>)}
         </div>}
 
+        <div className="camera-dock">
+          <div className="camera-head">
+            <h3>Tu cámara</h3>
+            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
+              className="tool-icon" disabled={paused}
+              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
+          </div>
+          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
+            live={false} /> :
+            <p className="tool-hint">{paused ? "Cámara en pausa." : "Cámara apagada. Enciéndela para que Ayni note si sonríes o te alejas y pueda mirar lo que le muestres."}</p>}
+          <p className="tool-hint">Di «mira acá» o «¿puedes ver mi cámara?» para compartir una captura actual con Groq. En los demás mensajes no se envían capturas. El video no sale de este dispositivo y no se guardan fotos ni video.</p>
+        </div>
         <form onSubmit={submit} className="reply-dock">
           <div role="status" className="reply-status">
             <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
@@ -428,29 +451,6 @@ export function GuidedConversation({
             </p>)}
             {pending && <p className="transcript-pending">Ayni está respondiendo…</p>}
           </div>
-        </div>
-
-        <div className="tool-block">
-          <div className="flex items-center justify-between gap-2">
-            <h4>Tu cámara</h4>
-            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
-              className="tool-icon" disabled={paused}
-              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
-          </div>
-          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
-            live={false} /> :
-            <p className="tool-hint">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
-          <label className="tool-check">
-            <input type="checkbox" checked={liveScene} disabled={!camera || paused} onChange={(event) => {
-              const enabled = event.target.checked; setLiveScene(enabled);
-              if (!enabled) {
-                setObservations([]);
-                void clearScene(sessionId).catch(() => setSceneNotice("No se pudo limpiar el contexto anterior. No se usarán más capturas mientras esté desactivado."));
-              }
-            }} />Contexto visual en vivo
-          </label>
-          <p className="tool-hint">Di «mira acá» o pregunta por la imagen para compartir una captura actual con Groq, sin pulsar un botón. En los demás mensajes no se envían capturas. No se guardan fotos ni video; solo la conversación y los detalles que pidas analizar.</p>
-          {sceneNotice && <p role="status" className="tool-hint">{sceneNotice}</p>}
         </div>
 
         <div className="tool-block">
