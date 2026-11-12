@@ -61,13 +61,30 @@ it("adjunta la cámara actual a lo que digo sin pulsar el botón de imagen", asy
  expect(speech.capture).toHaveBeenCalledOnce();
  expect(sendMessage).toHaveBeenLastCalledWith("guide", expect.objectContaining({ text:"Mira acá, ¿de qué color es lo que te muestro?", image:"data:image/jpeg;base64,current", image_consent:true }), expect.any(AbortSignal));
 });
-it("al desactivar el contexto visual no captura las respuestas", async () => {
+it("el contexto visual queda siempre activo y no se puede apagar por accidente", async () => {
  await begin("Empezar con Ayni");
- fireEvent.click(screen.getByRole("checkbox", { name:"Contexto visual en vivo" }));
- act(() => speech.receive?.("Hablemos de nuestro paseo"));
+ expect(screen.queryByRole("checkbox", { name:"Contexto visual en vivo" })).not.toBeInTheDocument();
+ act(() => speech.receive?.("¿Puedes ver mi cámara?"));
  await screen.findByText(answer.text);
- expect(speech.capture).not.toHaveBeenCalled();
- expect(vi.mocked(sendMessage).mock.calls.at(-1)![1].image).toBeUndefined();
+ expect(speech.capture).toHaveBeenCalledOnce();
+});
+it("si la persona sale del cuadro Ayni avisa que sigue ahí sin llamar a la IA", async () => {
+ await begin("Empezar con Ayni");
+ const calls = vi.mocked(sendMessage).mock.calls.length;
+ const now = performance.now();
+ vi.spyOn(performance, "now").mockReturnValue(now + 60_000);
+ fireEvent.click(screen.getByRole("button", { name:"Simular salida de cuadro" }));
+ expect(await screen.findByText("Aquí sigo contigo. Cuando quieras, seguimos conversando.")).toBeInTheDocument();
+ expect(sendMessage).toHaveBeenCalledTimes(calls);
+ vi.restoreAllMocks();
+});
+it("envía a la IA lo que Ayni dijo en pantalla al cambiar de actividad", async () => {
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name:"Cambiar actividad" }));
+ fireEvent.change(screen.getByRole("textbox", {name:"Tu respuesta"}), {target:{value:"cuando estaba descansando"}});
+ fireEvent.click(screen.getByRole("button", {name:"Enviar"}));
+ await screen.findByText(answer.text);
+ expect(vi.mocked(sendMessage).mock.calls.at(-1)![1].previous_prompt).toBe("Hablemos de la anécdota. ¿Qué parte te gustaría contar?");
 });
 it("con cámara encendida conversa sin capturas cuando no se pide mirar", async () => {
  await begin("Empezar con Ayni");
@@ -214,4 +231,22 @@ it("explica una recomendación sin impedir que la familia cambie de elección",a
  expect(screen.getByRole("combobox",{name:"Recuerdo para la sesión"})).toHaveValue("memory");
  fireEvent.change(screen.getByRole("combobox",{name:"Recuerdo para la sesión"}),{target:{value:""}});
  expect(screen.getByRole("combobox",{name:"Recuerdo para la sesión"})).toHaveValue("");
+});
+
+it("Ayni muestra una foto cuando la IA entiende que la piden, dicho con cualquier palabra",async()=>{
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["image"],{type:"image/jpeg"}) }));
+ await begin();
+ vi.mocked(sendMessage).mockResolvedValue({...answer,text:"Claro, mira esta foto. ¿Qué recuerdas de ese día?",action:"show_photo"});
+ act(() => speech.receive?.("oye y no tendrás por ahí algo guardado para ver"));
+ await screen.findByRole("img",{name:"Foto familiar"});
+ expect(vi.mocked(sendMessage).mock.calls.at(-1)![1]).toEqual(expect.objectContaining({ available:["anecdote","photo"] }));
+});
+it("si Ayni decide mirar, toma una captura y vuelve a responder con ella",async()=>{
+ await begin("Empezar con Ayni");
+ vi.mocked(sendMessage).mockResolvedValueOnce({...answer,text:"Déjame mirar.",action:"look_camera"}).mockResolvedValueOnce({...answer,text:"Veo una taza azul. ¿Es tuya?"});
+ act(() => speech.receive?.("oye fíjate qué tengo en la mano"));
+ await screen.findByText("Veo una taza azul. ¿Es tuya?");
+ expect(speech.capture).toHaveBeenCalledOnce();
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({ image:"data:image/jpeg;base64,current", image_consent:true }),expect.any(AbortSignal));
 });

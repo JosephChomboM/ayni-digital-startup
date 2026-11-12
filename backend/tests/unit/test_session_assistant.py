@@ -241,3 +241,61 @@ def test_ambiguous_input_can_receive_clarification_as_a_normal_turn(provider):
     assert result.suggestion == "continue"
     assert "No entendí bien" in result.message
     assert len(calls) == 1
+
+
+def reply_with(action: str) -> dict:
+    return {
+        "message": "Claro, mira esta foto. ¿Qué recuerdas de ese día?",
+        "suggestion": "continue",
+        "observations": [],
+        "action": action,
+    }
+
+
+def test_ayni_can_choose_an_available_action_from_free_wording(provider):
+    calls, _, setup = provider
+    setup(reply_with("show_photo"))
+    result = assistant.generate_reply(
+        assistant.ChatRequest(
+            text="oye y no tendrás por ahí algo guardado para ver", available=["photo", "song"]
+        ),
+        context=[],
+        history=[],
+    )
+    assert result.action == "show_photo"
+    listed = calls[0]["messages"][1]["content"]
+    assert "show_photo" in listed and "play_song" in listed
+    assert "tell_story" not in listed and "look_camera" not in listed
+
+
+@pytest.mark.parametrize(
+    ("action", "request_data"),
+    [
+        ("tell_story", {"available": ["photo"]}),
+        ("look_camera", {"available": ["photo"], "camera_on": False}),
+        ("show_photo", {"available": ["photo"], "cue": "smile"}),
+    ],
+)
+def test_unavailable_or_unrequested_actions_are_ignored(provider, action, request_data):
+    _, _, setup = provider
+    setup(reply_with(action))
+    result = assistant.generate_reply(
+        assistant.ChatRequest(text="hola", **request_data), context=[], history=[]
+    )
+    assert result.action == "none"
+
+
+def test_looking_at_the_camera_is_offered_only_without_a_current_image(provider):
+    calls, _, setup = provider
+    setup(reply_with("look_camera"))
+    result = assistant.generate_reply(
+        assistant.ChatRequest(text="¿me ves?", camera_on=True), context=[], history=[]
+    )
+    assert result.action == "look_camera"
+    with_image = assistant.generate_reply(
+        assistant.ChatRequest(text="¿me ves?", camera_on=True, image=photo(), image_consent=True),
+        context=[],
+        history=[],
+    )
+    assert with_image.action == "none"
+    assert "look_camera" not in calls[-1]["messages"][1]["content"]

@@ -2924,3 +2924,31 @@
   30% { opacity:1 }
   100% { opacity:0; transform:translateY(-26px) }
 }
+
+/* La cámara queda a la vista, junto a la respuesta, no al fondo del panel */
+.camera-dock {
+  display:grid;
+  align-content:start;
+  gap:10px;
+  padding:14px;
+  border-radius:22px;
+  border:1px solid #dce4d2;
+  background:#fffefa
+}
+.camera-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px
+}
+.camera-head h3 { font-size:1rem; font-weight:700; color:#223e38 }
+.camera-dock video { border-radius:14px }
+@media (min-width:1280px) {
+  .conversation-main {
+    grid-template-columns:minmax(0,1fr) minmax(15rem,19rem);
+    grid-template-areas:"choices camera" "reply camera"
+  }
+  .conversation-main .stage-choices { grid-area:choices }
+  .conversation-main .reply-dock { grid-area:reply }
+  .conversation-main .camera-dock { grid-area:camera }
+}

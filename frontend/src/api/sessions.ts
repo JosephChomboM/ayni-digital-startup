@@ -27,6 +27,8 @@ export interface SavedMessage {
   role: "user" | "assistant";
   text: string;
   suggestion: "continue" | "slow_down" | "pause" | "change_activity";
+  /** Lo que Ayni decide hacer en pantalla en este turno. */
+  action?: "none" | "show_photo" | "play_song" | "tell_story" | "look_camera" | "pause";
   observations: string[];
 }
 
@@ -38,6 +40,9 @@ export interface ChatInput {
   cue?: "smile" | "brow";
   use_scene?: boolean;
   active_memory_id?: string;
+  previous_prompt?: string;
+  available?: ("photo" | "song" | "anecdote")[];
+  camera_on?: boolean;
 }
 
 export type Reaction = "receptivo" | "emocionado" | "indiferente" | "agitado";
