@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+import { useState } from "react"
 import { Check, Loader2, SmilePlus } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
@@ -30,11 +30,11 @@ export function ResponseRegistry() {
     <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-[#e9c46a]/20 p-3 text-[#2c5f7c]">
+          <div className="rounded-2xl bg-[#edce84]/20 p-3 text-[#235c50]">
             <SmilePlus className="size-6" />
           </div>
           <div>
-            <CardTitle className="text-lg font-bold text-[#2c5f7c]">
+            <CardTitle className="text-lg font-bold text-[#235c50]">
               ¿Cómo reaccionó tu familiar?
             </CardTitle>
             <CardDescription className="text-xs text-gray-500">
@@ -54,13 +54,13 @@ export function ResponseRegistry() {
                 onClick={() => setSelected(response.label)}
                 className={`rounded-xl border p-3 text-left transition-all ${
                   isSelected
-                    ? "border-[#2c5f7c] bg-[#2c5f7c]/10 ring-2 ring-[#2c5f7c]/20"
+                    ? "border-[#235c50] bg-[#235c50]/10 ring-2 ring-[#235c50]/20"
                     : "border-gray-200 hover:bg-gray-50"
                 }`}
                 aria-pressed={isSelected}
               >
                 <span className="text-2xl">{response.icon}</span>
-                <span className="mt-1 block text-xs font-bold text-[#264653]">
+                <span className="mt-1 block text-xs font-bold text-[#223e38]">
                   {response.label}
                 </span>
               </button>
@@ -69,7 +69,7 @@ export function ResponseRegistry() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="notes" className="text-xs font-bold text-[#264653]">
+          <label htmlFor="notes" className="text-xs font-bold text-[#223e38]">
             ¿Algo más que quieras anotar?{" "}
             <span className="font-normal text-gray-400">(opcional)</span>
           </label>
@@ -85,7 +85,7 @@ export function ResponseRegistry() {
         <Button
           onClick={handleSave}
           disabled={saving || saved}
-          className="w-full bg-[#2c5f7c] hover:bg-[#224a61] text-white font-bold text-xs py-2.5 rounded-xl transition-all"
+          className="w-full bg-[#235c50] hover:bg-[#194b40] text-white font-bold text-xs py-2.5 rounded-xl transition-all"
         >
           {saving ? (
             <span className="flex items-center justify-center gap-2">

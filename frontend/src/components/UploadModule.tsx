@@ -1,3 +1,4 @@
+import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react"
 import { Check, FileText, ImagePlus, Link2, Music2, Trash2, Users, Heart } from "lucide-react"
 import { Button } from "./ui/button"
@@ -163,17 +164,18 @@ export function UploadModule() {
   )
 
   return (
-    <div className="space-y-5">
+    <div className="memories-page space-y-6">
+    <PageIntro eyebrow="EL ÁLBUM DE NUESTRA VIDA" title="Pequeños recuerdos. Grandes historias.">Una fotografía, una canción, un momento que merece volver a contarse.</PageIntro>
     <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-xs shrink-0">
-              <Heart className="size-5 fill-current text-[#e76f51]" />
-              <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[#e9c46a]" />
+            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#235c50] text-white shadow-xs shrink-0">
+              <Heart className="size-5 fill-current text-[#b94c35]" />
+              <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[#edce84]" />
             </div>
             <div>
-              <CardTitle className="text-lg font-extrabold text-[#2c5f7c]">
+              <CardTitle className="text-lg font-extrabold text-[#235c50]">
                 Construyamos su historia
               </CardTitle>
               <CardDescription className="text-xs text-gray-500 mt-0.5">
@@ -181,7 +183,7 @@ export function UploadModule() {
               </CardDescription>
             </div>
           </div>
-          <div className="rounded-2xl bg-[#2c5f7c]/10 p-2.5 text-[#2c5f7c] shrink-0">
+          <div className="rounded-2xl bg-[#235c50]/10 p-2.5 text-[#235c50] shrink-0">
             <Users className="size-5" />
           </div>
         </div>
@@ -190,38 +192,38 @@ export function UploadModule() {
       <CardContent className="flex flex-col gap-5">
         <section className="space-y-4 py-2" aria-labelledby="family-photos-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><h3 id="family-photos-title" className="font-semibold text-[#2c5f7c]">Fotos para compartir</h3><p className="mt-1 text-sm text-slate-600">Elige imágenes familiares para acompañar una conversación.</p></div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#2c5f7c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244d66] has-[:disabled]:opacity-60">
+            <div><h3 id="family-photos-title" className="font-semibold text-[#235c50]">Fotos para compartir</h3><p className="mt-1 text-sm text-slate-600">Elige imágenes familiares para acompañar una conversación.</p></div>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#235c50] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#194b40] has-[:disabled]:opacity-60">
               <ImagePlus className="size-4" /> Seleccionar fotos
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={pending || !currentUser} onChange={(event) => { handlePhotoFiles(event.target.files); event.currentTarget.value = "" }} className="sr-only" />
             </label>
           </div>
           <p className="text-xs text-slate-500">Si guardaste fotos antes en este navegador, vuelve a seleccionarlas para compartirlas.</p>
           {photoError && <p role="alert" className="text-sm text-red-700">{photoError}</p>}
-          {pendingPhotos.length > 0 && <p className="text-sm font-medium text-[#2c5f7c]">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada" : "fotos seleccionadas"}; se guardarán junto con el recuerdo.</p>}
+          {pendingPhotos.length > 0 && <p className="text-sm font-medium text-[#235c50]">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada" : "fotos seleccionadas"}; se guardarán junto con el recuerdo.</p>}
           {pendingPhotos.length > 0 && <StagedPhotoGrid files={pendingPhotos} onRemove={(index) => setPendingPhotos((items) => items.filter((_, itemIndex) => itemIndex !== index))} />}
           {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos se guardarán de forma privada y podrás verlas desde otros dispositivos de tu familia.</p>}
         </section>
 
         <div className="space-y-4 border-t border-slate-200 pt-5">
-          <div><h3 className="font-semibold text-[#2c5f7c]">Guardar un recuerdo</h3><p className="mt-1 text-sm text-slate-600">Conserva una historia o una canción que ayude a abrir la conversación.</p></div>
+          <div><h3 className="font-semibold text-[#235c50]">Guardar un recuerdo</h3><p className="mt-1 text-sm text-slate-600">Conserva una historia o una canción que ayude a abrir la conversación.</p></div>
           <div className="flex gap-2" role="tablist" aria-label="Tipo de recuerdo">
-            <button type="button" role="tab" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "anecdote" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}>
+            <button type="button" role="tab" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "anecdote" ? "bg-[#235c50] text-white" : "text-[#235c50] hover:bg-slate-100"}`}>
               <FileText className="mr-2 inline size-4" />Anécdota
             </button>
-            <button type="button" role="tab" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "song" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}>
+            <button type="button" role="tab" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "song" ? "bg-[#235c50] text-white" : "text-[#235c50] hover:bg-slate-100"}`}>
               <Music2 className="mr-2 inline size-4" />Canción
             </button>
           </div>
         <div className="flex flex-col gap-1.5">
           {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
-          {success && <p role="status" className="flex items-center gap-2 text-sm font-medium text-[#2c5f7c]"><Check className="size-4" aria-hidden="true" />{success}</p>}
-          <label htmlFor="memory-title" className="text-xs font-bold text-[#264653]">Título del recuerdo</label>
+          {success && <p role="status" className="flex items-center gap-2 text-sm font-medium text-[#235c50]"><Check className="size-4" aria-hidden="true" />{success}</p>}
+          <label htmlFor="memory-title" className="text-xs font-bold text-[#223e38]">Título del recuerdo</label>
           <Input id="memory-title" required maxLength={100} value={title} disabled={pending}
             onChange={(e) => { setTitle(e.target.value); setSuccess(null) }}
             placeholder="Ej. Un paseo en familia" className="text-xs border-gray-200 bg-gray-50/50" />
-          {memoryMode === "anecdote" && <label htmlFor="memory" className="flex items-center gap-2 text-xs font-bold text-[#264653]">
-            <FileText className="size-4 text-[#e76f51]" /> Una anécdota especial
+          {memoryMode === "anecdote" && <label htmlFor="memory" className="flex items-center gap-2 text-xs font-bold text-[#223e38]">
+            <FileText className="size-4 text-[#b94c35]" /> Una anécdota especial
           </label>}
           {memoryMode === "anecdote" && <Textarea
             id="memory"
@@ -235,9 +237,9 @@ export function UploadModule() {
         </div>
 
         {memoryMode === "song" && <div className="flex flex-col gap-1.5">
-          <label htmlFor="song" className="flex items-center justify-between text-xs font-bold text-[#264653]">
+          <label htmlFor="song" className="flex items-center justify-between text-xs font-bold text-[#223e38]">
             <span className="flex items-center gap-2">
-              <Music2 className="size-4 text-[#e76f51]" /> Canción de YouTube o Spotify
+              <Music2 className="size-4 text-[#b94c35]" /> Canción de YouTube o Spotify
             </span>
             <span className="text-[11px] text-[#1DB954] font-semibold flex items-center gap-1">
               <SpotifyIcon className="size-3.5" /> Enlace de canción
@@ -258,7 +260,7 @@ export function UploadModule() {
           </div>
         </div>}
 
-        <div className="flex flex-col gap-2 text-xs text-[#264653]">
+        <div className="flex flex-col gap-2 text-xs text-[#223e38]">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={positive} disabled={pending} onChange={(e) => setPositive(e.target.checked)} />
             Es un recuerdo bonito
@@ -270,13 +272,13 @@ export function UploadModule() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <Badge variant="secondary" className="bg-[#e76f51]/10 text-[#e76f51] hover:bg-[#e76f51]/20 font-bold text-[10px]">
+          <Badge variant="secondary" className="bg-[#b94c35]/10 text-[#b94c35] hover:bg-[#b94c35]/20 font-bold text-[10px]">
             <Check className="size-3 mr-1" /> Contenido protegido
           </Badge>
           <Button
             onClick={handleSave}
             disabled={pending}
-            className="bg-[#2c5f7c] hover:bg-[#224a61] text-white font-bold text-xs px-5 py-2 rounded-xl transition-all"
+            className="bg-[#235c50] hover:bg-[#194b40] text-white font-bold text-xs px-5 py-2 rounded-xl transition-all"
           >
             {pending ? "Guardando…" : editing ? "Guardar cambios" : memoryMode === "song" ? "Guardar canción" : "Guardar anécdota"}
           </Button>
@@ -295,7 +297,7 @@ export function UploadModule() {
       </CardContent>
     </Card>
     <Contributions revision={revision} busy={pending} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />
-    {successDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="memory-saved-title" className="w-full max-w-sm rounded-xl bg-white p-7 text-center shadow-xl"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="size-7" aria-hidden="true" /></div><h2 id="memory-saved-title" className="mt-4 text-xl font-semibold text-[#2c5f7c]">¡Se guardó correctamente!</h2><p className="mt-2 text-sm text-slate-600">{success}</p><Button autoFocus onClick={() => setSuccessDialog(false)} className="mt-5 w-full bg-[#2c5f7c] hover:bg-[#224a61]">OK</Button></section></div>}
+    {successDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="memory-saved-title" className="w-full max-w-sm rounded-xl bg-white p-7 text-center shadow-xl"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="size-7" aria-hidden="true" /></div><h2 id="memory-saved-title" className="mt-4 text-xl font-semibold text-[#235c50]">¡Se guardó correctamente!</h2><p className="mt-2 text-sm text-slate-600">{success}</p><Button autoFocus onClick={() => setSuccessDialog(false)} className="mt-5 w-full bg-[#235c50] hover:bg-[#194b40]">OK</Button></section></div>}
     </div>
   )
 }
@@ -381,7 +383,7 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
   return (
     <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader>
-        <CardTitle className="text-base font-bold text-[#2c5f7c]">
+        <CardTitle className="text-base font-bold text-[#235c50]">
           Contribuciones familiares
         </CardTitle>
         <CardDescription className="text-xs text-gray-500 mt-0.5">
@@ -393,7 +395,7 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
         <form className="flex flex-col gap-2" onSubmit={(event) => {
           event.preventDefault(); setPage(0); setQuery(searchText.trim())
         }}>
-          <label htmlFor="memory-search" className="text-xs font-bold text-[#264653]">Buscar recuerdos</label>
+          <label htmlFor="memory-search" className="text-xs font-bold text-[#223e38]">Buscar recuerdos</label>
           <Input id="memory-search" maxLength={100} value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             placeholder="Título, palabras, personas o lugares" />
@@ -403,17 +405,17 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
               onClick={() => { setSearchText(""); setQuery(""); setPage(0) }}>Limpiar búsqueda</Button>
           </div>
         </form>
-        <label className="flex items-center gap-2 text-xs text-[#264653]">
+        <label className="flex items-center gap-2 text-xs text-[#223e38]">
           <input type="checkbox" checked={includeSensitive} onChange={(e) => { setIncludeSensitive(e.target.checked); setPage(0); setLoading(true) }} />
           Mostrar temas delicados
         </label>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Fecha
+          <label className="flex flex-col gap-1 text-xs font-semibold text-[#223e38]">Fecha
             <select value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal">
               <option value="all">Cualquier fecha</option><option value="3days">Últimos 3 días</option><option value="week">Última semana</option><option value="custom">Elegir fechas</option>
             </select>
           </label>
-          {dateRange === "custom" && <><label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label><label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label></>}
+          {dateRange === "custom" && <><label className="flex flex-col gap-1 text-xs font-semibold text-[#223e38]">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label><label className="flex flex-col gap-1 text-xs font-semibold text-[#223e38]">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label></>}
         </div>
         {loading && <p role="status" className="text-xs text-gray-500">Cargando recuerdos...</p>}
         {error && <div role="alert" className="text-xs text-red-700">
@@ -423,14 +425,14 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
         {!loading && !error && visibleItems.length === 0 && <p className="text-xs text-gray-500">{items.length ? "No hay recuerdos en ese periodo." : query ? "No encontramos recuerdos con esa búsqueda." : "Todavía no hay recuerdos para mostrar."}</p>}
         {!loading && !error && visibleItems.map((memory) => (
           <div key={memory.id} className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-            <p className="text-xs font-bold text-[#264653]">{memory.title}</p>
+            <p className="text-xs font-bold text-[#223e38]">{memory.title}</p>
             {memory.deletion_pending && <p role="status" className="text-xs text-amber-800">Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.</p>}
             <PhotoGrid photos={photos[memory.id] ?? []} busy={busy}
               canManage={!!user && (user.role === "cuidador_principal" || user.id === memory.created_by)}
               onDelete={onDeletePhoto} onRefresh={() => setAttempt((value) => value + 1)} />
             {memory.type === "anecdote"
               ? <p className="text-[11px] text-gray-500 whitespace-pre-wrap wrap-break-word">{memory.text}</p>
-              : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2c5f7c] underline">Abrir canción</a>}
+              : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-[#235c50] underline">Abrir canción</a>}
             <div className="flex gap-2">
               {memory.is_positive && <Badge variant="outline">Recuerdo bonito</Badge>}
               {memory.is_sensitive && <Badge variant="outline">Tema delicado</Badge>}

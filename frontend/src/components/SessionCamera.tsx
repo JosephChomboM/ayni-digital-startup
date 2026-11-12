@@ -211,7 +211,7 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
   }, []);
 
   return <div className="space-y-2">
-    <div className="relative overflow-hidden rounded-xl bg-[#17232d]" style={{ aspectRatio: ratio }}>
+    <div className="relative overflow-hidden rounded-xl bg-[#193e35]" style={{ aspectRatio: ratio }}>
       <video ref={preview} muted playsInline aria-label="Vista de la cámara" className="absolute inset-0 size-full object-contain [transform:scaleX(-1)]" />
       {face && <div aria-hidden="true" className="pointer-events-none absolute rounded-lg border-2 border-[#d1edaa] motion-safe:transition-[left,top,width,height] motion-safe:duration-150"
         style={{ left: `${face.x}%`, top: `${face.y}%`, width: `${face.width}%`, height: `${face.height}%` }} />}

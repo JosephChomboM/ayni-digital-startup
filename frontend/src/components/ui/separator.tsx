@@ -1,4 +1,4 @@
-﻿import * as React from "react"
+import * as React from "react"
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return inputs.filter(Boolean).join(" ")
@@ -21,7 +21,7 @@ function Separator({
       aria-orientation={orientation}
       data-slot="separator"
       className={cn(
-        "shrink-0 bg-[#2c5f7c]/15",
+        "shrink-0 bg-[#235c50]/15",
         orientation === "horizontal" ? "h-px w-full" : "h-full w-px self-stretch",
         className
       )}

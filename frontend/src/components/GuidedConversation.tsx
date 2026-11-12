@@ -1,3 +1,4 @@
+import { AyniCompanion } from "./AyniCompanion";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
@@ -308,10 +309,10 @@ export function GuidedConversation({
       transcribing: "Pasando tu voz a texto…",
     })[dictation.state];
 
-  return <section aria-label="Sesión con Ayni" className="overflow-hidden rounded-xl border border-[#cddbdc] bg-[#f4faf8]">
-    <header className="flex flex-wrap items-center justify-between gap-3 bg-[#193745] px-4 py-4 text-white sm:px-6">
+  return <section aria-label="Sesión con Ayni" className="conversation-room">
+    <header className="flex flex-wrap items-center justify-between gap-3 bg-[#193e35] px-4 py-4 text-white sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#e9c46a] text-[#193745]"><Bot aria-hidden="true" className="size-6" /></span>
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#edce84] text-[#193e35]"><Bot aria-hidden="true" className="size-6" /></span>
         <div>
           <h2 ref={heading} tabIndex={-1} className="text-xl font-bold leading-tight focus:outline-none">Conversación con Ayni</h2>
           <p className="mt-1 text-sm tabular-nums text-[#d2e8eb]">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
@@ -330,7 +331,12 @@ export function GuidedConversation({
       </div>
     </header>
 
-    <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
+    <div className="conversation-stage">
+      <AyniCompanion state={paused ? "paused" : speaking ? "speaking" : pending || dictation.state === "transcribing" || dictation.state === "loading" ? "thinking" : mic && !dictation.error && (dictation.state === "listening" || dictation.state === "recording") ? "listening" : "idle"}/>
+      <div><span className="eyebrow">TU COMPAÑERO DE CONVERSACIÓN</span><p>{paused ? "Tomemos un respiro." : speaking ? "Una historia nos lleva a otra." : pending ? "Estoy preparando mi respuesta…" : "Te acompaño, a tu ritmo."}</p><span className="stage-status"><i/>{status}</span></div>
+      <span className="stage-flower" aria-hidden="true">✳</span>
+    </div>
+    <div className="conversation-layout grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
       <aside className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#cddbdc] px-4 py-3 md:col-start-2 md:row-span-2 md:row-start-1 md:block md:border-b-0 md:border-l md:px-5 md:py-5" aria-label="Cámara y recuerdo">
         {Boolean(memoryOptions?.length) && <label className="col-span-2 mb-3 block text-sm font-semibold">Recuerdo activo
           <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} className="mt-1 w-full rounded border bg-white p-2 font-normal" onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
@@ -340,9 +346,9 @@ export function GuidedConversation({
         </label>}
         <div className="min-w-0">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="font-bold text-[#264653]">Tu cámara</h3>
+            <h3 className="font-bold text-[#223e38]">Tu cámara</h3>
             <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
-              className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#264653] hover:bg-[#e8f5e9]" disabled={paused}
+              className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#223e38] hover:bg-[#e8f5e9]" disabled={paused}
               onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
           </div>
           {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
@@ -370,7 +376,7 @@ export function GuidedConversation({
         {photo && <p className="text-xs">Al analizar, compartes esta foto con Groq para conversar sobre sus detalles visibles.</p>}
         {observations.length > 0 && <div className="my-3 text-sm"><strong>Detalles que observó Ayni:</strong><ul className="list-inside list-disc">{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
         {activity && <details key={title} className="min-w-0 md:mt-3 md:border-t md:border-[#cddbdc] md:pt-3" open>
-          <summary className="cursor-pointer break-words font-semibold text-[#264653]">{title}</summary>
+          <summary className="cursor-pointer break-words font-semibold text-[#223e38]">{title}</summary>
           {activity}
         </details>}
       </aside>
@@ -381,7 +387,7 @@ export function GuidedConversation({
         }}
         className="h-[clamp(13rem,36dvh,28rem)] md:h-[clamp(16rem,49dvh,30rem)] min-w-0 space-y-3 sm:space-y-5 overflow-y-auto bg-white px-4 py-5 focus-visible:outline-offset-[-3px] sm:px-6 md:col-start-1 md:row-start-1">
         {messages.map(({ id, from, text }) => <div key={id} className={from === "you" ? "flex justify-end" : "flex"}>
-          <div className={`max-w-[88%] rounded-xl px-4 py-3 text-[#193745] ${from === "you" ? "bg-[#e6f0f4]" : "bg-[#edf6ef]"}`}>
+          <div className={`max-w-[88%] rounded-xl px-4 py-3 text-[#193e35] ${from === "you" ? "bg-[#e6f0f4]" : "bg-[#edf6ef]"}`}>
             <p className="text-sm font-bold">{from === "ayni" ? "Ayni" : "Tú"}</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
           </div>
@@ -404,7 +410,7 @@ export function GuidedConversation({
       </div>
 
       <form onSubmit={submit} className="min-w-0 space-y-2 border-t border-[#cddbdc] bg-white px-4 py-3 sm:px-6 md:col-start-1 md:row-start-2">
-        <div role="status" className="flex min-h-6 items-center gap-2 text-sm font-semibold text-[#264653]">
+        <div role="status" className="flex min-h-6 items-center gap-2 text-sm font-semibold text-[#223e38]">
           <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
         </div>
         <div className="flex items-end gap-2">
@@ -417,10 +423,10 @@ export function GuidedConversation({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-[#a9bfc0] px-3 py-2.5 text-base text-[#264653] placeholder:text-[#536c70] focus-visible:outline-2 focus-visible:outline-[#2c5f7c]"
+            className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-[#a9bfc0] px-3 py-2.5 text-base text-[#223e38] placeholder:text-[#536c70] focus-visible:outline-2 focus-visible:outline-[#235c50]"
             placeholder="Escribe tu respuesta…" disabled={paused} />
           <button type="button" aria-label={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"} title={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"}
-            className="grid size-11 shrink-0 place-items-center rounded-md border border-[#a9bfc0] text-[#264653] hover:bg-[#edf6ef]" disabled={paused}
+            className="grid size-11 shrink-0 place-items-center rounded-md border border-[#a9bfc0] text-[#223e38] hover:bg-[#edf6ef]" disabled={paused}
             onClick={() => {
               if (dictation.error) { dictation.retry(); setMic(true); }
               else setMic(!mic);
