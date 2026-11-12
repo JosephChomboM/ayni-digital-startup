@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { ArrowRight, Bot, Camera, Mic, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
 import { nextConversationTurn } from "../api/conversation";
 import type { ConversationTopic } from "../api/conversation";
 import { SessionCamera } from "./SessionCamera";
@@ -28,6 +28,7 @@ const acknowledgments: Partial<Record<ConversationTopic, string>> = {
 
 interface GuidedConversationProps {
   memoryId?: string;
+  withDevices: boolean;
   title: string;
   elapsed: string;
   paused: boolean;
@@ -39,15 +40,24 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  memoryId, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
+  memoryId, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   const [line, setLine] = useState(SESSION_GREETING);
-  const [lastReply, setLastReply] = useState("");
+  const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
+  const nextMessage = useRef(0);
+  const transcript = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const append = (from: "ayni" | "you", text: string) => {
+    const id = nextMessage.current++;
+    setMessages((items) => [...items.slice(-49), { id, from, text }]);
+  };
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [sound, setSound] = useState(true);
   const [speaking, setSpeaking] = useState(false);
-  const [camera, setCamera] = useState(false);
+  const [camera, setCamera] = useState(withDevices);
+  const [mic, setMic] = useState(withDevices);
+  const [visible, setVisible] = useState(!document.hidden);
   const [voiceNotice, setVoiceNotice] = useState("");
   const request = useRef<AbortController | null>(null);
   const recent = useRef<string[]>([]);
@@ -60,9 +70,11 @@ export function GuidedConversation({
   function speak(text: string) {
     if (!sound || document.hidden) return;
     if (!speakLocally(text, setSpeaking)) {
+      setSpeaking(false);
       waitingForVoice.current = text;
       setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz local en español.");
     } else {
+      setSpeaking(true);
       waitingForVoice.current = null;
       setVoiceNotice("");
     }
@@ -71,6 +83,7 @@ export function GuidedConversation({
   function show(text: string) {
     lastTurnAt.current = performance.now();
     setLine(text);
+    append("ayni", text);
     speak(text);
   }
 
@@ -109,8 +122,8 @@ export function GuidedConversation({
 
   function receive(raw: string) {
     const reply = raw.trim().slice(0, 500);
-    if (!reply || paused) return;
-    setLastReply(reply);
+    if (!reply || paused || request.current) return;
+    append("you", reply);
     const intent = interpretReply(reply);
     if (intent === "end") finish();
     else if (intent === "pause") pause("Claro, hagamos una pausa. Pulsa Continuar cuando te apetezca.");
@@ -119,13 +132,14 @@ export function GuidedConversation({
     else void follow(intent, acknowledgments[intent]);
   }
 
-  const dictation = useSessionDictation(receive);
-  const dictating = dictation.state !== "idle";
+  const dictation = useSessionDictation(
+    (reply) => { if (!input.trim()) receive(reply); },
+    mic && !paused && !pending && !speaking && !input.trim(),
+  );
 
   function pause(message: string) {
     cancelTurn();
     dictation.cancel();
-    setCamera(false);
     show(message);
     onPause(message);
   }
@@ -144,15 +158,13 @@ export function GuidedConversation({
 
   function canFollowExpression() {
     const now = performance.now();
-    return !paused && !dictating && !request.current && !window.speechSynthesis?.speaking &&
+    return !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
       now - lastTurnAt.current >= 5000 && now - lastExpressionAt.current >= 25_000;
   }
 
   function onCameraCue(cue: FaceCue) {
-    if (cue === "away") {
-      pause("Te perdí de vista. Cuando vuelvas, puedes pulsar Continuar.");
-      return;
-    }
+    // A glance away should never stop the session or switch off the preview.
+    if (cue === "away") return;
     if (!canFollowExpression()) return;
     lastExpressionAt.current = performance.now();
     if (cue === "brow") show("Podemos seguir, cambiar de actividad o hacer una pausa. ¿Qué prefieres?");
@@ -161,19 +173,30 @@ export function GuidedConversation({
 
   const greet = useEffectEvent(() => {
     heading.current?.focus();
-    show(SESSION_GREETING);
+    if (!nextMessage.current) show(SESSION_GREETING);
+    else speak(SESSION_GREETING);
   });
 
   useEffect(() => {
     function onVoicesChanged() {
       const text = waitingForVoice.current;
       if (!text || document.hidden || !speakLocally(text, setSpeaking)) return;
+      setSpeaking(true);
       waitingForVoice.current = null;
       setVoiceNotice("");
     }
+    function updateVisibility() {
+      setVisible(!document.hidden);
+      if (document.hidden) {
+        window.speechSynthesis?.cancel();
+        setSpeaking(false);
+      }
+    }
+    document.addEventListener("visibilitychange", updateVisibility);
     window.speechSynthesis?.addEventListener("voiceschanged", onVoicesChanged);
     greet();
     return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
       request.current?.abort();
       waitingForVoice.current = null;
       window.speechSynthesis?.removeEventListener("voiceschanged", onVoicesChanged);
@@ -183,7 +206,8 @@ export function GuidedConversation({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!input.trim() || paused || pending || dictating) return;
+    if (!input.trim() || paused || pending) return;
+    dictation.cancel();
     receive(input);
     setInput("");
   }
@@ -196,100 +220,117 @@ export function GuidedConversation({
       setSound(false);
     } else {
       setSound(true);
-      if (!speakLocally(line, setSpeaking)) setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz local en español.");
+      if (speakLocally(line, setSpeaking)) { setSpeaking(true); setVoiceNotice(""); }
+      else setVoiceNotice("Este dispositivo no tiene una voz local en español.");
     }
   }
 
-  const dictationText = {
-    idle: "",
-    permission: "Esperando permiso del micrófono…",
-    recording: "Te escucho. Pulsa Listo al terminar.",
-    loading: "Preparando la voz en español. La primera descarga puede tardar.",
-    transcribing: "Estoy leyendo tu respuesta…",
-  }[dictation.state];
+  useEffect(() => {
+    const view = transcript.current;
+    followLatest.current = true;
+    if (view) view.scrollTop = view.scrollHeight;
+  }, [messages, pending]);
 
-  return <section aria-label="Sesión con Ayni" className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-      <div>
-        <h2 ref={heading} tabIndex={-1} className="text-2xl font-bold tracking-tight text-[#264653] focus:outline-none">Sesión con Ayni</h2>
-        <p className="mt-1 text-sm tabular-nums text-slate-600">{paused ? "En pausa · " : ""}{elapsed}</p>
+  useEffect(() => {
+    const view = transcript.current;
+    if (!view || typeof ResizeObserver === "undefined") return;
+    const resize = new ResizeObserver(() => {
+      if (followLatest.current) view.scrollTop = view.scrollHeight;
+    });
+    resize.observe(view);
+    return () => resize.disconnect();
+  }, []);
+
+  const status = paused ? "En pausa" : speaking ? "Ayni está hablando" : pending ? "Ayni está preparando una pregunta" :
+    dictation.error && mic ? "Puedes seguir por escrito" : ({
+      idle: mic ? "Puedes hablar o escribir" : "Escribe para responder",
+      permission: "Esperando permiso del micrófono…",
+      listening: "Te escucho. Habla cuando quieras",
+      recording: "Te estoy escuchando…",
+      loading: "Preparando el dictado en español…",
+      transcribing: "Pasando tu voz a texto…",
+    })[dictation.state];
+
+  return <section aria-label="Sesión con Ayni" className="overflow-hidden rounded-xl border border-[#cddbdc] bg-[#f4faf8]">
+    <header className="flex flex-wrap items-center justify-between gap-3 bg-[#193745] px-4 py-4 text-white sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#e9c46a] text-[#193745]"><Bot aria-hidden="true" className="size-6" /></span>
+        <div>
+          <h2 ref={heading} tabIndex={-1} className="text-xl font-bold leading-tight focus:outline-none">Conversación con Ayni</h2>
+          <p className="mt-1 text-sm tabular-nums text-[#d2e8eb]">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" className="w-auto gap-2" aria-pressed={sound} onClick={toggleSound}>
-          {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}{sound ? "Silenciar" : "Activar voz"}
-        </Button>
-        <Button type="button" variant="outline" className="w-auto gap-2" onClick={() => {
+      <div className="flex items-center gap-1">
+        <button type="button" title={sound ? "Silenciar a Ayni" : "Activar voz"} aria-label={sound ? "Silenciar a Ayni" : "Activar voz"}
+          className="grid size-11 place-items-center rounded-md text-white hover:bg-white/15" onClick={toggleSound}>
+          {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+        </button>
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={() => {
           if (paused) { onResume(); show("Seguimos a tu ritmo. ¿Qué te gustaría contar ahora?"); }
           else pause("Hagamos una pausa. Seguimos cuando quieras.");
-        }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</Button>
-        <Button type="button" variant="outline" className="w-auto gap-2" onClick={finish}><Square className="size-4" />Terminar</Button>
+        }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</button>
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={finish}><Square className="size-4" />Terminar</button>
       </div>
-    </div>
+    </header>
 
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.58fr)]">
-      <div className="rounded-xl bg-[#193745] p-5 text-white sm:p-7 lg:col-start-1 lg:row-start-1">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[#e9c46a] text-[#193745]">
-              <Bot className="size-6" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="font-bold">Ayni</p>
-              <p className="text-sm text-[#d2e8eb]" role="status">
-                {paused ? "En pausa" : speaking ? "Hablando…" : dictation.state === "recording" ? "Escuchando…" : pending ? "Pensando…" : "Te acompaño"}
-              </p>
-            </div>
-          </div>
-          <p aria-live="polite" className="mt-5 text-xl font-semibold leading-snug sm:text-2xl">{line}</p>
-          <button type="button" className="mt-3 min-h-11 text-sm font-semibold text-[#f4d784] underline underline-offset-4"
-            onClick={() => {
-              if (!speakLocally(line, setSpeaking)) setVoiceNotice("Este dispositivo no tiene una voz local en español. Puedes leer mi mensaje en pantalla.");
-            }} disabled={dictating}>
-            Volver a escuchar
-          </button>
-      </div>
-      <aside className="space-y-3 lg:col-start-2 lg:row-span-2 lg:row-start-1" aria-label="Cámara y recuerdo">
-        <div className="space-y-2 rounded-xl border border-slate-200 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
+      <aside className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#cddbdc] px-4 py-3 md:col-start-2 md:row-span-2 md:row-start-1 md:block md:border-b-0 md:border-l md:px-5 md:py-5" aria-label="Cámara y recuerdo">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="font-bold text-[#264653]">Tu cámara</h3>
-            <Button type="button" variant="outline" className="w-auto gap-2" aria-pressed={camera} disabled={paused}
-              onClick={() => setCamera((enabled) => !enabled)}>
-              {camera ? <VideoOff className="size-4" /> : <Camera className="size-4" />}{camera ? "Apagar cámara" : "Activar cámara"}
-            </Button>
+            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
+              className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#264653] hover:bg-[#e8f5e9]" disabled={paused}
+              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
           </div>
-          {camera && !paused ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} /> :
-            <p className="text-sm text-slate-600">El video se queda en tu dispositivo.</p>}
+          {camera && !paused && visible ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} /> :
+            <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
         </div>
-        {activity && <details key={title} className="border-b border-slate-200 py-2" open>
-          <summary className="break-words font-semibold text-[#264653]">{title}</summary>
+        {activity && <details key={title} className="min-w-0 md:mt-3 md:border-t md:border-[#cddbdc] md:pt-3" open>
+          <summary className="cursor-pointer break-words font-semibold text-[#264653]">{title}</summary>
           {activity}
         </details>}
       </aside>
-      <div className="space-y-3 lg:col-start-1 lg:row-start-2">
-        {lastReply && <p className="break-words text-sm text-slate-700"><strong>Tú:</strong> {lastReply}</p>}
-        <form onSubmit={submit} className="space-y-3">
-          <label htmlFor="session-reply" className="block font-semibold text-[#264653]">Tu respuesta</label>
-          <textarea id="session-reply" maxLength={500} rows={2} value={input} onChange={(event) => setInput(event.target.value)}
-            className="w-full resize-y rounded-xl border border-slate-300 p-3 text-base text-[#264653] placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-[#2c5f7c]"
-            placeholder="Por ejemplo: fuimos al parque" disabled={paused} />
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={!input.trim() || paused || pending || dictating} className="w-auto gap-2"><Send className="size-4" />Enviar</Button>
-            {dictation.state === "recording" ?
-              <Button type="button" variant="secondary" className="w-auto gap-2" onClick={dictation.stop}><Square className="size-4" />Listo, ya hablé</Button> :
-              <Button type="button" variant="outline" className="w-auto gap-2" disabled={paused || pending || dictating} onClick={() => {
-                waitingForVoice.current = null;
-                window.speechSynthesis?.cancel();
-                setSpeaking(false);
-                void dictation.start();
-              }}><Mic className="size-4" />Hablar</Button>}
-            {dictating && <Button type="button" variant="ghost" className="w-auto" onClick={dictation.cancel}>Cancelar voz</Button>}
-            <Button type="button" variant="ghost" className="w-auto gap-2" disabled={paused} onClick={() => changeActivity()}>
-              Otra actividad <ArrowRight className="size-4" />
-            </Button>
+
+      <div ref={transcript} role="log" aria-label="Mensajes de la conversación" tabIndex={0}
+        onScroll={({ currentTarget: view }) => {
+          followLatest.current = view.scrollHeight - view.scrollTop - view.clientHeight < 24;
+        }}
+        className="h-[clamp(13rem,36dvh,28rem)] md:h-[clamp(16rem,49dvh,30rem)] min-w-0 space-y-3 sm:space-y-5 overflow-y-auto bg-white px-4 py-5 focus-visible:outline-offset-[-3px] sm:px-6 md:col-start-1 md:row-start-1">
+        {messages.map(({ id, from, text }) => <div key={id} className={from === "you" ? "flex justify-end" : "flex"}>
+          <div className={`max-w-[88%] rounded-xl px-4 py-3 text-[#193745] ${from === "you" ? "bg-[#e6f0f4]" : "bg-[#edf6ef]"}`}>
+            <p className="text-sm font-bold">{from === "ayni" ? "Ayni" : "Tú"}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
           </div>
-          {(dictationText || dictation.error || voiceNotice) && <p role="status" className="text-sm text-slate-700">{dictationText || dictation.error || voiceNotice}</p>}
-        </form>
+        </div>)}
+        {pending && <p className="text-sm text-[#435d60]">Ayni está preparando una pregunta…</p>}
       </div>
 
+      <form onSubmit={submit} className="min-w-0 space-y-2 border-t border-[#cddbdc] bg-white px-4 py-3 sm:px-6 md:col-start-1 md:row-start-2">
+        <div role="status" className="flex min-h-6 items-center gap-2 text-sm font-semibold text-[#264653]">
+          <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
+        </div>
+        <div className="flex items-end gap-2">
+          <label htmlFor="session-reply" className="sr-only">Tu respuesta</label>
+          <textarea id="session-reply" maxLength={500} rows={1} value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-[#a9bfc0] px-3 py-2.5 text-base text-[#264653] placeholder:text-[#536c70] focus-visible:outline-2 focus-visible:outline-[#2c5f7c]"
+            placeholder="Escribe tu respuesta…" disabled={paused} />
+          <button type="button" aria-label={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"} title={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"}
+            className="grid size-11 shrink-0 place-items-center rounded-md border border-[#a9bfc0] text-[#264653] hover:bg-[#edf6ef]" disabled={paused}
+            onClick={() => {
+              if (dictation.error) { dictation.retry(); setMic(true); }
+              else setMic(!mic);
+            }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
+          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
+        </div>
+        {(voiceNotice || (mic && dictation.error)) && <p role="status" className="text-sm text-[#435d60]">{(mic && dictation.error) || voiceNotice}</p>}
+      </form>
     </div>
   </section>;
 }

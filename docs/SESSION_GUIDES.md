@@ -96,23 +96,27 @@ La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
 
 ## Sesión con Ayni
 
-1. En **Guía de sesión**, elige una anécdota bonita si tienen una y pulsa
-   **Empezar con Ayni**. La guía también funciona sin un recuerdo guardado.
-2. Ayni saluda y hace una pregunta. Usa **Hablar → Listo, ya hablé** o
-   **Tu respuesta → Enviar**. Para escuchar otra vez, pulsa **Volver a escuchar**.
-3. **Activar cámara** abre la vista en vivo al dar permiso. Cuando el detector
-   encuadra un solo rostro, muestra un marco. Una expresión sostenida puede
-   producir una invitación a seguir o cambiar. Si sale de cuadro durante siete
-   segundos, Ayni ofrece continuar cuando la persona regrese.
-4. «Quiero descansar» pausa, «otra actividad» cambia entre los recuerdos
-   disponibles y «quiero terminar» abre el cierre de la sesión.
+1. En **Guía de sesión**, elige una anécdota si quieres y pulsa
+   **Empezar con Ayni**. Concede los permisos del navegador, o elige empezar
+   sin cámara ni micrófono para conversar por escrito.
+2. Ayni saluda y muestra la pregunta en el chat. Cuando acaba de hablar, el
+   micrófono escucha automáticamente. Habla y deja una pausa para enviar el
+   turno, o escribe y pulsa **Enviar**. Las respuestas quedan visibles en el
+   chat durante la sesión.
+3. La cámara permanece visible al lado del chat. Cuando detecta un solo rostro,
+   el marco sigue su posición. Si sales de cuadro, la cámara y la conversación
+   siguen disponibles. Una señal visual sostenida puede adaptar una pregunta
+   cuando Ayni no está hablando y nadie está respondiendo.
+4. «Quiero descansar» pausa, «otra actividad» cambia de recuerdo y «quiero
+   terminar» abre el cierre. También puedes apagar el micrófono o la cámara
+   por separado. Los dispositivos se liberan al pausar, cerrar la sesión o
+   cambiar de pestaña.
 
-La respuesta por voz graba hasta 18 segundos por turno. Whisper se descarga al
-navegador la primera vez y transcribe localmente. El modelo puede tardar en
-cargar en conexiones lentas. Los mensajes se leen con una voz local en español
-si el dispositivo la tiene. La cámara y el micrófono requieren HTTPS o localhost.
-El detector facial descarga su modelo por separado. Si falla esa descarga, la
-vista previa de la cámara sigue disponible.
+El detector de voz cierra el turno después de una pausa breve o al llegar al
+límite de 18 segundos desde que empiezas a hablar. Whisper se descarga la
+primera vez y transcribe en el navegador. La salida de voz usa una voz local
+en español si el dispositivo la tiene. Cámara y micrófono requieren HTTPS o
+localhost. Si no carga el detector facial, la vista previa sigue disponible.
 
 Para una anécdota elegible, `POST /sessions/conversation/{memory_id}` comprueba
 el JWT y la familia y recibe un tema y los identificadores de preguntas recientes.

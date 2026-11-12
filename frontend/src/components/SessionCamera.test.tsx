@@ -69,7 +69,7 @@ it("uses video frames locally, reports a sustained smile and releases the camera
   const { unmount } = render(<SessionCamera onCue={onCue} canFollowExpression={() => true} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(1800); });
   expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ audio: false }));
-  expect(screen.getByText("Sonrisa en cuadro.")).toBeInTheDocument();
+  expect(screen.getByText("Seguimiento activo.")).toBeInTheDocument();
   expect(onCue).toHaveBeenCalledOnce();
   expect(onCue).toHaveBeenCalledWith("smile");
   unmount();

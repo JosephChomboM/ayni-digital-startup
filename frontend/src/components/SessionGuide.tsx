@@ -48,6 +48,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   const [photoIndex, setPhotoIndex] = useState(0);
   const [anecdoteId, setAnecdoteId] = useState("");
   const [songId, setSongId] = useState("");
+  const [withDevices, setWithDevices] = useState(false);
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -103,7 +104,8 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   if (photos.length) availableActivities.push("photo");
   if (selectedSong) availableActivities.push("song");
 
-  function begin() {
+  function begin(devices: boolean) {
+    setWithDevices(devices);
     setActivity(availableActivities[0]);
     setPhotoIndex(0);
     setStarted(true);
@@ -171,7 +173,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
           <div className="grid size-12 shrink-0 place-items-center rounded-full bg-[#193745] text-[#f4d784]"><Bot aria-hidden="true" className="size-6" /></div>
           <div>
             <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
-            <p className="mt-1 text-base text-slate-700">Te daré la bienvenida y te haré una pregunta. Puedes responder hablando o escribiendo.</p>
+            <p className="mt-1 text-base text-slate-700">Te haré una pregunta y esperaré tu respuesta. Puedes hablar o escribir a tu ritmo.</p>
           </div>
         </div>
         {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="mt-5 space-y-4">
@@ -190,10 +192,15 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
               {songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
             </select>
           </label>}
-          <Button type="button" onClick={begin} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" onClick={() => begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+            <Button type="button" variant="ghost" onClick={() => begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
+          </div>
+          <p className="text-sm text-slate-600">Al empezar, tu navegador pedirá permiso para usar la cámara y el micrófono. El audio y el video se procesan en este dispositivo.</p>
         </div>}
       </section>}
       {started && <GuidedConversation
+        withDevices={withDevices}
         memoryId={activity === "anecdote" ? selectedAnecdote?.id : undefined}
         title={activityTitle ?? "Recuerdo familiar"}
         elapsed={formatTime(elapsed)}
