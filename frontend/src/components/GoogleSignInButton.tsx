@@ -16,11 +16,16 @@ function loadGoogle(): Promise<GoogleIdentityClient> {
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
+    const timeout = window.setTimeout(() => {
+      scriptLoad = undefined; script.remove();
+      reject(new Error("Google tardó demasiado en responder. Vuelve a intentarlo."));
+    }, 20_000);
     script.onload = () => {
+      window.clearTimeout(timeout);
       const client = (window as GoogleWindow).google?.accounts.id;
       if (client) resolve(client); else { scriptLoad = undefined; script.remove(); reject(new Error("Google no está disponible.")); }
     };
-    script.onerror = () => { scriptLoad = undefined; script.remove(); reject(new Error("Google no está disponible.")); };
+    script.onerror = () => { window.clearTimeout(timeout); scriptLoad = undefined; script.remove(); reject(new Error("Google no está disponible.")); };
     document.head.appendChild(script);
   });
   return scriptLoad;
