@@ -5,6 +5,9 @@ import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
 import type { ConsentText, RegisterPayload, User as UserType } from "../api/auth";
 import { ApiError } from "../api/client";
+import { loginWithGoogle, registerWithGoogle, updateMyProfile } from "../api/account";
+import type { GoogleProof } from "../api/account";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 interface AuthPageProps {
   initialMode?: "login" | "register";
@@ -20,6 +23,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [googleProof, setGoogleProof] = useState<GoogleProof | null>(null);
+  const [profilePendingUser, setProfilePendingUser] = useState<UserType | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +43,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [consentAttempt, setConsentAttempt] = useState(0);
   const [hasConsented, setHasConsented] = useState(false);
   const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => sessionStorage.getItem("ayni_account_deleted") === "1" ? "Tu cuenta y los datos correspondientes se eliminaron correctamente." : null);
+  React.useEffect(() => { sessionStorage.removeItem("ayni_account_deleted"); }, []);
 
   const reloadConsent = () => {
     setConsent(null);
@@ -64,6 +70,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     return () => { active = false; };
   }, [mode, consentAttempt]);
 
+  const handleGoogle = async (proof: GoogleProof) => {
+    setLoading(true); setError(null); setProfilePendingUser(null);
+    try {
+      const response = await loginWithGoogle(proof);
+      onSuccess(response.user);
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "google_account_not_registered") {
+        setGoogleProof(proof); setMode("register"); reloadConsent();
+        setNotice("Completa tus datos, elige una contraseña de Ayni y acepta el consentimiento para crear tu cuenta con Google.");
+      } else {
+        setGoogleProof(null);
+        setError(reason instanceof Error ? reason.message : "No pudimos continuar con Google.");
+      }
+    } finally { setLoading(false); }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -81,6 +103,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setError("El nombre del grupo familiar debe ser distinto de tu contraseña.");
         return;
       }
+      if (!/^\+?[0-9][0-9 ()-]{5,29}$/.test(phone.trim()) || Array.from(city.trim()).length > 100 || Array.from(district.trim()).length > 100) {
+        setError("Revisa tu teléfono y usa hasta 100 caracteres para ciudad y distrito.");
+        return;
+      }
       if (!consent || consentLoading || !hasConsented || !hasAcceptedPrivacy) {
         setError("Lee y acepta el consentimiento y el tratamiento de datos personales para continuar.");
         return;
@@ -89,6 +115,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setLoading(true);
 
     try {
+      let loginEmail = email;
+      let registered = false;
       if (mode === "register" && consent) {
         const data: RegisterPayload = {
           email, password, name: `${firstName.trim()} ${lastName.trim()}`,
@@ -97,14 +125,32 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             ? { family_name: familyName.trim() }
             : { invitation_token: invitationToken.trim() }),
         };
-        await register(data);
+        if (googleProof) {
+          const created = await registerWithGoogle({
+            ...googleProof, password, name: data.name, consent: data.consent,
+            ...(registrationMode === "family" ? { family_name: familyName.trim() } : { invitation_token: invitationToken.trim() }),
+          });
+          loginEmail = created.user.email; setEmail(loginEmail); setGoogleProof(null);
+        } else await register(data);
+        registered = true;
         // If login fails, the next attempt must not register the account again.
         setMode("login");
         setNotice("Tu cuenta ya está creada. Inicia sesión para continuar.");
       }
-      const response = await login({ email, password });
+      const response = await login({ email: loginEmail, password });
 
       setPassword("");
+      if (registered) {
+        try {
+          const profile = await updateMyProfile({ phone: phone.trim(), city: city.trim(), district: district.trim() });
+          onSuccess(profile.user);
+        } catch (reason) {
+          if (reason instanceof ApiError && reason.status === 401) throw reason;
+          setProfilePendingUser(response.user);
+          setError("Tu cuenta está creada, pero no pudimos guardar tus datos de contacto. Puedes completarlos desde Mi cuenta.");
+        }
+        return;
+      }
       onSuccess(response.user);
     } catch (err) {
       if (err instanceof ApiError && err.code === "consent_version_invalid") {
@@ -158,7 +204,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <div className="flex gap-6 border-b border-gray-200">
               <button
                 type="button"
-                onClick={() => { reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
+                onClick={() => { setGoogleProof(null); reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "register"
@@ -170,7 +216,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => { setMode("login"); setError(null); setNotice(null); }}
+                onClick={() => { setGoogleProof(null); setMode("login"); setError(null); setNotice(null); }}
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "login"
@@ -183,6 +229,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
 
             {notice && <p role="status" className="text-xs text-gray-500">{notice}</p>}
+            {profilePendingUser && <Button type="button" onClick={() => onSuccess(profilePendingUser)}>Continuar y completar mis datos después</Button>}
+            {googleProof && <p className="text-sm text-slate-600">Usaremos el correo de tu cuenta de Google. <button type="button" className="font-semibold underline" onClick={() => { setGoogleProof(null); setNotice(null); }}>Usar correo y contraseña</button></p>}
             {error && (
               <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 space-y-2">
                 <p className="font-semibold">{error}</p>
@@ -255,14 +303,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </>
               )}
 
-              <div className="space-y-1">
+              <div className="space-y-1" hidden={Boolean(googleProof)}>
                 <label htmlFor="auth-email" className="text-xs font-bold text-[#264653]">Correo Electrónico</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
                     id="auth-email"
                     type="email"
-                    required
+                    required={!googleProof}
+                    disabled={Boolean(googleProof)}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="correo@ejemplo.com"
@@ -340,7 +389,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </form>
 
             <div className="pt-2 border-t border-gray-100 flex flex-col gap-3">
-              <button type="button" disabled title="El acceso con Google requiere configuración del backend" className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>Continuar con Google · Próximamente</button>
+              <GoogleSignInButton disabled={loading} onCredential={(proof) => { void handleGoogle(proof); }} />
               <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
                 <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
                 <span>Tus datos y archivos familiares están protegidos de forma privada.</span>
