@@ -8,6 +8,11 @@ from app.core.errors import ApplicationError
 from app.modules.billing.service import BillingService
 from app.modules.families.service import FamiliesService
 from app.modules.memories.service import MemoriesService
+from app.modules.sessions.conversation import (
+    ConversationRequest,
+    ConversationTurn,
+    select_conversation_turn,
+)
 from app.modules.sessions.models import FamilySession
 from app.modules.sessions.repository import SessionsRepository
 from app.modules.sessions.schemas import (
@@ -95,6 +100,24 @@ class SessionsService:
 
     def _profile(self, actor_id: UUID) -> UUID:
         return self.families.get_elder_profile(actor_id).id
+
+    def converse_about_memory(
+        self, actor_id: UUID, memory_id: UUID, data: ConversationRequest
+    ) -> ConversationTurn:
+        memory = self.memories.get_memory(actor_id, memory_id)
+        if (
+            memory.type != "anecdote"
+            or not memory.text
+            or not memory.is_positive
+            or memory.is_sensitive
+            or memory.deletion_pending
+        ):
+            raise ApplicationError(
+                code="conversation_memory_unavailable",
+                status_code=409,
+                message="Elige una anécdota marcada como bonita y que no sea un tema delicado.",
+            )
+        return select_conversation_turn(memory.text, data)
 
     def _detail(self, record: FamilySession) -> SessionDetail:
         available = self.memories.available_session_memory_ids(

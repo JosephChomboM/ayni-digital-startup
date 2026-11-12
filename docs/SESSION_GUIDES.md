@@ -93,3 +93,47 @@ el id devuelto y recupera detalle/historial desde GET. No genera automáticament
 o recargar la pantalla. Debe mostrar carga, vacío y errores como estados distintos,
 leer detail.message/detail.code y cerrar sesión ante 401 como hace el cliente existente.
 La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
+
+## Conversar con Ayni
+
+En la guía, elige una anécdota marcada como bonita y sin la marca de tema
+delicado. Comienza la actividad, avanza a **Conversen sin apuro** y pulsa
+**Conversar**. Tras leer o escuchar la pregunta, la familia puede hablar y
+elegir **El lugar**, **Lo que hicimos** u **Otro detalle** para seguir. La
+conversación ofrece hasta cinco preguntas distintas y puede terminarse en
+cualquier momento.
+
+- **Pregunta elegida por IA** indica que Groq seleccionó una pregunta del
+  catálogo de Ayni. El modelo recibe únicamente una categoría amplia del
+  recuerdo, el tema elegido y opciones de preguntas. La extracción de
+  entidades de las anécdotas sigue siendo una función independiente.
+- **Pregunta de la guía** indica que se usó el catálogo local cuando Groq
+  está desconfigurado o no responde de manera válida.
+- **Leer las preguntas en voz alta** y **Escuchar pregunta** usan una voz
+  local en español. **Responder por voz** analiza una respuesta breve
+  con el reconocimiento local del navegador. «Fuimos al parque» lleva
+  a una pregunta sobre el lugar. «No me acuerdo» ofrece una pregunta
+  más sencilla. «Quiero descansar» pausa la guía y «otra actividad»
+  avanza al paso de la canción. Los botones ofrecen el recorrido manual.
+  Si el navegador permite instalar el paquete de español, se puede
+  descargar desde la conversación.
+- **Activar cámara** abre la vista con permiso del navegador. MediaPipe
+  analiza las expresiones en el dispositivo. Una sonrisa sostenida puede
+  traer una pregunta adicional. Un ceño sostenido ofrece una alternativa
+  más tranquila. Cada conversación aplica como máximo una sugerencia
+  por expresión. Tras siete segundos de ausencia de un rostro previamente
+  encuadrado, la guía se pausa. Con más de un rostro se suspenden las
+  sugerencias. Los umbrales son reglas iniciales de interacción.
+- Ayni descarta la transcripción y procesa el video localmente, sin
+  almacenarlo. La cámara se apaga al pausar, cambiar de paso o salir
+  de la pestaña. Requiere HTTPS o localhost y descarga el modelo
+  de MediaPipe la primera vez que se activa. El backend comprueba que el recuerdo pertenece a la
+  familia autenticada y sigue siendo apto en cada turno. La conversación
+  se mantiene en memoria durante el paso y se reinicia al salir o pausar.
+
+Para probar el flujo, guarda una anécdota ficticia como «Caminamos por el
+parque y luego compartimos la merienda» y márcala como bonita. El endpoint
+`POST /sessions/conversation/{memory_id}` usa la configuración existente
+`GROQ_API_KEY`, `GROQ_MODEL` y `LLM_TIMEOUT_SECONDS`. Requiere el JWT de
+Ayni y recibe únicamente `topic` y los identificadores de preguntas ya
+mostradas. No crea una sesión persistida ni consume el cupo de generación.
