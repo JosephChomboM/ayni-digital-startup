@@ -20,6 +20,8 @@ class BillingGateway(Protocol):
     def get_subscription(self, subscription_id: str) -> dict[str, Any]: ...
     def get_invoice(self, invoice_id: str) -> dict[str, Any]: ...
     def cancel_subscription(self, subscription_id: str) -> dict[str, Any]: ...
+    def expire_checkout(self, session_id: str) -> dict[str, Any]: ...
+    def delete_customer(self, customer_id: str) -> dict[str, Any]: ...
     def verify_event(self, payload: bytes, signature: str) -> dict[str, Any]: ...
 
 
@@ -141,6 +143,28 @@ class StripeGateway:
                     {"cancel_at_period_end": True},
                 )
             )
+        except stripe.StripeError:
+            raise provider_unavailable() from None
+
+    def expire_checkout(self, session_id: str) -> dict[str, Any]:
+        try:
+            client = self._client()
+            current = self._test_object(client.v1.checkout.sessions.retrieve(session_id))
+            if current.get("status") != "open":
+                return current
+            return self._test_object(client.v1.checkout.sessions.expire(session_id))
+        except stripe.StripeError:
+            raise provider_unavailable() from None
+
+    def delete_customer(self, customer_id: str) -> dict[str, Any]:
+        try:
+            client = self._client()
+            current = client.v1.customers.retrieve(customer_id).to_dict()
+            if current.get("deleted") is True:
+                return current
+            if current.get("livemode") is not False:
+                raise provider_unavailable()
+            return client.v1.customers.delete(customer_id).to_dict()
         except stripe.StripeError:
             raise provider_unavailable() from None
 

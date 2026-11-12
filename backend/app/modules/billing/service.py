@@ -91,6 +91,40 @@ class BillingService:
         status = self.get_status(actor_id)
         return SessionQuotaPolicy(maximum=None if status.plan == "family" else 1)
 
+    def prepare_account_deletion(self, actor_id: UUID) -> None:
+        context = self.families.get_account_deletion_context(actor_id)
+        if not context.whole_family:
+            return
+        with self.session.begin():
+            subscription = self.repository.get_subscription(context.family_id)
+            if subscription is None:
+                return
+            customer = subscription.stripe_customer_id
+            if customer is None:
+                if subscription.stripe_subscription_id is not None:
+                    raise provider_unavailable()
+                return
+            attempt = self.repository.pending_checkout(context.family_id)
+            if attempt is not None:
+                remote = (
+                    self.gateway.expire_checkout(attempt.stripe_session_id)
+                    if attempt.stripe_session_id
+                    else self.gateway.find_checkout(customer, attempt.id)
+                )
+                if remote is not None and remote.get("status") == "open":
+                    remote = self.gateway.expire_checkout(str(remote["id"]))
+                if remote is not None and (
+                    remote.get("customer") != customer
+                    or remote.get("status") not in {"expired", "complete"}
+                ):
+                    raise provider_unavailable()
+            result = self.gateway.delete_customer(customer)
+            if result.get("id") != customer or result.get("deleted") is not True:
+                raise provider_unavailable()
+            # Stripe customer deletion immediately cancels its subscriptions.
+            subscription.status = "canceled"
+            subscription.cancel_at_period_end = False
+
     @staticmethod
     def _existing_subscription() -> BillingError:
         return BillingError(

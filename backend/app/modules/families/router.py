@@ -9,6 +9,7 @@ from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
     CurrentUserResponse,
+    DeleteAccountRequest,
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
@@ -63,6 +64,14 @@ def get_current_user(
     user_id: AuthenticatedUserId, service: FamiliesServiceDep
 ) -> CurrentUserResponse:
     return service.get_current_user(user_id)
+
+
+@router.delete("/users/me", status_code=204, response_class=Response)
+def delete_account(
+    data: DeleteAccountRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> Response:
+    service.delete_account(user_id, data)
+    return Response(status_code=204)
 
 
 @router.get("/families/me", response_model=FamilyResponse)

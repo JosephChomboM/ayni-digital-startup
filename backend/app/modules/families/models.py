@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -32,6 +33,9 @@ class Family(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(100))
+    deletion_pending: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users: Mapped[list["User"]] = relationship(
@@ -67,6 +71,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254))
     name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(255))
+    deletion_pending: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     role: Mapped[UserRole] = mapped_column(
         SQLAlchemyEnum(
             UserRole,

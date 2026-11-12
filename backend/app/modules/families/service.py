@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated, cast
@@ -26,6 +27,7 @@ from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
     CurrentUserResponse,
+    DeleteAccountRequest,
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
@@ -70,6 +72,14 @@ def _invitation_digest(token: str) -> str:
 
 class FamiliesError(ApplicationError):
     """A public error raised by the families module."""
+
+
+@dataclass(frozen=True)
+class AccountDeletionContext:
+    user_id: UUID
+    family_id: UUID
+    elder_profile_id: UUID | None
+    whole_family: bool
 
 
 class FamiliesService:
@@ -233,7 +243,74 @@ class FamiliesService:
                 message="Solo quien cuida principalmente puede hacer esto.",
                 status_code=403,
             )
+        family = self.repository.get_family(actor.family_id)
+        if actor.deletion_pending or (family is not None and family.deletion_pending):
+            raise FamiliesError(
+                code="account_deletion_pending",
+                status_code=409,
+                message="El borrado está pendiente. Vuelve a confirmarlo para completarlo.",
+            )
         return actor
+
+    def get_account_deletion_context(self, actor_id: UUID) -> AccountDeletionContext:
+        """Trusted cleanup interface; never accepts client-supplied family/profile IDs."""
+        with self.session.begin():
+            actor = self.repository.get_user(actor_id)
+            if actor is None:
+                raise FamiliesError(
+                    code="unauthorized", message="Vuelve a iniciar sesión.", status_code=401
+                )
+            family = self.repository.get_family(actor.family_id)
+            whole_family = actor.role is UserRole.PRIMARY_CAREGIVER
+            if (
+                not actor.deletion_pending
+                or family is None
+                or (whole_family and not family.deletion_pending)
+            ):
+                raise FamiliesError(
+                    code="deletion_not_requested",
+                    message="Primero confirma el borrado de tu cuenta.",
+                    status_code=409,
+                )
+            profile = self.repository.get_elder_profile(family.id)
+            return AccountDeletionContext(
+                actor.id, family.id, profile.id if profile else None, whole_family
+            )
+
+    def delete_account(self, actor_id: UUID, request: DeleteAccountRequest) -> None:
+        # Lazy imports avoid cycles: each module uses families.service for authorization.
+        from app.modules.billing.service import BillingService
+        from app.modules.memories.service import MemoriesService
+
+        with self.session.begin():
+            actor = self.repository.get_user(actor_id)
+            if actor is None:
+                raise FamiliesError(
+                    code="unauthorized", message="Vuelve a iniciar sesión.", status_code=401
+                )
+            if not verify_password(request.password.get_secret_value(), actor.password_hash):
+                raise FamiliesError(
+                    code="invalid_password",
+                    message="La contraseña no es correcta.",
+                    status_code=403,
+                )
+            family = self.repository.get_family(actor.family_id, for_update=True)
+            if family is None:
+                raise FamiliesError(
+                    code="family_not_found", message="No encontramos tu familia.", status_code=404
+                )
+            actor.deletion_pending = True
+            if actor.role is UserRole.PRIMARY_CAREGIVER:
+                family.deletion_pending = True
+        # Persist intent before irreversible provider calls. Only the delete endpoint
+        # permits retrying an account in this state; regular data access is blocked.
+        context = self.get_account_deletion_context(actor_id)
+        BillingService(self.session).prepare_account_deletion(actor_id)
+        MemoriesService(self.session).purge_account_memories(actor_id)
+        with self.session.begin():
+            self.repository.delete_account(
+                actor_id, context.family_id, whole_family=context.whole_family
+            )
 
     def _family_for_actor(self, actor: User, *, for_update: bool = False) -> Family:
         family = self.repository.get_family(actor.family_id, for_update=for_update)
@@ -356,7 +433,7 @@ class FamiliesService:
                     raise self._invitation_not_found()
                 # All invitation operations lock the family before the invitation.
                 family = self.repository.get_family(invitation.family_id, for_update=True)
-                if family is None:
+                if family is None or family.deletion_pending:
                     raise self._invitation_not_found()
                 invitation = self._require_active_invitation(
                     self.repository.get_invitation_by_token_hash(digest, for_update=True),

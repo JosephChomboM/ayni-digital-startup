@@ -92,6 +92,11 @@ class LoginRequest(RequestSchema):
     password: SecretStr = Field(min_length=10, repr=False)
 
 
+class DeleteAccountRequest(RequestSchema):
+    password: SecretStr = Field(min_length=10, repr=False)
+    confirmation: Literal["ELIMINAR"]
+
+
 class ElderProfileRequest(RequestSchema):
     name: ShortText
     birth_decade: int = Field(strict=True, ge=0)

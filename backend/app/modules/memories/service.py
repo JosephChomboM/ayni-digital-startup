@@ -302,6 +302,27 @@ class MemoriesService:
             for start in range(0, len(keys), 100):
                 self.photo_storage.remove(bucket, keys[start : start + 100])
 
+    def purge_account_memories(self, actor_id: UUID) -> None:
+        context = self.families.get_account_deletion_context(actor_id)
+        if context.elder_profile_id is None:
+            return
+        with self.session.begin():
+            self.repository.mark_account_memories_for_deletion(
+                context.elder_profile_id,
+                actor_id,
+                whole_family=context.whole_family,
+            )
+        with self.session.begin():
+            self._remove_photo_objects(
+                self.repository.account_photos(
+                    context.elder_profile_id,
+                    actor_id,
+                    whole_family=context.whole_family,
+                )
+            )
+        # Preserve DB object keys until families.service completes the hard delete.
+        # A provider failure can then be retried, including already removed keys.
+
     def delete_photo(self, actor_id: UUID, memory_id: UUID, photo_id: UUID) -> None:
         profile_id, _, caregiver = self._photo_context(actor_id)
         with self.session.begin():

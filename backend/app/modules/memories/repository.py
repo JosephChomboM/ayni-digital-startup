@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -20,6 +20,24 @@ class MemoriesRepository:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def account_photos(
+        self, profile_id: UUID, actor_id: UUID, *, whole_family: bool
+    ) -> list[MemoryPhoto]:
+        statement = select(MemoryPhoto).join(Memory).where(Memory.elder_profile_id == profile_id)
+        if not whole_family:
+            statement = statement.where(
+                or_(Memory.created_by == actor_id, MemoryPhoto.created_by == actor_id)
+            )
+        return list(self.session.scalars(statement))
+
+    def mark_account_memories_for_deletion(
+        self, profile_id: UUID, actor_id: UUID, *, whole_family: bool
+    ) -> None:
+        statement = update(Memory).where(Memory.elder_profile_id == profile_id)
+        if not whole_family:
+            statement = statement.where(Memory.created_by == actor_id)
+        self.session.execute(statement.values(deletion_pending=True))
 
     def create_memory(
         self,
