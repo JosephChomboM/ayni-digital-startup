@@ -3,11 +3,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionGuide } from "./SessionGuide";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
+import { getElderProfile } from "../api/families";
 import { clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
 vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
+vi.mock("../api/families", () => ({ getElderProfile: vi.fn() }));
 vi.mock("../api/sessions", () => ({ clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ captureRef, onCue, onAnalyzeFrame }: { captureRef?: { current: (() => Promise<string>) | null }; onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => { if (captureRef) captureRef.current = speech.capture; return <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></>; } }));
@@ -28,6 +30,7 @@ beforeEach(() => {
  vi.mocked(listMemories).mockResolvedValue({items:[memory],total:1,limit:50,offset:0});
  vi.mocked(getMemory).mockResolvedValue(memory);
  vi.mocked(listPhotos).mockResolvedValue([]);
+ vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:[], created_at:"", updated_at:"" });
  vi.mocked(generateSession).mockResolvedValue(guide);
  vi.mocked(getSession).mockResolvedValue(guide);
  vi.mocked(listSessions).mockResolvedValue({items:[guide],total:1,limit:10,offset:0});
@@ -300,4 +303,10 @@ it("carga también los recuerdos que quedan fuera de la primera página", async 
  render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()}/>);
  expect(await screen.findByRole("option",{name:/Recuerdo nuevo con imagen/})).toBeInTheDocument();
  expect(listMemories).toHaveBeenCalledWith(expect.objectContaining({offset:1}));
+});
+
+it("viste a Ayni y ambienta la sala con los gustos del perfil",async()=>{
+ vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:["cocina criolla","boleros"], created_at:"", updated_at:"" });
+ await begin();
+ expect(screen.getByText(/Ayni lleva gorro y mandil de cocina/)).toBeInTheDocument();
 });

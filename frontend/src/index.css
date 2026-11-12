@@ -3012,5 +3012,60 @@
     right:20px;
     width:clamp(220px,24cqi,300px)
   }
-  .stage-speech,.stage-prop { margin-right:calc(clamp(220px,24cqi,300px) + 12px) }
+  .buddy-stage[data-camera] :is(.stage-speech,.stage-prop) { margin-right:calc(clamp(220px,24cqi,300px) + 12px) }
+}
+
+/* Ambiente según los gustos: paredes, objetos de la sala y ropa de Ayni */
+.buddy-stage[data-theme=music] .stage-room { --wall-a:#f6ece0; --wall-b:#f1e2d2 }
+.buddy-stage[data-theme=garden] .stage-room { --wall-a:#eef3e4; --wall-b:#e5eed9 }
+.buddy-stage[data-theme=cooking] .stage-room { --wall-a:#f8efe2; --wall-b:#f8efe2 }
+.buddy-stage[data-theme=football] .stage-room { --wall-a:#f7efe6; --wall-b:#f3e6dc }
+.buddy-stage[data-theme=knitting] .stage-room { --wall-a:#f7ece4; --wall-b:#f2e2d8 }
+.buddy-stage[data-theme=reading] .stage-room { --wall-a:#f4eee0; --wall-b:#ece3cf }
+.buddy-stage[data-theme=pets] .stage-room { --wall-a:#f5f0e2; --wall-b:#efe7d2 }
+.buddy-stage[data-theme=sea] .stage-room { --wall-a:#eaf2f2; --wall-b:#e0ecee }
+.buddy-stage[data-theme] .stage-room {
+  background:
+    linear-gradient(to bottom,transparent 0 calc(100% - var(--buddy-h) * .22 - 18px),#d9c7a6 calc(100% - var(--buddy-h) * .22 - 18px) calc(100% - var(--buddy-h) * .22 - 14px),#eadcc2 calc(100% - var(--buddy-h) * .22 - 14px)),
+    repeating-linear-gradient(90deg,var(--wall-a) 0 46px,var(--wall-b) 46px 92px)
+}
+/* Cocina: azulejos en la parte baja de la pared */
+.buddy-stage[data-theme=cooking] .stage-room::before {
+  content:'';
+  position:absolute;
+  inset:auto 0 calc(var(--buddy-h) * .22 - 14px);
+  height:72px;
+  background:linear-gradient(90deg,#e8dccb 1px,transparent 1px) 0 0/24px 24px,linear-gradient(#e8dccb 1px,#fbf6ec 1px) 0 0/24px 24px
+}
+.room-decor { position:absolute; display:block }
+.room-decor svg { display:block; width:100% }
+.decor-floor {
+  right:calc(3% + clamp(52px,6vw,78px) + 14px);
+  bottom:calc(var(--buddy-h) * .22 - 30px);
+  width:clamp(70px,8.5vw,110px)
+}
+.decor-floor2 {
+  right:calc(3% + clamp(52px,6vw,78px) + clamp(70px,8.5vw,110px) + 34px);
+  bottom:calc(var(--buddy-h) * .22 - 30px);
+  width:clamp(50px,6vw,80px)
+}
+.decor-music.decor-floor,.decor-music.decor-floor2 { width:clamp(56px,6vw,80px) }
+.decor-wall {
+  left:5%;
+  top:calc(7% + clamp(90px,12vw,150px) * 4 / 3 + 28px);
+  width:clamp(84px,11vw,140px)
+}
+.decor-pets .dog-tail {
+  transform-box:view-box;
+  transform-origin:74px 70px;
+  animation:tail-wag .5s ease-in-out infinite alternate
+}
+@keyframes tail-wag {
+  from { transform:rotate(-14deg) }
+  to { transform:rotate(16deg) }
+}
+.ayni-buddy[data-hat] :is(.buddy-antenna,.buddy-light) { display:none }
+.buddy-wear { pointer-events:none }
+@media (max-width:899px) {
+  .decor-wall,.decor-floor2 { display:none }
 }
