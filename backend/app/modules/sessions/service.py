@@ -8,7 +8,12 @@ from app.core.errors import ApplicationError
 from app.modules.billing.service import BillingService
 from app.modules.families.service import FamiliesService
 from app.modules.memories.service import MemoriesService
-from app.modules.sessions.assistant import ChatRequest, generate_reply, redact_contacts
+from app.modules.sessions.assistant import (
+    ChatRequest,
+    asks_about_previous_image,
+    generate_reply,
+    redact_contacts,
+)
 from app.modules.sessions.conversation import (
     ConversationRequest,
     ConversationTurn,
@@ -197,23 +202,25 @@ class SessionsService:
                         "Pueden descansar o volver a sus recuerdos."
                     ),
                 )
-            reply = generate_reply(
-                data,
-                context=context,
-                history=[
-                    {
-                        "role": item.role,
-                        "content": item.text
-                        + (
-                            "\nDetalles observados en una captura anterior "
-                            "(no son la escena actual): " + str(item.observations)
-                            if item.observations
-                            else ""
-                        ),
-                    }
-                    for item in messages
-                ],
-            )
+            # A past image is relevant only when asked about explicitly.
+            past_image_requested = asks_about_previous_image(data.text)
+            visual_turn_ids = {
+                item.request_id
+                for item in messages
+                if item.observations
+                or (item.role == "user" and asks_about_previous_image(item.text))
+            }
+            history = []
+            for item in messages:
+                if item.request_id in visual_turn_ids and not past_image_requested:
+                    continue
+                content = item.text
+                if item.observations:
+                    content += "\nDetalles observados en una captura anterior: " + str(
+                        item.observations
+                    )
+                history.append({"role": item.role, "content": content})
+            reply = generate_reply(data, context=context, history=history)
             position = len(messages)
             text = redact_contacts(data.text.strip())
             if text:

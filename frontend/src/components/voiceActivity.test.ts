@@ -16,7 +16,8 @@ it("respeta pausas entre palabras y finaliza una respuesta tras silencio sosteni
   expect(detector(.001, 1900).ended).toBe(false);
   detector(.02, 1950); detector(.02, 2000); detector(.02, 2050);
   expect(detector(.001, 4200).ended).toBe(false);
-  expect(detector(.001, 4500).ended).toBe(true);
+  expect(detector(.001, 4500).ended).toBe(false);
+  expect(detector(.001, 5300).ended).toBe(true);
 });
 
 it("limita una intervención continua a treinta segundos", () => {

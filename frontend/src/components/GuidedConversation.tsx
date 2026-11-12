@@ -1,10 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
-import { getMessages, sendMessage, imageForConversation, observeScene, clearScene, transcribeAudio } from "../api/sessions";
+import { ApiError } from "../api/client";
+import { getMessages, sendMessage, imageForConversation, clearScene, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
-import { interpretReply, speakLocally } from "./sessionSignals";
+import { interpretReply, requestsVisualContext, spanishVoices, speakLocally } from "./sessionSignals";
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
 import { Button } from "./ui/button";
@@ -34,10 +35,11 @@ export function GuidedConversation({
   const [liveScene, setLiveScene] = useState(withDevices);
   const cameraCapture = useRef<(() => Promise<string>) | null>(null);
   const [sceneNotice, setSceneNotice] = useState("");
-  const [sceneUpdated, setSceneUpdated] = useState("");
-  const sceneRequest = useRef<AbortController | null>(null);
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
+  const [voices, setVoices] = useState(() => spanishVoices(window.speechSynthesis?.getVoices() ?? []));
+  const [voiceURI, setVoiceURI] = useState("");
+  const [failedTurns, setFailedTurns] = useState(0);
   const [line, setLine] = useState(SESSION_GREETING);
   const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
   const nextMessage = useRef(0);
@@ -57,6 +59,7 @@ export function GuidedConversation({
   const [voiceNotice, setVoiceNotice] = useState("");
   const request = useRef<AbortController | null>(null);
   const [aiError, setAiError] = useState("");
+  const [recovering, setRecovering] = useState(false);
   const [suggestion, setSuggestion] = useState("continue");
   const [observations, setObservations] = useState<string[]>([]);
   const lastAttempt = useRef<ChatInput | null>(null);
@@ -68,7 +71,7 @@ export function GuidedConversation({
 
   function speak(text: string) {
     if (!sound || document.hidden) return;
-    if (!speakLocally(text, setSpeaking)) {
+    if (!speakLocally(text, setSpeaking, voiceURI)) {
       setSpeaking(false);
       waitingForVoice.current = text;
       setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz local en español.");
@@ -98,22 +101,52 @@ export function GuidedConversation({
     request.current = controller;
     setPending(true);
     setAiError("");
-    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: liveScene && camera, ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
+    setRecovering(false);
+    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
-      if (!retry?.image && !image && !cue && text.trim() && camera && liveScene) {
-        if (!cameraCapture.current) throw new Error("La cámara todavía no está lista. Espera a ver la imagen antes de enviar tu respuesta.");
-        image = await cameraCapture.current();
-        if (controller.signal.aborted) return;
+      if (!retry?.image && !image && !cue && requestsVisualContext(text)) {
+        if (camera && liveScene && cameraCapture.current) {
+          try { image = await cameraCapture.current(); }
+          catch { /* The camera may still be starting or may have lost access. */ }
+          if (controller.signal.aborted) return;
+        }
+        if (!image) {
+          lastAttempt.current = null;
+          setObservations([]);
+          setSuggestion("continue");
+          show(camera && liveScene
+            ? "La cámara todavía no me muestra la imagen. ¿Puedes enseñármela otra vez?"
+            : "Si quieres que mire algo, activa la cámara y el contexto visual o usa Analizar foto con IA.");
+          return;
+        }
       }
       const payload: ChatInput = { ...lastAttempt.current, ...(image ? { image, image_consent: true } : {}) };
       lastAttempt.current = payload;
-      const result = await sendMessage(sessionId, payload, controller.signal);
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
+      const result = await sendMessage(sessionId, payload, signal);
       if (controller.signal.aborted) return;
+      setFailedTurns(0);
       setSuggestion(result.suggestion);
-      setObservations(result.observations);
+      setObservations(image ? result.observations : []);
       show(result.text);
     } catch (cause) {
-      if (!controller.signal.aborted) setAiError(cause instanceof Error ? cause.message : "La IA no pudo responder. Puedes reintentar.");
+      if (controller.signal.aborted) return;
+      if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && cause.status !== 429) {
+        setAiError(cause.message);
+        return;
+      }
+      const failures = failedTurns + 1;
+      setFailedTurns(failures);
+      setSuggestion("continue");
+      setObservations([]);
+      if (!cue) {
+        show(image ? "No pude ver bien la imagen esta vez. ¿Qué querías mostrarme?" :
+          text ? "Podemos seguir a tu ritmo. ¿Qué más te gustaría contar de ese momento?" : SESSION_GREETING);
+      }
+      if (failures >= 2 && !cue) {
+        setRecovering(true);
+        setAiError("La conexión con Ayni está intermitente. Puedes seguir conversando.");
+      }
     } finally {
       if (request.current === controller) { request.current = null; setPending(false); }
     }
@@ -138,24 +171,11 @@ export function GuidedConversation({
       if (!reviewVoice || intent === "pause" || intent === "end") receive(reply);
       else setInput(reply);
     },
-    mic && !paused && !pending && !speaking && !input.trim() && !aiError,
+    mic && !paused && !pending && !speaking && !input.trim(),
     cloudVoice ? (recording, signal) => transcribeAudio(sessionId, recording, signal) : undefined,
   );
 
-  async function observe(image: string) {
-    if (sceneRequest.current || !liveScene || paused) return;
-    const controller = new AbortController();
-    sceneRequest.current = controller;
-    try {
-      const result = await observeScene(sessionId, image, controller.signal);
-      if (!controller.signal.aborted) { setObservations(result.observations); setSceneUpdated(result.updated_at); setSceneNotice(""); }
-    } catch (cause) {
-      if (!controller.signal.aborted) setSceneNotice(cause instanceof Error ? cause.message : "El contexto visual no está disponible.");
-    } finally { if (sceneRequest.current === controller) sceneRequest.current = null; }
-  }
-
   function pause(message: string) {
-    sceneRequest.current?.abort(); sceneRequest.current = null;
     cancelTurn();
     dictation.cancel();
     show(message);
@@ -197,24 +217,28 @@ export function GuidedConversation({
         setMessages(saved.map((item, index) => ({ id: index, from: item.role === "assistant" ? "ayni" : "you", text: item.text })));
         nextMessage.current = saved.length;
         const last = saved.filter((item) => item.role === "assistant").at(-1);
-        if (last) { setLine(last.text); setSuggestion(last.suggestion); setObservations(last.observations); }
+        if (last) { setLine(last.text); setSuggestion(last.suggestion); }
       } else {
         await follow("", undefined, undefined, { text: "", request_id: greetingId.current });
       }
     } catch (cause) {
-      if (isActive()) setAiError(cause instanceof Error ? cause.message : "No pudimos recuperar la conversación.");
+      if (!isActive()) return;
+      if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) setAiError(cause.message);
+      else show(SESSION_GREETING);
     }
   }
   const initialize = useEffectEvent(loadConversation);
+  const refreshVoices = useEffectEvent(() => {
+    setVoices(spanishVoices(window.speechSynthesis?.getVoices() ?? []));
+    const text = waitingForVoice.current;
+    if (!text || document.hidden || !speakLocally(text, setSpeaking, voiceURI)) return;
+    setSpeaking(true);
+    waitingForVoice.current = null;
+    setVoiceNotice("");
+  });
 
   useEffect(() => {
-    function onVoicesChanged() {
-      const text = waitingForVoice.current;
-      if (!text || document.hidden || !speakLocally(text, setSpeaking)) return;
-      setSpeaking(true);
-      waitingForVoice.current = null;
-      setVoiceNotice("");
-    }
+    function onVoicesChanged() { refreshVoices(); }
     function updateVisibility() {
       setVisible(!document.hidden);
       if (document.hidden) {
@@ -228,7 +252,6 @@ export function GuidedConversation({
     void initialize(() => active);
     return () => {
       active = false;
-      sceneRequest.current?.abort();
       document.removeEventListener("visibilitychange", updateVisibility);
       request.current?.abort();
       request.current = null;
@@ -240,7 +263,7 @@ export function GuidedConversation({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!input.trim() || paused || pending || aiError) return;
+    if (!input.trim() || paused || pending) return;
     dictation.cancel();
     receive(input);
     setInput("");
@@ -254,7 +277,7 @@ export function GuidedConversation({
       setSound(false);
     } else {
       setSound(true);
-      if (speakLocally(line, setSpeaking)) { setSpeaking(true); setVoiceNotice(""); }
+      if (speakLocally(line, setSpeaking, voiceURI)) { setSpeaking(true); setVoiceNotice(""); }
       else setVoiceNotice("Este dispositivo no tiene una voz local en español.");
     }
   }
@@ -275,7 +298,7 @@ export function GuidedConversation({
     return () => resize.disconnect();
   }, []);
 
-  const status = paused ? "En pausa" : speaking ? "Ayni está hablando" : pending ? "Ayni está preparando una pregunta" :
+  const status = paused ? "En pausa" : speaking ? "Ayni está hablando" : pending ? "Ayni está respondiendo" :
     dictation.error && mic ? "Puedes seguir por escrito" : ({
       idle: mic ? "Puedes hablar o escribir" : "Escribe para responder",
       permission: "Esperando permiso del micrófono…",
@@ -323,20 +346,19 @@ export function GuidedConversation({
               onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
           </div>
           {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
-            live={liveScene} onObserveFrame={observe} canObserve={() => !pending && !speaking && !input.trim() && (dictation.state === "idle" || dictation.state === "listening")} /> :
+            live={false} /> :
             <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
         </div>
         <label className="mt-3 flex min-h-11 items-start gap-2 text-sm">
           <input type="checkbox" checked={liveScene} disabled={!camera || paused} onChange={(event) => {
             const enabled = event.target.checked; setLiveScene(enabled);
             if (!enabled) {
-              sceneRequest.current?.abort(); sceneRequest.current = null; setSceneUpdated("");
+              setObservations([]);
               void clearScene(sessionId).catch(() => setSceneNotice("No se pudo limpiar el contexto anterior. No se usarán más capturas mientras esté desactivado."));
             }
           }} />Contexto visual en vivo
         </label>
-        <p className="text-xs">Con esta opción, cada respuesta hablada o escrita comparte una captura actual con Groq. Puedes decir «mira acá» y contar lo que muestras. También se actualiza el contexto cada 15 segundos. No se guardan fotos ni video; solo la conversación y detalles observados. Puedes desactivarlo cuando quieras.</p>
-        {liveScene && sceneUpdated && <p className="mt-2 text-xs">Última observación: {new Date(sceneUpdated).toLocaleTimeString("es-PE")}</p>}
+        <p className="text-xs">Di «mira acá» o pregunta por la imagen para compartir una captura actual con Groq, sin pulsar un botón. En los demás mensajes no se envían capturas. No se guardan fotos ni video; solo la conversación y los detalles que pidas analizar.</p>
         {sceneNotice && <p role="status" className="text-xs">{sceneNotice}</p>}
         <div className="my-3 flex flex-wrap gap-2">
           <button type="button" disabled={paused || pending} onClick={() => changeActivity()} className="min-h-11 rounded-lg border px-3 text-sm">Cambiar actividad</button>
@@ -364,21 +386,21 @@ export function GuidedConversation({
             <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
           </div>
         </div>)}
-        {aiError && <div role="alert" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+        {aiError && <div role={recovering ? "alert" : "status"} className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
           <p>{aiError}</p>
-          <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
+          {recovering && <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
             const attempt = lastAttempt.current;
             if (attempt) void follow(attempt.text, attempt.image, attempt.cue, attempt);
             else void loadConversation(() => true);
-          }}>Reintentar con IA</button>
-          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); lastAttempt.current = null; }}>Seguir con otra pregunta</button>
+          }}>Reintentar con IA</button>}
+          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); setRecovering(false); }}>Seguir conversando</button>
         </div>}
         {!aiError && suggestion !== "continue" && <div className="rounded-lg bg-sky-50 p-3 text-sm">
           <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
           <button type="button" className="min-h-11 font-semibold underline" onClick={() => pause("La sesión está en pausa. Continúen cuando quieran.")}>Hacer una pausa</button>
           <button type="button" className="ml-3 min-h-11 font-semibold underline" onClick={() => changeActivity()}>Cambiar actividad</button>
         </div>}
-        {pending && <p className="text-sm text-[#435d60]">Ayni está preparando una pregunta…</p>}
+        {pending && <p className="text-sm text-[#435d60]">Ayni está respondiendo…</p>}
       </div>
 
       <form onSubmit={submit} className="min-w-0 space-y-2 border-t border-[#cddbdc] bg-white px-4 py-3 sm:px-6 md:col-start-1 md:row-start-2">
@@ -403,15 +425,27 @@ export function GuidedConversation({
               if (dictation.error) { dictation.retry(); setMic(true); }
               else setMic(!mic);
             }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
-          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending || Boolean(aiError)} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
+          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
         </div>
         {dictation.state === "recording" && <Button type="button" variant="outline" onClick={dictation.finish}>Listo, ya hablé</Button>}
         <details className="text-sm"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Opciones de voz</summary>
+          <label className="block py-2">Voz de Ayni
+            <select aria-label="Voz de Ayni" className="mt-1 block w-full rounded border p-2" value={voiceURI} onChange={(event) => {
+              setVoiceURI(event.target.value);
+              if (sound && speakLocally("Hola, soy Ayni. Conversemos a tu ritmo.", setSpeaking, event.target.value)) {
+                setSpeaking(true);
+                setVoiceNotice("");
+              }
+            }}>
+              <option value="">Automática: mejor voz local disponible</option>
+              {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)}
+            </select>
+          </label>
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
-          <p className="text-xs">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
+          <p className="text-xs">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español con el modelo de mayor precisión. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={reviewVoice} onChange={(event) => setReviewVoice(event.target.checked)} />Revisar el dictado antes de enviarlo</label>
         </details>
-        {(voiceNotice || (mic && dictation.error)) && <p role="status" className="text-sm text-[#435d60]">{(mic && dictation.error) || voiceNotice}</p>}
+        {(voiceNotice || (mic && (dictation.error || dictation.notice))) && <p role="status" className="text-sm text-[#435d60]">{(mic && (dictation.error || dictation.notice)) || voiceNotice}</p>}
       </form>
     </div>
   </section>;

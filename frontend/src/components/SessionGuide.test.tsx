@@ -57,12 +57,24 @@ it("al desactivar el contexto visual no captura las respuestas", async () => {
  expect(speech.capture).not.toHaveBeenCalled();
  expect(vi.mocked(sendMessage).mock.calls.at(-1)![1].image).toBeUndefined();
 });
-it("si la cámara falla reintenta la misma pregunta sin repetir un turno anterior", async () => {
+it("con cámara encendida conversa sin capturas cuando no se pide mirar", async () => {
+ await begin("Empezar con Ayni");
+ speech.capture.mockRejectedValue(new Error("Cámara averiada"));
+ act(() => speech.receive?.("Me gustaban los helados de lúcuma"));
+ await screen.findByText(answer.text);
+ expect(speech.capture).not.toHaveBeenCalled();
+ const payload = vi.mocked(sendMessage).mock.calls.at(-1)![1];
+ expect(payload.image).toBeUndefined();
+ expect(payload.use_scene).toBe(false);
+ expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+it("si la cámara falla Ayni pide que le muestren la imagen otra vez en el chat", async () => {
  await begin("Empezar con Ayni");
  speech.capture.mockRejectedValueOnce(new Error("Cámara no disponible"));
  act(() => speech.receive?.("Mira acá, este es mi álbum"));
- await screen.findByText("Cámara no disponible");
- fireEvent.click(screen.getByRole("button", { name:"Reintentar con IA" }));
+ await screen.findByText(/La cámara todavía no me muestra la imagen/);
+ expect(screen.queryByRole("button", { name:"Reintentar con IA" })).not.toBeInTheDocument();
+ act(() => speech.receive?.("Mira acá, este es mi álbum"));
  await screen.findByText(answer.text);
  expect(sendMessage).toHaveBeenLastCalledWith("guide", expect.objectContaining({ text:"Mira acá, este es mi álbum", image:"data:image/jpeg;base64,current" }), expect.any(AbortSignal));
 });
@@ -84,16 +96,32 @@ it("abre mensajes guardados sin gastar otra guía ni pedir otra respuesta al pro
  expect(generateSession).not.toHaveBeenCalled();
  expect(sendMessage).not.toHaveBeenCalled();
 });
-it("informa un error de Groq y reintenta con el mismo identificador",async()=>{
+it("continúa la conversación tras un fallo aislado de Groq", async () => {
  await begin();
  vi.mocked(sendMessage).mockRejectedValueOnce(new Error("Groq no está disponible"));
- fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"Me gustaban los helados"}});
- fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
- await screen.findByText("Groq no está disponible");
- const failed=vi.mocked(sendMessage).mock.calls.at(-1)![1];
- fireEvent.click(screen.getByRole("button",{name:"Reintentar con IA"}));
+ act(() => speech.receive?.("Me gustaban los helados"));
+ await screen.findByText(/Podemos seguir a tu ritmo/);
+ expect(screen.queryByRole("button", { name: "Reintentar con IA" })).not.toBeInTheDocument();
+ act(() => speech.receive?.("Eran de lúcuma"));
  await screen.findByText(answer.text);
- expect(sendMessage).toHaveBeenLastCalledWith("guide",failed,expect.any(AbortSignal));
+});
+
+it("reserva el aviso técnico para fallos repetidos y conserva el identificador al reintentar", async () => {
+ await begin("Empezar con Ayni");
+ vi.mocked(sendMessage).mockRejectedValue(new Error("Servicio temporalmente ocupado"));
+ act(() => speech.receive?.("Me gusta cantar"));
+ await screen.findByText(/Podemos seguir a tu ritmo/);
+ expect(speech.enabled).toBe(true);
+ fireEvent.change(screen.getByRole("textbox", {name:"Tu respuesta"}), {target:{value:"Quiero conversar"}});
+ fireEvent.click(screen.getByRole("button", {name:"Enviar"}));
+ await screen.findByRole("alert");
+ expect(speech.enabled).toBe(true);
+ const failed = vi.mocked(sendMessage).mock.calls.at(-1)![1];
+ vi.mocked(sendMessage).mockResolvedValue(answer);
+ fireEvent.click(screen.getByRole("button", {name:"Reintentar con IA"}));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide", failed, expect.any(AbortSignal));
+ expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 it("pausa desde un comando transcrito sin esperar al proveedor",async()=>{
  await begin("Empezar con Ayni");

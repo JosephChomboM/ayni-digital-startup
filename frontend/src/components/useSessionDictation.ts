@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createVoiceActivity } from "./voiceActivity";
+import { ApiError } from "../api/client";
 
 const LIMIT_MS = 30_000;
 const SAMPLE_RATE = 16_000;
@@ -14,6 +15,8 @@ interface Capture {
   meter?: number;
   audio?: AudioContext;
   transcription?: AbortController;
+  speechOffset?: number;
+  lastSpeechOffset?: number;
 }
 
 async function monoSamples(recording: Blob) {
@@ -49,6 +52,7 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
   cloud?: (recording: Blob, signal: AbortSignal) => Promise<string>) {
   const [state, setState] = useState<DictationState>("idle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const active = useRef<Capture | null>(null);
   const worker = useRef<Worker | null>(null);
   const callback = useRef(onTranscript);
@@ -103,6 +107,12 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     setError(message);
   }
 
+  function askToRepeat() {
+    discard();
+    setState("idle");
+    setNotice("No te entendí bien. ¿Puedes repetirlo un poco más cerca del micrófono?");
+  }
+
   async function start() {
     if (active.current || state !== "idle" || document.hidden) return;
     setError("");
@@ -139,21 +149,41 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
         if (active.current !== capture) return;
         try {
           const recording = new Blob(chunks, { type: recorder.mimeType });
-          const samples = await monoSamples(recording);
+          const decoded = await monoSamples(recording);
+          // Preserve consonants on either side while removing long waits before
+          // the first word and after the last one from local transcription.
+          const firstSample = Math.floor(Math.max(0, (capture.speechOffset ?? 0) - 600) * SAMPLE_RATE / 1000);
+          const lastSample = capture.lastSpeechOffset === undefined ? decoded.length :
+            Math.ceil((capture.lastSpeechOffset + 700) * SAMPLE_RATE / 1000);
+          const samples = decoded.subarray(firstSample, lastSample).slice();
           if (active.current !== capture) return;
           const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
           if (samples.length < SAMPLE_RATE * 0.4 || rms < 0.0015) {
-            fail("No escuché una respuesta. Acércate al micrófono o escribe lo que querías decir.");
+            askToRepeat();
             return;
           }
 
           if (cloudCallback.current) {
             capture.transcription = new AbortController();
-            const text = await cloudCallback.current(recording, capture.transcription.signal);
-            if (active.current !== capture) return;
-            active.current = null; release(capture); setState("idle");
-            callback.current(text);
-            return;
+            const signal = AbortSignal.any([capture.transcription.signal, AbortSignal.timeout(8_000)]);
+            try {
+              const text = await cloudCallback.current(recording, signal);
+              if (active.current !== capture) return;
+              if (!text.trim()) { askToRepeat(); return; }
+              discard();
+              setState("idle");
+              setNotice("");
+              callback.current(text);
+              return;
+            } catch (cause) {
+              if (active.current !== capture) return;
+              if (cause instanceof ApiError && cause.code === "audio_not_understood") {
+                askToRepeat();
+                return;
+              }
+              // The local recognizer can still use this recording if the
+              // network or enhanced dictation service is unavailable.
+            }
           }
           const gain = Math.min(8, 0.08 / Math.max(rms, 0.0015));
           if (gain > 1) for (let index = 0; index < samples.length; index++) samples[index] = Math.max(-1, Math.min(1, samples[index] * gain));
@@ -172,14 +202,14 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
               active.current = null;
               release(capture);
               setState("idle");
-              if (data.text) callback.current(data.text);
-              else setError("No pude entenderte. Puedes intentarlo otra vez o escribir.");
+              if (data.text) { setNotice(""); callback.current(data.text); }
+              else askToRepeat();
             }
           };
           timeout.current = window.setTimeout(failure, 120_000);
           transcriber.postMessage({ samples }, [samples.buffer]);
-        } catch (cause) {
-          if (active.current === capture) fail(cause instanceof Error ? cause.message : "No pude leer la grabación. Puedes escribir tu respuesta.");
+        } catch {
+          if (active.current === capture) fail("No pude leer la grabación. Puedes escribir tu respuesta.");
         }
       };
       recorder.start(250);
@@ -191,6 +221,8 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
         const rms = Math.sqrt(waveform.reduce((sum, sample) => sum + sample * sample, 0) / waveform.length);
         const now = performance.now();
         const voice = detectVoice(rms, now);
+        if (voice.started) capture.speechOffset = now - idleSince;
+        if (voice.lastSpeech !== null) capture.lastSpeechOffset = voice.lastSpeech - idleSince;
         if (voice.started) { setState("recording"); capture.timer = window.setTimeout(stop, LIMIT_MS); }
         if (voice.ended) stop();
         if (!voice.active) {
@@ -238,5 +270,5 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     return () => window.clearTimeout(delay);
   }, [enabled, visible, state, error, cancel]);
 
-  return { state, error, cancel, finish: stop, retry: () => setError("") };
+  return { state, error, notice, cancel, finish: stop, retry: () => setError("") };
 }
