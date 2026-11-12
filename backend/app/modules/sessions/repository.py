@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.sessions.models import FamilySession, SessionItem
+from app.modules.sessions.models import FamilySession, SessionItem, SessionMessage
 from app.modules.sessions.schemas import SessionGuide
 
 
@@ -13,6 +13,39 @@ class SessionsRepository:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def messages(self, session_id: UUID) -> list[SessionMessage]:
+        return list(
+            self.session.scalars(
+                select(SessionMessage)
+                .where(SessionMessage.session_id == session_id)
+                .order_by(SessionMessage.position)
+            )
+        )
+
+    def add_message(
+        self,
+        session_id: UUID,
+        request_id: UUID,
+        *,
+        position: int,
+        role: str,
+        text: str,
+        suggestion: str = "continue",
+        observations: list[str] | None = None,
+    ) -> SessionMessage:
+        record = SessionMessage(
+            session_id=session_id,
+            request_id=request_id,
+            position=position,
+            role=role,
+            text=text,
+            suggestion=suggestion,
+            observations=observations or [],
+        )
+        self.session.add(record)
+        self.session.flush()
+        return record
 
     def create_session(
         self, *, elder_profile_id: UUID, created_by: UUID, guide: SessionGuide

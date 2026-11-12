@@ -1,148 +1,133 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionGuide } from "./SessionGuide";
-import { ApiError } from "../api/client";
-import { getMemory } from "../api/memories";
+import { listMemories, getMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
-import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
-import type { SessionResponse } from "../api/sessions";
-import { nextConversationTurn } from "../api/conversation";
+import { generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
-
-vi.mock("../api/sessions", () => ({ generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), recordReaction: vi.fn() }));
-vi.mock("../api/memories", () => ({ getMemory: vi.fn(), memoryErrorMessage: (error: Error) => error.message }));
+const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false }));
+vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
-
-vi.mock("../api/conversation", () => ({ nextConversationTurn: vi.fn() }));
-vi.mock("./SessionCamera", () => ({
-  SessionCamera: ({ onCue }: { onCue: (cue: FaceCue) => void }) =>
-    <button type="button" onClick={() => onCue("away")}>Simular salida de cuadro</button>,
-}));
-const user = { id: "u", name: "Persona de prueba", email: "persona@example.test", role: "familiar" as const, family_id: "f", created_at: "2026-11-11T12:00:00Z" };
-const guide = { id: "saved-guide", elder_profile_id: "p", created_by: "u", created_at: "2026-11-11T12:00:00Z", template_version: "1.0", duration_minutes: 15, steps: [
-  { position: 1, duration_minutes: 2, instruction: "Busca un lugar tranquilo.", memory_id: null, source_memory_id: null, memory_available: false },
-  { position: 2, duration_minutes: 10, instruction: "Lean la anécdota juntos.", memory_id: "memory", source_memory_id: "memory", memory_available: true },
-  { position: 3, duration_minutes: 3, instruction: "Agradece el momento compartido.", memory_id: null, source_memory_id: null, memory_available: false },
-] };
-const response: SessionResponse = { id: "saved-response", session_id: guide.id, elder_profile_id: "p", created_by: "u", reaction: "receptivo", occurred_at: guide.created_at, created_at: guide.created_at };
-
+vi.mock("../api/sessions", () => ({ generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
+vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
+vi.mock("./SessionCamera", () => ({ SessionCamera: ({ onCue, onAnalyzeFrame }: { onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></> }));
+const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
+const memory = {
+  id: "memory", elder_profile_id: "profile", created_by: "u", type: "anecdote" as const,
+  title: "El paseo", text: "Caminamos por el parque.", url: null,
+  is_positive: true, is_sensitive: false, entities: [], entities_status: "completed" as const,
+  created_at: "", updated_at: "",
+};
+const guide = { id:"guide", elder_profile_id:"profile", created_at:"2026-11-12T02:00:00Z", duration_minutes:15, steps:[{ instruction:"Conversen a su ritmo", memory_id:"memory", memory_available:true }] };
+const answer = { id:"reply", role:"assistant" as const, text:"Me contaste que caminabas por el parque. ¿Qué te gustaba mirar allí?", suggestion:"continue" as const, observations:[] };
+const photo = { id:"photo", memory_id:"memory", created_by:"u", content_type:"image/jpeg", size_bytes:12, width:1, height:1, created_at:"", url:"https://photos.example.test/signed", url_expires_at:"2026-11-12T03:00:00Z" };
 beforeEach(() => {
-  localStorage.clear();
-  vi.mocked(listSessions).mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
-  vi.mocked(generateSession).mockResolvedValue(guide);
-  vi.mocked(getSession).mockResolvedValue(guide);
-  vi.mocked(getRecordedReaction).mockResolvedValue(null);
-  vi.mocked(recordReaction).mockResolvedValue(response);
-  vi.mocked(listPhotos).mockResolvedValue([]);
-  vi.mocked(getMemory).mockResolvedValue({ id: "memory", elder_profile_id: "p", created_by: "u", type: "anecdote", title: "Paseo en familia", text: "Un paseo agradable.", url: null, is_positive: true, is_sensitive: false, entities: [], entities_status: "completed", created_at: guide.created_at, updated_at: guide.created_at });
+ URL.createObjectURL=vi.fn(()=>"blob:test"); URL.revokeObjectURL=vi.fn();
+ vi.mocked(listMemories).mockResolvedValue({items:[memory],total:1,limit:50,offset:0});
+ vi.mocked(getMemory).mockResolvedValue(memory);
+ vi.mocked(listPhotos).mockResolvedValue([]);
+ vi.mocked(generateSession).mockResolvedValue(guide);
+ vi.mocked(getSession).mockResolvedValue(guide);
+ vi.mocked(listSessions).mockResolvedValue({items:[guide],total:1,limit:10,offset:0});
+ vi.mocked(getMessages).mockResolvedValue([]);
+ vi.mocked(getRecordedReaction).mockResolvedValue(null);
+ vi.mocked(recordReaction).mockResolvedValue({ id:"response", session_id:"guide", elder_profile_id:"profile", created_by:"u", reaction:"receptivo", occurred_at:"", created_at:"" });
+ vi.mocked(sendMessage).mockImplementation(async (_id, body) => ({...answer, text:body.text ? answer.text : "Hola, ¿qué disfrutaban de sus paseos?"}));
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
-
-async function begin() {
-  render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
-  const button = screen.getByRole("button", { name: "Comenzar cuando estén listos" });
-  await waitFor(() => expect(button).toBeEnabled());
-  fireEvent.click(button);
-  await screen.findByText("Busca un lugar tranquilo.");
+afterEach(() => { cleanup(); vi.resetAllMocks(); localStorage.clear(); });
+async function begin(mode="Empezar sin cámara ni micrófono") {
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
+ fireEvent.click(await screen.findByRole("button",{name:mode}));
+ await screen.findByText("Hola, ¿qué disfrutaban de sus paseos?");
 }
-
-it("uses persisted steps and confirms a reaction only after the server saves it", async () => {
-  let resolveSave!: (value: SessionResponse) => void;
-  vi.mocked(recordReaction).mockImplementation(() => new Promise((resolve) => { resolveSave = resolve; }));
-  await begin();
-  expect(generateSession).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole("button", { name: "Pausar" }));
-  expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-  fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Un paseo agradable.");
-  fireEvent.click(screen.getByRole("button", { name: "Terminar" }));
-  expect(screen.getByRole("button", { name: "Guardar reacción" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Receptivo" }));
-  fireEvent.click(screen.getByRole("button", { name: "Guardar reacción" }));
-  expect(recordReaction).toHaveBeenCalledWith(guide.id, "receptivo");
-  expect(screen.queryByRole("heading", { name: "Reacción guardada en tu familia" })).not.toBeInTheDocument();
-  await act(async () => resolveSave(response));
-  expect(await screen.findByRole("heading", { name: "Reacción guardada en tu familia" })).toBeInTheDocument();
-  expect(localStorage.length).toBe(0);
-});
-
-it("shows the API error and permits retry without pretending a guide was generated", async () => {
-  vi.mocked(generateSession).mockRejectedValue(new ApiError("Ya preparaste tu guía de esta semana.", "session_limit_reached", 409));
-  render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
-  const button = screen.getByRole("button", { name: "Comenzar cuando estén listos" });
-  await waitFor(() => expect(button).toBeEnabled()); fireEvent.click(button);
-  expect(await screen.findByRole("alert")).toHaveTextContent("Ya preparaste tu guía de esta semana.");
-  expect(screen.queryByRole("button", { name: "Terminar" })).not.toBeInTheDocument();
-  expect(recordReaction).not.toHaveBeenCalled();
-});
-
-it("recovers an existing guide and reaction without consuming another generation", async () => {
-  vi.mocked(listSessions).mockResolvedValue({ items: [guide], total: 1, limit: 20, offset: 0 });
-  vi.mocked(getRecordedReaction).mockResolvedValue(response);
-  render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Abrir guía" }));
-  await screen.findByText("Busca un lugar tranquilo.");
-  fireEvent.click(screen.getByRole("button", { name: "Terminar" }));
-  expect(await screen.findByRole("heading", { name: "Reacción guardada en tu familia" })).toBeInTheDocument();
-  expect(generateSession).not.toHaveBeenCalled(); expect(recordReaction).not.toHaveBeenCalled();
-});
-
-it("keeps the reaction form open with the error when save fails", async () => {
-  vi.mocked(recordReaction).mockRejectedValue(new ApiError("No pudimos guardar. Inténtalo de nuevo.", "service_unavailable", 503));
-  await begin(); fireEvent.click(screen.getByRole("button", { name: "Terminar" }));
-  fireEvent.click(screen.getByRole("button", { name: "Agitado" }));
-  fireEvent.click(screen.getByRole("button", { name: "Guardar reacción" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar.");
-  expect(screen.getByRole("button", { name: "Guardar reacción" })).toBeEnabled();
-  expect(screen.queryByRole("heading", { name: "Reacción guardada en tu familia" })).not.toBeInTheDocument();
-});
-
-it("aborts a pending turn and releases the camera panel when framing pauses the guide", async () => {
- vi.mocked(nextConversationTurn)
-   .mockResolvedValueOnce({ question_id: "first", question: "¿Qué parte quieres contar?", source: "ai" })
-   .mockImplementationOnce(() => new Promise(() => {}));
+it("genera una guía persistida y manda la respuesta real, no una categoría",async()=>{
  await begin();
- fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
- await screen.findByText("Un paseo agradable.");
- expect(nextConversationTurn).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole("button", { name: "Conversar" }));
- expect(await screen.findByText("Pregunta elegida por IA")).toBeInTheDocument();
- fireEvent.click(screen.getByRole("button", { name: "Activar cámara" }));
- fireEvent.click(screen.getByRole("button", { name: "El lugar" }));
- const [memoryId, topic, asked, signal] = vi.mocked(nextConversationTurn).mock.calls[1];
- expect([memoryId, topic, asked]).toEqual(["memory", "place", ["first"]]);
- fireEvent.click(screen.getByRole("button", { name: "Simular salida de cuadro" }));
+ expect(generateSession).toHaveBeenCalledTimes(1);
+ fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"Caminábamos y comprábamos helados"}});
+ fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({text:"Caminábamos y comprábamos helados",request_id:expect.any(String)}),expect.any(AbortSignal));
+ expect(screen.getByRole("log")).toHaveTextContent("Caminábamos y comprábamos helados");
+});
+it("abre mensajes guardados sin gastar otra guía ni pedir otra respuesta al proveedor",async()=>{
+ vi.mocked(getMessages).mockResolvedValue([answer]);
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
+ fireEvent.click(await screen.findByRole("button",{name:"Continuar conversación"}));
+ await screen.findByText(answer.text);
+ expect(getSession).toHaveBeenCalledWith("guide");
+ expect(generateSession).not.toHaveBeenCalled();
+ expect(sendMessage).not.toHaveBeenCalled();
+});
+it("informa un error de Groq y reintenta con el mismo identificador",async()=>{
+ await begin();
+ vi.mocked(sendMessage).mockRejectedValueOnce(new Error("Groq no está disponible"));
+ fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"Me gustaban los helados"}});
+ fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
+ await screen.findByText("Groq no está disponible");
+ const failed=vi.mocked(sendMessage).mock.calls.at(-1)![1];
+ fireEvent.click(screen.getByRole("button",{name:"Reintentar con IA"}));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",failed,expect.any(AbortSignal));
+});
+it("pausa desde un comando transcrito sin esperar al proveedor",async()=>{
+ await begin("Empezar con Ayni");
+ const previous=vi.mocked(sendMessage).mock.calls.length;
+ act(()=>speech.receive?.("Quiero descansar un rato"));
+ expect(screen.getByRole("textbox",{name:"Tu respuesta"})).toBeDisabled();
+ expect(speech.enabled).toBe(false);
+ expect(sendMessage).toHaveBeenCalledTimes(previous);
+});
+it("saves a reaction through the API instead of storing review data in the browser",async()=>{
+ await begin(); expect(speech.enabled).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
+ fireEvent.click(screen.getByRole("button",{name:"Receptivo"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
+ await screen.findByRole("heading",{name:"Reacción guardada en tu familia"});
+ expect(recordReaction).toHaveBeenCalledWith("guide","receptivo");
+});
+it("una captura explícita se envía con consentimiento y muestra detalles detectados",async()=>{
+ await begin("Empezar con Ayni");
+ vi.mocked(sendMessage).mockResolvedValue({...answer,observations:["Árboles y un álbum"]});
+ fireEvent.click(screen.getByRole("button",{name:"Conversar sobre esta imagen"}));
+ await screen.findByText("Árboles y un álbum");
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({image:"data:image/jpeg;base64,test",image_consent:true}),expect.any(AbortSignal));
+});
+it("no inventa una conversación si el backend rechaza una guía vacía",async()=>{
+ vi.mocked(generateSession).mockRejectedValue(new Error("Primero comparte un recuerdo bonito"));
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
+ fireEvent.click(await screen.findByRole("button",{name:"Empezar sin cámara ni micrófono"}));
+ await screen.findByText("Primero comparte un recuerdo bonito");
+ expect(sendMessage).not.toHaveBeenCalled();
+});
+it("aborta una respuesta en curso al pausar e impide que reaparezca",async()=>{
+ await begin();
+ vi.mocked(sendMessage).mockImplementation(()=>new Promise(()=>{}));
+ fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"Otra historia"}});
+ fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
+ const signal=vi.mocked(sendMessage).mock.calls.at(-1)![2];
+ fireEvent.click(screen.getByRole("button",{name:"Pausar"}));
  expect(signal.aborted).toBe(true);
- expect(screen.queryByRole("region", { name: "Conversar con Ayni" })).not.toBeInTheDocument();
- expect(screen.getByText(/salió del cuadro/)).toBeInTheDocument();
- expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+});
+it("permite analizar una foto familiar solo mediante una acción explícita",async()=>{
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["image"],{type:"image/jpeg"}) }));
+ vi.mocked(imageForConversation).mockResolvedValue("data:image/jpeg;base64,photo");
+ await begin();
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
+ await screen.findByRole("button",{name:"Analizar foto con IA"});
+ const previous=vi.mocked(sendMessage).mock.calls.length;
+ expect(vi.mocked(sendMessage).mock.calls.some(([,body])=>Boolean(body.image))).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Analizar foto con IA"}));
+ await waitFor(()=>expect(sendMessage).toHaveBeenCalledTimes(previous+1));
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({image:"data:image/jpeg;base64,photo",image_consent:true}),expect.any(AbortSignal));
 });
 
-it("acts on a spoken request to rest without submitting the transcript", async () => {
- let recognition: FakeRecognition;
- class FakeRecognition {
-   static available = vi.fn().mockResolvedValue("available");
-   processLocally = false;
-   lang = "";
-   start = vi.fn();
-   abort = vi.fn();
-   onresult: ((event: { results: { transcript: string }[][] }) => void) | null = null;
-   constructor() { recognition = this; }
- }
- vi.stubGlobal("SpeechRecognition", FakeRecognition);
- vi.mocked(nextConversationTurn).mockResolvedValue({
-   question_id: "first", question: "¿Qué parte quieres contar?", source: "ai",
- });
+it("keeps the review open and shows the server error if a reaction cannot be saved",async()=>{
  await begin();
- fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
- await screen.findByText("Un paseo agradable.");
- fireEvent.click(screen.getByRole("button", { name: "Conversar" }));
- fireEvent.click(await screen.findByRole("button", { name: "Responder por voz" }));
- await waitFor(() => expect(recognition.start).toHaveBeenCalledOnce());
- expect(recognition!.processLocally).toBe(true);
- act(() => recognition.onresult?.({ results: [[{ transcript: "Quiero descansar un rato" }]] }));
- expect(screen.getByText("Claro, tomemos una pausa.")).toBeInTheDocument();
- expect(recognition!.abort).toHaveBeenCalledOnce();
- expect(nextConversationTurn).toHaveBeenCalledOnce();
+ vi.mocked(recordReaction).mockRejectedValue(new Error("No pudimos guardar la reacción."));
+ fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
+ fireEvent.click(screen.getByRole("button",{name:"Emocionado"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
+ expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar la reacción.");
+ expect(screen.queryByRole("heading",{name:"Reacción guardada en tu familia"})).not.toBeInTheDocument();
 });

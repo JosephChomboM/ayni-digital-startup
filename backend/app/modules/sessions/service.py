@@ -8,6 +8,7 @@ from app.core.errors import ApplicationError
 from app.modules.billing.service import BillingService
 from app.modules.families.service import FamiliesService
 from app.modules.memories.service import MemoriesService
+from app.modules.sessions.assistant import ChatRequest, generate_reply, redact_contacts
 from app.modules.sessions.conversation import (
     ConversationRequest,
     ConversationTurn,
@@ -22,6 +23,7 @@ from app.modules.sessions.schemas import (
     SessionGuide,
     SessionListRequest,
     SessionListResponse,
+    SessionMessageResponse,
     SessionStepResponse,
     SessionSummary,
 )
@@ -100,6 +102,87 @@ class SessionsService:
 
     def _profile(self, actor_id: UUID) -> UUID:
         return self.families.get_elder_profile(actor_id).id
+
+    def _chat_context(self, actor_id: UUID, session_id: UUID) -> list[str]:
+        guide = self.get_session(actor_id, session_id)
+        context = []
+        for step in guide.steps:
+            if not step.source_memory_id:
+                continue
+            if not step.memory_available or not step.memory_id:
+                raise ApplicationError(
+                    code="conversation_context_changed",
+                    status_code=409,
+                    message=(
+                        "Un recuerdo de esta guía dejó de estar disponible. "
+                        "La conversación se oculta para respetar ese cambio."
+                    ),
+                )
+            memory = self.memories.get_memory(actor_id, step.memory_id)
+            if not memory.is_positive or memory.is_sensitive or memory.deletion_pending:
+                raise ApplicationError(
+                    code="conversation_context_changed",
+                    status_code=409,
+                    message="Ese recuerdo ya no está disponible para conversar.",
+                )
+            context.append((memory.title + ": " + (memory.text or "Canción familiar"))[:1800])
+        return context
+
+    def list_messages(self, actor_id: UUID, session_id: UUID) -> list[SessionMessageResponse]:
+        self._chat_context(actor_id, session_id)
+        with self.session.begin():
+            return [
+                SessionMessageResponse.model_validate(item)
+                for item in self.repository.messages(session_id)
+            ]
+
+    def chat(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SessionMessageResponse:
+        context = self._chat_context(actor_id, session_id)
+        with self.session.begin():
+            # Serializa turnos de la misma guía y evita duplicados al reintentar.
+            self.repository.lock_generation(session_id)
+            messages = self.repository.messages(session_id)
+            previous = next(
+                (
+                    item
+                    for item in messages
+                    if item.request_id == data.request_id and item.role == "assistant"
+                ),
+                None,
+            )
+            if previous:
+                return SessionMessageResponse.model_validate(previous)
+            if len(messages) >= 80:
+                raise ApplicationError(
+                    code="conversation_turn_limit",
+                    status_code=409,
+                    message=(
+                        "Ya compartieron una conversación larga. "
+                        "Pueden descansar o volver a sus recuerdos."
+                    ),
+                )
+            reply = generate_reply(
+                data,
+                context=context,
+                history=[{"role": item.role, "content": item.text} for item in messages],
+            )
+            position = len(messages)
+            text = redact_contacts(data.text.strip())
+            if text:
+                self.repository.add_message(
+                    session_id, data.request_id, position=position, role="user", text=text
+                )
+                position += 1
+            record = self.repository.add_message(
+                session_id,
+                data.request_id,
+                position=position,
+                role="assistant",
+                text=reply.message,
+                suggestion=reply.suggestion,
+                observations=reply.observations,
+            )
+            return SessionMessageResponse.model_validate(record)
 
     def converse_about_memory(
         self, actor_id: UUID, memory_id: UUID, data: ConversationRequest

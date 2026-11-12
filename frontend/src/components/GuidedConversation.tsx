@@ -1,279 +1,357 @@
-import { useEffect, useRef, useState } from "react";
-import { Camera, MessageCircle, Mic, Volume2 } from "lucide-react";
-import { nextConversationTurn } from "../api/conversation";
-import type { ConversationTopic, ConversationTurn } from "../api/conversation";
-import { Button } from "./ui/button";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { getMessages, sendMessage, imageForConversation } from "../api/sessions";
+import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
 import { interpretReply, speakLocally } from "./sessionSignals";
-import type { FaceCue } from "./sessionSignals";
+import type { FaceCue, SessionActivity } from "./sessionSignals";
+import { useSessionDictation } from "./useSessionDictation";
+import { Button } from "./ui/button";
 
-const MAX_QUESTIONS = 5;
-const topics = [
-  ["place", "El lugar"],
-  ["activity", "Lo que hicimos"],
-  ["detail", "Otro detalle"],
-] as const;
-
-interface LocalRecognition {
-  processLocally: boolean;
-  lang: string;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  abort: () => void;
-}
-
-type RecognitionClass = {
-  new (): LocalRecognition;
-  available?: (options: { langs: string[]; processLocally: true }) => Promise<string>;
-  install?: (options: { langs: string[]; processLocally: true }) => Promise<boolean>;
-};
-
-function localRecognitionClass() {
-  const speech = window as Window & { SpeechRecognition?: RecognitionClass };
-  return speech.SpeechRecognition?.available ? speech.SpeechRecognition : undefined;
-}
+export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
 interface GuidedConversationProps {
-  memoryId: string;
+  sessionId: string;
+  photo?: Blob;
+  withDevices: boolean;
   title: string;
-  onPause: (message: string, speak: boolean) => void;
-  onNextActivity: () => void;
+  elapsed: string;
+  paused: boolean;
+  activity: ReactNode;
+  onPause: (message: string) => void;
+  onResume: () => void;
+  onNextActivity: (preferred?: SessionActivity) => string;
+  onFinish: (speak: boolean) => void;
 }
 
-export function GuidedConversation({ memoryId, title, onPause, onNextActivity }: GuidedConversationProps) {
-  const [turn, setTurn] = useState<ConversationTurn | null>(null);
-  const [asked, setAsked] = useState<string[]>([]);
+export function GuidedConversation({
+  sessionId, photo, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
+}: GuidedConversationProps) {
+  const [line, setLine] = useState(SESSION_GREETING);
+  const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
+  const nextMessage = useRef(0);
+  const transcript = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const append = (from: "ayni" | "you", text: string) => {
+    const id = nextMessage.current++;
+    setMessages((items) => [...items.slice(-49), { id, from, text }]);
+  };
+  const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [closed, setClosed] = useState(false);
-  const [camera, setCamera] = useState(false);
-  const [readAutomatically, setReadAutomatically] = useState(false);
-  const [needsVoicePack, setNeedsVoicePack] = useState(false);
-  const [installingVoicePack, setInstallingVoicePack] = useState(false);
+  const [sound, setSound] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+  const [camera, setCamera] = useState(withDevices);
+  const [mic, setMic] = useState(withDevices);
+  const [visible, setVisible] = useState(!document.hidden);
+  const [voiceNotice, setVoiceNotice] = useState("");
   const request = useRef<AbortController | null>(null);
-  const microphone = useRef<LocalRecognition | null>(null);
+  const [aiError, setAiError] = useState("");
+  const [suggestion, setSuggestion] = useState("continue");
+  const [observations, setObservations] = useState<string[]>([]);
+  const lastAttempt = useRef<ChatInput | null>(null);
+  const greetingId = useRef(crypto.randomUUID());
   const lastTurnAt = useRef(0);
-  const expressionUsed = useRef(false);
+  const lastExpressionAt = useRef(-Infinity);
+  const waitingForVoice = useRef<string | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
 
-  function stopMicrophone() {
-    const recognition = microphone.current;
-    microphone.current = null;
-    if (!recognition) return;
-    recognition.onresult = null;
-    recognition.onerror = null;
-    recognition.onend = null;
-    recognition.abort();
+  function speak(text: string) {
+    if (!sound || document.hidden) return;
+    if (!speakLocally(text, setSpeaking)) {
+      setSpeaking(false);
+      waitingForVoice.current = text;
+      setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz local en español.");
+    } else {
+      setSpeaking(true);
+      waitingForVoice.current = null;
+      setVoiceNotice("");
+    }
   }
 
-  useEffect(() => {
-    function onVisibilityChange() {
-      if (!document.hidden) return;
-      stopMicrophone();
-      setListening(false);
-      window.speechSynthesis?.cancel();
-    }
+  function show(text: string) {
+    lastTurnAt.current = performance.now();
+    setLine(text);
+    append("ayni", text);
+    speak(text);
+  }
 
-    document.addEventListener("visibilitychange", onVisibilityChange);
+  function cancelTurn() {
+    request.current?.abort();
+    request.current = null;
+    setPending(false);
+  }
+
+  async function follow(text: string, image?: string, cue?: "smile" | "brow", retry?: ChatInput) {
+    if (paused || request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
+    const payload: ChatInput = retry ?? { text, request_id: crypto.randomUUID(), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
+    lastAttempt.current = payload;
+    setPending(true);
+    setAiError("");
+    try {
+      const result = await sendMessage(sessionId, payload, controller.signal);
+      if (controller.signal.aborted) return;
+      setSuggestion(result.suggestion);
+      setObservations(result.observations);
+      show(result.text);
+    } catch (cause) {
+      if (!controller.signal.aborted) setAiError(cause instanceof Error ? cause.message : "La IA no pudo responder. Puedes reintentar.");
+    } finally {
+      if (request.current === controller) { request.current = null; setPending(false); }
+    }
+  }
+
+  function receive(raw: string) {
+    const reply = raw.trim().slice(0, 500);
+    if (!reply || paused || request.current) return;
+    append("you", reply);
+    const intent = interpretReply(reply);
+    if (intent === "end") finish();
+    else if (intent === "pause") pause("Claro, hagamos una pausa. Pulsa Continuar cuando te apetezca.");
+    else if (intent === "next") changeActivity();
+    else if (intent === "photo" || intent === "song" || intent === "anecdote") changeActivity(intent);
+    else void follow(reply);
+  }
+
+  const dictation = useSessionDictation(
+    (reply) => { if (!input.trim()) receive(reply); },
+    mic && !paused && !pending && !speaking && !input.trim() && !aiError,
+  );
+
+  function pause(message: string) {
+    cancelTurn();
+    dictation.cancel();
+    show(message);
+    onPause(message);
+  }
+
+  function finish() {
+    cancelTurn();
+    dictation.cancel();
+    onFinish(sound);
+  }
+
+  function changeActivity(preferred?: SessionActivity) {
+    cancelTurn();
+    dictation.cancel();
+    show(onNextActivity(preferred));
+  }
+
+  function canFollowExpression() {
+    const now = performance.now();
+    return !aiError && !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
+      now - lastTurnAt.current >= 5000 && now - lastExpressionAt.current >= 25_000;
+  }
+
+  function onCameraCue(cue: FaceCue) {
+    // A glance away should never stop the session or switch off the preview.
+    if (cue === "away") return;
+    if (!canFollowExpression()) return;
+    lastExpressionAt.current = performance.now();
+    void follow("", undefined, cue);
+  }
+
+  async function loadConversation(isActive: () => boolean) {
+    heading.current?.focus();
+    try {
+      const saved = await getMessages(sessionId);
+      if (!isActive()) return;
+      if (saved.length) {
+        setMessages(saved.map((item, index) => ({ id: index, from: item.role === "assistant" ? "ayni" : "you", text: item.text })));
+        nextMessage.current = saved.length;
+        const last = saved.filter((item) => item.role === "assistant").at(-1);
+        if (last) { setLine(last.text); setSuggestion(last.suggestion); setObservations(last.observations); }
+      } else {
+        await follow("", undefined, undefined, { text: "", request_id: greetingId.current });
+      }
+    } catch (cause) {
+      if (isActive()) setAiError(cause instanceof Error ? cause.message : "No pudimos recuperar la conversación.");
+    }
+  }
+  const initialize = useEffectEvent(loadConversation);
+
+  useEffect(() => {
+    function onVoicesChanged() {
+      const text = waitingForVoice.current;
+      if (!text || document.hidden || !speakLocally(text, setSpeaking)) return;
+      setSpeaking(true);
+      waitingForVoice.current = null;
+      setVoiceNotice("");
+    }
+    function updateVisibility() {
+      setVisible(!document.hidden);
+      if (document.hidden) {
+        window.speechSynthesis?.cancel();
+        setSpeaking(false);
+      }
+    }
+    document.addEventListener("visibilitychange", updateVisibility);
+    window.speechSynthesis?.addEventListener("voiceschanged", onVoicesChanged);
+    let active = true;
+    void initialize(() => active);
     return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      active = false;
+      document.removeEventListener("visibilitychange", updateVisibility);
       request.current?.abort();
       request.current = null;
-      stopMicrophone();
+      waitingForVoice.current = null;
+      window.speechSynthesis?.removeEventListener("voiceschanged", onVoicesChanged);
       window.speechSynthesis?.cancel();
     };
   }, []);
 
-  async function ask(topic: ConversationTopic, introduction = "") {
-    if (request.current || asked.length >= MAX_QUESTIONS) return;
-    stopMicrophone();
-    window.speechSynthesis?.cancel();
-    setListening(false);
-    setNotice("");
-    setPending(true);
-    const controller = new AbortController();
-    request.current = controller;
-    try {
-      const next = await nextConversationTurn(memoryId, topic, asked, controller.signal);
-      if (controller.signal.aborted) return;
-      lastTurnAt.current = performance.now();
-      setTurn(next);
-      setAsked((previous) => [...previous, next.question_id]);
-      if (introduction) setNotice(introduction);
-      if (readAutomatically && !document.hidden) {
-        speakLocally([introduction, next.question].filter(Boolean).join(" "));
-      }
-    } catch {
-      if (!controller.signal.aborted) {
-        setNotice("No pudimos traer otra pregunta. Pueden volver a intentar o seguir con la guía.");
-      }
-    } finally {
-      if (!controller.signal.aborted) {
-        request.current = null;
-        setPending(false);
-      }
-    }
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!input.trim() || paused || pending || aiError) return;
+    dictation.cancel();
+    receive(input);
+    setInput("");
   }
 
-  function close() {
-    request.current?.abort();
-    request.current = null;
-    stopMicrophone();
-    window.speechSynthesis?.cancel();
-    setClosed(true);
-  }
-
-  function readQuestion() {
-    if (!turn) return;
-    if (!speakLocally(turn.question)) {
-      setNotice("No encontramos una voz en español en este dispositivo. Pueden leer la pregunta en pantalla.");
-    }
-  }
-
-  function canFollowExpression() {
-    return !expressionUsed.current && !!turn && !request.current && !microphone.current &&
-      !window.speechSynthesis?.speaking && performance.now() - lastTurnAt.current >= 4000 &&
-      asked.length < MAX_QUESTIONS;
-  }
-
-  function handleFaceCue(cue: FaceCue) {
-    if (cue === "away") {
-      onPause("La persona salió del cuadro. Podemos retomar cuando esté lista.", readAutomatically);
-      return;
-    }
-    if (!canFollowExpression()) return;
-    expressionUsed.current = true;
-    if (cue === "brow") {
-      void ask("ease", "Tómate tu tiempo. Podemos cambiar de actividad cuando quieras.");
+  function toggleSound() {
+    if (sound) {
+      waitingForVoice.current = null;
+      window.speechSynthesis?.cancel();
+      setSpeaking(false);
+      setSound(false);
     } else {
-      void ask("detail", "Si te apetece, podemos seguir con este recuerdo.");
+      setSound(true);
+      if (speakLocally(line, setSpeaking)) { setSpeaking(true); setVoiceNotice(""); }
+      else setVoiceNotice("Este dispositivo no tiene una voz local en español.");
     }
   }
 
-  async function listenForTopic() {
-    const Recognition = localRecognitionClass();
-    if (!Recognition?.available || microphone.current) return;
-    const recognition = new Recognition();
-    if (!("processLocally" in recognition)) return;
-    microphone.current = recognition;
-    setListening(true);
-    setNotice("");
-    window.speechSynthesis?.cancel();
-    try {
-      recognition.processLocally = true;
-      recognition.lang = "es-ES";
-      const status = await Recognition.available({ langs: [recognition.lang], processLocally: true });
-      if (microphone.current !== recognition) return;
-      if (status !== "available") {
-        const canInstall = status === "downloadable" && !!Recognition.install;
-        setNeedsVoicePack(canInstall);
-        setNotice(canInstall
-          ? "Descarga el paquete de español para responder por voz."
-          : "El dictado local en español no está disponible aquí. Elijan un tema con los botones.");
-        microphone.current = null;
-        setListening(false);
-        return;
-      }
-      recognition.onresult = (event) => {
-        const transcript = event.results[0]?.[0]?.transcript;
-        if (!transcript?.trim()) return;
-        const choice = interpretReply(transcript);
-        if (choice === "end") close();
-        else if (choice === "pause") onPause("Claro, tomemos una pausa.", readAutomatically);
-        else if (choice === "next") onNextActivity();
-        else void ask(choice, choice === "ease" ? "Está bien. Podemos tomarnos nuestro tiempo." : "");
-      };
-      recognition.onerror = () => {
-        stopMicrophone();
-        setListening(false);
-        setNotice("No pudimos escuchar. Pueden elegir el tema con los botones.");
-      };
-      recognition.onend = () => {
-        if (microphone.current === recognition) microphone.current = null;
-        setListening(false);
-      };
-      recognition.start();
-    } catch {
-      if (microphone.current !== recognition) return;
-      microphone.current = null;
-      setListening(false);
-      setNotice("No pudimos activar el micrófono. Pueden elegir el tema con los botones.");
-    }
-  }
+  useEffect(() => {
+    const view = transcript.current;
+    followLatest.current = true;
+    if (view) view.scrollTop = view.scrollHeight;
+  }, [messages, pending]);
 
-  async function installVoicePack() {
-    const Recognition = localRecognitionClass();
-    if (!Recognition?.install || installingVoicePack) return;
-    setInstallingVoicePack(true);
-    try {
-      const ready = await Recognition.install({ langs: ["es-ES"], processLocally: true });
-      setNeedsVoicePack(!ready);
-      setNotice(ready ? "La voz está lista. Pulsa «Responder por voz»." : "La descarga no terminó. Puedes usar los botones.");
-    } catch {
-      setNotice("No pudimos instalar el español. Puedes usar los botones.");
-    } finally {
-      setInstallingVoicePack(false);
-    }
-  }
+  useEffect(() => {
+    const view = transcript.current;
+    if (!view || typeof ResizeObserver === "undefined") return;
+    const resize = new ResizeObserver(() => {
+      if (followLatest.current) view.scrollTop = view.scrollHeight;
+    });
+    resize.observe(view);
+    return () => resize.disconnect();
+  }, []);
 
-  if (closed) return <p role="status" className="text-sm text-slate-600">Gracias por compartir este recuerdo.</p>;
+  const status = paused ? "En pausa" : speaking ? "Ayni está hablando" : pending ? "Ayni está preparando una pregunta" :
+    dictation.error && mic ? "Puedes seguir por escrito" : ({
+      idle: mic ? "Puedes hablar o escribir" : "Escribe para responder",
+      permission: "Esperando permiso del micrófono…",
+      listening: "Te escucho. Habla cuando quieras",
+      recording: "Te estoy escuchando…",
+      loading: "Preparando el dictado en español…",
+      transcribing: "Pasando tu voz a texto…",
+    })[dictation.state];
 
-  return <section aria-label="Conversar con Ayni" className="space-y-4 rounded-xl border border-slate-200 p-4 sm:p-5">
-    <div>
-      <h3 className="font-semibold text-[#264653]">Conversar con Ayni</h3>
-      <p className="mt-1 text-sm text-slate-600">{title}</p>
-    </div>
-    <label className="flex min-h-11 items-center gap-2 text-sm text-[#264653]">
-      <input type="checkbox" checked={readAutomatically} disabled={pending || listening} onChange={(event) => {
-        const enabled = event.target.checked;
-        setReadAutomatically(enabled);
-        if (!enabled) window.speechSynthesis?.cancel();
-        else if (turn) readQuestion();
-      }} />
-      Leer las preguntas en voz alta
-    </label>
-    {!turn && <Button type="button" onClick={() => void ask("start")} disabled={pending} className="w-auto">
-      <MessageCircle className="mr-2 size-4" />Conversar
-    </Button>}
-    {turn && <>
-      <div aria-live="polite">
-        <p className="text-sm text-slate-600">{turn.source === "ai" ? "Pregunta elegida por IA" : "Pregunta de la guía"}</p>
-        <p className="mt-1 text-lg font-medium text-[#264653]">{turn.question}</p>
-      </div>
-      <Button type="button" variant="outline" className="w-auto" onClick={readQuestion} disabled={pending || listening}>
-        <Volume2 className="mr-2 size-4" />Escuchar pregunta
-      </Button>
-      {asked.length < MAX_QUESTIONS && <fieldset className="space-y-2">
-        <legend className="text-sm text-slate-600">¿De qué les gustaría hablar ahora?</legend>
-        <div className="flex flex-wrap gap-2">
-          {topics.map(([topic, label]) => <Button key={topic} type="button" variant="outline" className="w-auto"
-            onClick={() => void ask(topic)} disabled={pending}>{label}</Button>)}
+  return <section aria-label="Sesión con Ayni" className="overflow-hidden rounded-xl border border-[#cddbdc] bg-[#f4faf8]">
+    <header className="flex flex-wrap items-center justify-between gap-3 bg-[#193745] px-4 py-4 text-white sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#e9c46a] text-[#193745]"><Bot aria-hidden="true" className="size-6" /></span>
+        <div>
+          <h2 ref={heading} tabIndex={-1} className="text-xl font-bold leading-tight focus:outline-none">Conversación con Ayni</h2>
+          <p className="mt-1 text-sm tabular-nums text-[#d2e8eb]">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
         </div>
-      </fieldset>}
-      {localRecognitionClass() && <div className="space-y-2">
-        <Button type="button" variant="outline" className="w-auto"
-          onClick={() => void listenForTopic()} disabled={pending || listening || installingVoicePack}>
-          <Mic className="mr-2 size-4" />{listening ? "Te estamos escuchando…" : "Responder por voz"}
-        </Button>
-        {needsVoicePack && <Button type="button" variant="outline" className="w-auto"
-          onClick={() => void installVoicePack()} disabled={installingVoicePack}>
-          {installingVoicePack ? "Descargando español…" : "Descargar español"}
-        </Button>}
-        <p className="text-sm text-slate-600">Puedes contar un detalle, pedir una pausa o decir «otra actividad».</p>
-      </div>}
-      <div className="space-y-2 border-t border-slate-200 pt-3">
-        <Button type="button" variant="outline" className="w-auto" onClick={() => setCamera((enabled) => !enabled)}>
-          <Camera className="mr-2 size-4" />{camera ? "Apagar cámara" : "Activar cámara"}
-        </Button>
-        {camera
-          ? <SessionCamera onCue={handleFaceCue} canFollowExpression={canFollowExpression} />
-          : <p className="text-sm text-slate-600">Con su permiso, la cámara ayuda a ajustar el ritmo. El video se procesa en este dispositivo.</p>}
       </div>
-    </>}
-    {pending && <p role="status" className="text-sm text-slate-600">Buscando una pregunta…</p>}
-    {notice && <p role="status" className="text-sm text-slate-700">{notice}</p>}
-    {(turn || pending) && <Button type="button" variant="outline" className="w-auto" onClick={close}>Terminar conversación</Button>}
+      <div className="flex items-center gap-1">
+        <button type="button" title={sound ? "Silenciar a Ayni" : "Activar voz"} aria-label={sound ? "Silenciar a Ayni" : "Activar voz"}
+          className="grid size-11 place-items-center rounded-md text-white hover:bg-white/15" onClick={toggleSound}>
+          {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+        </button>
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={() => {
+          if (paused) { onResume(); show("Seguimos a tu ritmo. ¿Qué te gustaría contar ahora?"); }
+          else pause("Hagamos una pausa. Seguimos cuando quieras.");
+        }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</button>
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={finish}><Square className="size-4" />Terminar</button>
+      </div>
+    </header>
+
+    <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
+      <aside className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#cddbdc] px-4 py-3 md:col-start-2 md:row-span-2 md:row-start-1 md:block md:border-b-0 md:border-l md:px-5 md:py-5" aria-label="Cámara y recuerdo">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="font-bold text-[#264653]">Tu cámara</h3>
+            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
+              className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#264653] hover:bg-[#e8f5e9]" disabled={paused}
+              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
+          </div>
+          {camera && !paused && visible ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)} /> :
+            <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
+        </div>
+        <div className="my-3 flex flex-wrap gap-2">
+          <button type="button" disabled={paused || pending} onClick={() => changeActivity()} className="min-h-11 rounded-lg border px-3 text-sm">Cambiar actividad</button>
+          {photo && <button type="button" disabled={paused || pending} className="min-h-11 rounded-lg border px-3 text-sm" onClick={async () => {
+            try { await follow("Exploremos juntos esta foto familiar.", await imageForConversation(photo)); }
+            catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
+          }}>Analizar foto con IA</button>}
+        </div>
+        {photo && <p className="text-xs">Al analizar, compartes esta foto con Groq para conversar sobre sus detalles visibles.</p>}
+        {observations.length > 0 && <div className="my-3 text-sm"><strong>Detalles que observó Ayni:</strong><ul className="list-inside list-disc">{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
+        {activity && <details key={title} className="min-w-0 md:mt-3 md:border-t md:border-[#cddbdc] md:pt-3" open>
+          <summary className="cursor-pointer break-words font-semibold text-[#264653]">{title}</summary>
+          {activity}
+        </details>}
+      </aside>
+
+      <div ref={transcript} role="log" aria-label="Mensajes de la conversación" tabIndex={0}
+        onScroll={({ currentTarget: view }) => {
+          followLatest.current = view.scrollHeight - view.scrollTop - view.clientHeight < 24;
+        }}
+        className="h-[clamp(13rem,36dvh,28rem)] md:h-[clamp(16rem,49dvh,30rem)] min-w-0 space-y-3 sm:space-y-5 overflow-y-auto bg-white px-4 py-5 focus-visible:outline-offset-[-3px] sm:px-6 md:col-start-1 md:row-start-1">
+        {messages.map(({ id, from, text }) => <div key={id} className={from === "you" ? "flex justify-end" : "flex"}>
+          <div className={`max-w-[88%] rounded-xl px-4 py-3 text-[#193745] ${from === "you" ? "bg-[#e6f0f4]" : "bg-[#edf6ef]"}`}>
+            <p className="text-sm font-bold">{from === "ayni" ? "Ayni" : "Tú"}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
+          </div>
+        </div>)}
+        {aiError && <div role="alert" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+          <p>{aiError}</p>
+          <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
+            const attempt = lastAttempt.current;
+            if (attempt) void follow(attempt.text, attempt.image, attempt.cue, attempt);
+            else void loadConversation(() => true);
+          }}>Reintentar con IA</button>
+          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); lastAttempt.current = null; }}>Seguir con otra pregunta</button>
+        </div>}
+        {!aiError && suggestion !== "continue" && <div className="rounded-lg bg-sky-50 p-3 text-sm">
+          <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
+          <button type="button" className="min-h-11 font-semibold underline" onClick={() => pause("La sesión está en pausa. Continúen cuando quieran.")}>Hacer una pausa</button>
+          <button type="button" className="ml-3 min-h-11 font-semibold underline" onClick={() => changeActivity()}>Cambiar actividad</button>
+        </div>}
+        {pending && <p className="text-sm text-[#435d60]">Ayni está preparando una pregunta…</p>}
+      </div>
+
+      <form onSubmit={submit} className="min-w-0 space-y-2 border-t border-[#cddbdc] bg-white px-4 py-3 sm:px-6 md:col-start-1 md:row-start-2">
+        <div role="status" className="flex min-h-6 items-center gap-2 text-sm font-semibold text-[#264653]">
+          <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
+        </div>
+        <div className="flex items-end gap-2">
+          <label htmlFor="session-reply" className="sr-only">Tu respuesta</label>
+          <textarea id="session-reply" maxLength={500} rows={1} value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-[#a9bfc0] px-3 py-2.5 text-base text-[#264653] placeholder:text-[#536c70] focus-visible:outline-2 focus-visible:outline-[#2c5f7c]"
+            placeholder="Escribe tu respuesta…" disabled={paused} />
+          <button type="button" aria-label={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"} title={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"}
+            className="grid size-11 shrink-0 place-items-center rounded-md border border-[#a9bfc0] text-[#264653] hover:bg-[#edf6ef]" disabled={paused}
+            onClick={() => {
+              if (dictation.error) { dictation.retry(); setMic(true); }
+              else setMic(!mic);
+            }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
+          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending || Boolean(aiError)} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
+        </div>
+        {(voiceNotice || (mic && dictation.error)) && <p role="status" className="text-sm text-[#435d60]">{(mic && dictation.error) || voiceNotice}</p>}
+      </form>
+    </div>
   </section>;
 }

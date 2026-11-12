@@ -7,6 +7,8 @@ describe("spoken session preferences", () => {
     ["No estoy cansado, sigamos", "detail"],
     ["No quiero seguir", "end"],
     ["Pasemos a otra actividad", "next"],
+    ["Quiero escuchar música", "song"],
+    ["Quiero ver una foto", "photo"],
     ["No me acuerdo de ese lugar", "ease"],
     ["Fuimos al parque", "place"],
     ["Ese día bailamos juntos", "activity"],

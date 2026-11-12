@@ -1,21 +1,28 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Clock3, ImagePlus, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Bot, Check, Play, RotateCcw } from "lucide-react";
 import type { User } from "../api/auth";
-import { ApiError } from "../api/client";
-import { getMemory, memoryErrorMessage } from "../api/memories";
+import { listMemories, getMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
 import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
-import type { Reaction, SessionGuide as SavedGuide, SessionSummary } from "../api/sessions";
+import type { Reaction, SavedSession, SessionSummary } from "../api/sessions";
 import { GuidedConversation } from "./GuidedConversation";
 import { speakLocally } from "./sessionSignals";
+import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Progress } from "./ui/progress";
 
-interface SessionGuideProps { currentUser: User; onOpenMemories: () => void }
-const reactions: Array<[Reaction, string]> = [["receptivo", "Receptivo"], ["emocionado", "Emocionado"], ["indiferente", "Indiferente"], ["agitado", "Agitado"]];
+interface SessionGuideProps {
+  currentUser: User;
+  onOpenMemories: () => void;
+}
+
+const reactions: Array<[Reaction, string]> = [
+  ["receptivo", "Receptivo"], ["emocionado", "Emocionado"],
+  ["indiferente", "Indiferente"], ["agitado", "Agitado"],
+];
+
 function playerUrl(value: string | null): string | null {
   if (!value) return null;
   try {
@@ -38,71 +45,95 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainder}`;
 }
 
+export function SessionGuide(props: SessionGuideProps) {
+  return <PersistedSessionGuide key={`${props.currentUser.id}:${props.currentUser.family_id}`} {...props} />;
+}
 
-export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps) {
-  const [guide, setGuide] = useState<SavedGuide | null>(null);
+function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProps) {
+  const [guide, setGuide] = useState<SavedSession | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>([]);
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [historyAttempt, setHistoryAttempt] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [contentError, setContentError] = useState("");
-  const [contentAttempt, setContentAttempt] = useState(0);
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    listSessions(10, offset).then((page) => {
+      if (active) { setHistory(page.items); setTotal(page.total); setHistoryError(""); }
+    }).catch((cause: unknown) => { if (active) setHistoryError(cause instanceof Error ? cause.message : "No pudimos cargar el historial."); })
+      .finally(() => { if (active) setHistoryLoading(false); });
+    return () => { active = false; };
+  }, [offset, revision]);
+  const refreshHistory = (next = offset) => { setHistoryLoading(true); setOffset(next); setRevision((value) => value + 1); };
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [photos, setPhotos] = useState<MemoryPhoto[]>([]);
+  const [photoBlob, setPhotoBlob] = useState<Blob>();
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [anecdoteId, setAnecdoteId] = useState("");
+  const [songId, setSongId] = useState("");
+  const [withDevices, setWithDevices] = useState(false);
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [adaptivePause, setAdaptivePause] = useState<{ message: string; speak: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [step, setStep] = useState(0);
+  const [activity, setActivity] = useState<SessionActivity>();
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewVoice, setReviewVoice] = useState(false);
   const [reaction, setReaction] = useState<Reaction | null>(null);
+  const [reactionSaved, setReactionSaved] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [saved, setSaved] = useState(false);
-  const guideId = guide?.id;
+
+  const songs = useMemo(() => memories.filter((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive), [memories]);
+  const anecdotes = useMemo(() => memories.filter((memory) =>
+    memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive), [memories]);
+  const selectedSong = songs.find((memory) => memory.id === songId) ?? songs[0];
+  const selectedAnecdote = anecdotes.find((memory) => memory.id === anecdoteId) ?? anecdotes[0];
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    listSessions(20, offset).then((page) => {
-      if (active) { setHistory(page.items); setTotal(page.total); setError(""); }
-    }).catch((reason: unknown) => { if (active) setError(memoryErrorMessage(reason)); })
-      .finally(() => { if (active) setLoading(false); });
+    listMemories({ include_sensitive: false, limit: 50, offset: 0 }).then(async (response) => {
+      if (!active) return;
+      setMemories(response.items);
+      const eligible = response.items.filter((memory) => memory.is_positive && !memory.is_sensitive);
+      const photoPages = await Promise.allSettled(eligible.map((memory) => listPhotos(memory.id)));
+      if (!active) return;
+      setPhotos(photoPages.flatMap((result) => result.status === "fulfilled" ? result.value : []));
+      const firstAnecdote = response.items.find((memory) => memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive);
+      if (firstAnecdote) setAnecdoteId(firstAnecdote.id);
+      const firstSong = response.items.find((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive);
+      if (firstSong) setSongId(firstSong.id);
+      setLoadError("");
+    }).catch((error: unknown) => {
+      if (active) setLoadError(error instanceof Error ? error.message : "No pudimos cargar los recuerdos.");
+    }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [currentUser.family_id, offset, historyAttempt]);
+  }, [currentUser.family_id]);
 
   useEffect(() => {
-    if (!guideId) return;
-    let active = true;
-    async function refreshContent() {
-      try {
-        const fresh = await getSession(guideId!);
-        const ids = [...new Set(fresh.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
-        const candidates = await Promise.all(ids.map(async (id) => {
-          try { return await getMemory(id); }
-          catch (reason) { if (reason instanceof ApiError && reason.code === "memory_not_found") return null; throw reason; }
-        }));
-        const safe = candidates.filter((item): item is Memory => item !== null && item.is_positive && !item.is_sensitive && !item.deletion_pending);
-        const groups = await Promise.all(safe.map(async (memory) => {
-          try { return await listPhotos(memory.id); }
-          catch (reason) {
-            if (reason instanceof ApiError && reason.status === 401) throw reason;
-            if (active) setContentError(memoryErrorMessage(reason));
-            return [];
-          }
-        }));
-        if (active) { setGuide(fresh); setMemories(safe); setPhotos(groups.flat()); }
-      } catch (reason) {
-        if (active) { setMemories([]); setPhotos([]); setContentError(memoryErrorMessage(reason)); }
-      }
-    }
-    setContentError("");
-    void refreshContent();
-    const renewal = window.setInterval(() => { void refreshContent(); }, 4 * 60 * 1000);
-    return () => { active = false; window.clearInterval(renewal); };
-  }, [guideId, contentAttempt]);
+    const currentPhoto = photos[photoIndex % Math.max(photos.length, 1)];
+    if (activity !== "photo" || !currentPhoto) { setPhotoBlob(undefined); return; }
+    const controller = new AbortController();
+    fetch(currentPhoto.url, { signal: controller.signal })
+      .then((response) => { if (!response.ok) throw new Error("No se pudo cargar la foto."); return response.blob(); })
+      .then((blob) => { if (!controller.signal.aborted) setPhotoBlob(blob); })
+      .catch(() => { if (!controller.signal.aborted) setPhotoBlob(undefined); });
+    return () => controller.abort();
+  }, [activity, photoIndex, photos]);
+
+  useEffect(() => {
+    if (!started || !memories.length) return;
+    const refresh = () => {
+      Promise.allSettled(memories.map((memory) => listPhotos(memory.id)))
+        .then((pages) => setPhotos(pages.flatMap((page) => page.status === "fulfilled" ? page.value : [])));
+    };
+    const timer = window.setInterval(refresh, 4 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [started, memories]);
 
   useEffect(() => {
     if (!started || paused) return;
@@ -111,100 +142,167 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   }, [started, paused]);
 
   useEffect(() => {
-    if (!paused || !adaptivePause?.speak) return;
-    speakLocally(adaptivePause.message);
+    if (!reviewOpen || !reviewVoice) return;
+    speakLocally("Gracias por compartir este momento conmigo. Si quieren, pueden contar cómo les fue.");
     return () => window.speechSynthesis?.cancel();
-  }, [paused, adaptivePause]);
+  }, [reviewOpen, reviewVoice]);
 
-  async function begin(existingId?: string) {
-    setBusy(true); setError("");
+  const availableActivities: SessionActivity[] = [];
+  if (selectedAnecdote) availableActivities.push("anecdote");
+  if (photos.length) availableActivities.push("photo");
+  if (selectedSong) availableActivities.push("song");
+
+  async function begin(devices: boolean, id?: string) {
+    if (busy) return;
+    setBusy(true);
+    setLoadError("");
     try {
-      const record = existingId ? await getSession(existingId) : await generateSession();
-      const response = existingId ? await getRecordedReaction(existingId) : null;
-      setGuide(record); setReaction(response?.reaction ?? null); setSaved(response !== null);
-      setStarted(true); setPaused(false); setAdaptivePause(null); setElapsed(0); setStep(0); setPhotoIndex(0); setReviewOpen(false);
-    } catch (reason) { setError(memoryErrorMessage(reason)); }
+      const saved = id ? await getSession(id) : await generateSession();
+      setGuide(saved);
+      refreshHistory(0);
+      const ids = [...new Set(saved.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
+      const results = await Promise.allSettled(ids.map(getMemory));
+      const allowed = results.flatMap((result) => result.status === "fulfilled" && result.value.is_positive && !result.value.is_sensitive && result.value.elder_profile_id === saved.elder_profile_id ? [result.value] : []);
+      const photoResults = await Promise.allSettled(allowed.map((memory) => listPhotos(memory.id)));
+      const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+      const previousReaction = await getRecordedReaction(saved.id);
+      setMemories(allowed);
+      setPhotos(sessionPhotos);
+      setAnecdoteId(allowed.find((item) => item.type === "anecdote")?.id ?? "");
+      setSongId(allowed.find((item) => item.type === "song")?.id ?? "");
+      setActivity(allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
+      setWithDevices(devices);
+      setPhotoIndex(0);
+      setStarted(true);
+      setPaused(false);
+      setElapsed(0);
+      setReviewOpen(false);
+      setSaved(false);
+      setReaction(previousReaction?.reaction ?? null);
+      setReactionSaved(Boolean(previousReaction));
+      setReviewError("");
+    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos abrir la guía."); }
     finally { setBusy(false); }
   }
 
-  async function saveReview() {
-    if (!guide || !reaction || busy || saved) return;
-    setBusy(true); setError("");
-    try { const result = await recordReaction(guide.id, reaction); setReaction(result.reaction); setSaved(true); }
-    catch (reason) { setError(memoryErrorMessage(reason)); }
-    finally { setBusy(false); }
+  function finish(speak: boolean) {
+    setStarted(false);
+    setPaused(false);
+    setReviewVoice(speak);
+    setSaved(reactionSaved);
+    setReviewOpen(true);
   }
 
-  function returnToHistory() {
-    setStarted(false); setReviewOpen(false); setElapsed(0); setGuide(null);
-    setHistoryAttempt((value) => value + 1);
+  function nextActivity(preferred?: SessionActivity): string {
+    if (preferred && !availableActivities.includes(preferred)) {
+      return "Ese recuerdo todavía no está disponible aquí. ¿Quieres que sigamos con lo que tenemos?";
+    }
+    const index = activity ? availableActivities.indexOf(activity) : -1;
+    const next = preferred ?? (availableActivities.length
+      ? availableActivities[(index + 1) % availableActivities.length]
+      : undefined);
+    setActivity(next);
+    if (next === "photo") {
+      if (activity === "photo") setPhotoIndex((value) => (value + 1) % photos.length);
+      return "Miremos una foto juntos. ¿Qué detalle te llama la atención?";
+    }
+    if (next === "song") return "Pasemos a la canción. Puedes ponerla cuando quieras. ¿En qué momento solías escucharla?";
+    if (next === "anecdote") return "Hablemos de la anécdota. ¿Qué parte te gustaría contar?";
+    return "Podemos pensar en otro día bonito. ¿Qué te gustaría compartir?";
   }
 
-  const currentStep = guide?.steps[step];
-  const memory = memories.find((item) => item.id === currentStep?.memory_id);
-  const stepPhotos = memory ? photos.filter((photo) => photo.memory_id === memory.id) : [];
-  const duration = (guide?.duration_minutes ?? 15) * 60;
+  const saveReview = async () => {
+    if (!guide || !reaction || reactionSaved || busy) return;
+    setBusy(true);
+    setReviewError("");
+    try {
+      await recordReaction(guide.id, reaction);
+      setReactionSaved(true);
+      setSaved(true);
+    } catch (cause) {
+      setReviewError(cause instanceof Error ? cause.message : "No pudimos guardar la reacción.");
+    } finally { setBusy(false); }
+  };
 
-  return <Card className="overflow-hidden border-0 bg-white shadow-none">
-    <CardHeader className="px-0 pb-5">
-      <p className="text-sm font-semibold text-[#e76f51]">Un momento en familia</p>
-      <CardTitle className="text-2xl font-semibold text-[#2c5f7c]">Guía de sesión</CardTitle>
-      <CardDescription className="max-w-2xl text-sm leading-relaxed text-slate-600">Guías y reacciones compartidas con tu familia. Pueden saltar preguntas, cambiar de tema o detenerse cuando quieran.</CardDescription>
-    </CardHeader>
+  const activityTitle = activity === "anecdote" ? selectedAnecdote?.title :
+    activity === "photo" ? "Foto familiar" : selectedSong?.title;
+  const activityContent = activity === "anecdote" ? (
+    <p className="mt-2 break-words text-sm leading-relaxed text-slate-700">{selectedAnecdote?.text}</p>
+  ) : activity === "photo" && photos.length ? (
+    <PhotoCarousel photos={photos} index={photoIndex} onChange={setPhotoIndex} />
+  ) : activity === "song" && selectedSong && !paused ? <MusicPlayer memory={selectedSong} /> : null;
+
+  return <Card className="border-0 bg-white shadow-none">
+    {!started && <CardHeader className="px-0 pb-5">
+      <CardTitle className="text-2xl font-bold text-[#264653]">Guía de sesión</CardTitle>
+      <CardDescription className="max-w-2xl text-base text-slate-600">Conversen a su ritmo con la ayuda de Ayni.</CardDescription>
+    </CardHeader>}
     <CardContent className="space-y-6 px-0">
-      {error && <div role="alert" className="py-3 text-sm text-red-700">{error}</div>}
-      {!started && !reviewOpen && <>
-        <section className="space-y-4" aria-labelledby="prepare-session">
-          <div><h2 id="prepare-session" className="text-lg font-semibold text-[#264653]">Preparen el momento</h2><p className="mt-1 text-sm text-slate-600">Ayni preparará una guía de 15 minutos con hasta tres recuerdos bonitos que no estén marcados como temas delicados.</p></div>
-          <p className="text-sm text-slate-600">La guía se guarda en tu familia. En el plan gratis puedes preparar una nueva cada siete días; abrir una guardada no consume otra guía.</p>
-          <div className="flex flex-wrap gap-3"><Button onClick={() => { void begin(); }} disabled={busy || loading} variant="secondary" className="w-auto px-5">{busy ? "Preparando guía…" : "Comenzar cuando estén listos"}</Button><Button variant="outline" onClick={onOpenMemories} className="w-auto"><ImagePlus className="mr-2 size-4" />Ver recuerdos</Button></div>
-        </section>
-        <section className="space-y-4 border-t border-slate-200 pt-5" aria-label="Historial de guías">
-          <h2 className="text-lg font-semibold text-[#264653]">Guías guardadas</h2>
-          {loading ? <p role="status">Cargando historial…</p> : !history.length ? <p className="text-sm text-slate-600">Todavía no hay guías en esta página.</p> : <ul className="divide-y divide-slate-100">{history.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><time dateTime={item.created_at} className="text-sm font-medium text-[#264653]">{new Date(item.created_at).toLocaleString("es-PE")}</time><p className="text-xs text-slate-500">Duración sugerida: {item.duration_minutes} minutos</p></div><Button variant="outline" disabled={busy} onClick={() => { void begin(item.id); }} className="w-auto">Abrir guía</Button></li>)}</ul>}
-          <div className="flex flex-wrap items-center gap-3"><Button variant="outline" className="w-auto" disabled={loading || busy || offset === 0} onClick={() => setOffset((value) => Math.max(0, value - 20))}>Anterior</Button><span className="text-sm text-slate-500">{total} guías guardadas</span><Button variant="outline" className="w-auto" disabled={loading || busy || offset + 20 >= total} onClick={() => setOffset((value) => value + 20)}>Siguiente</Button><button onClick={() => setHistoryAttempt((value) => value + 1)} disabled={loading || busy} className="text-sm font-semibold text-[#2c5f7c] underline">Actualizar historial</button></div>
-        </section>
-      </>}
-
-      {started && guide && currentStep && <section className="space-y-5" aria-live="polite">
-        <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-[#e76f51]">Paso {step + 1} de {guide.steps.length}</p><h2 className="text-xl font-semibold text-[#2c5f7c]">{memory?.title ?? "Un momento para compartir"}</h2></div><div className="flex items-center gap-2 text-sm font-medium text-slate-600"><Clock3 className="size-4 text-[#2c5f7c]" />{formatTime(elapsed)} / {formatTime(duration)}</div></div>
-        <Progress value={Math.min(100, elapsed / duration * 100)} className="h-1.5" />
-        <p className="text-base leading-relaxed text-slate-700">{currentStep.instruction}</p>
-        <p className="text-xs text-slate-500">Tiempo sugerido para este paso: {currentStep.duration_minutes} minutos.</p>
-        {currentStep.source_memory_id && !memory && <p role="status" className="text-sm text-slate-600">Este recuerdo ya no está disponible para la guía. Pueden continuar con el siguiente paso.</p>}
-        {memory?.type === "anecdote" && <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-700">{memory.text}</p>}
-        {memory?.type === "song" && <MusicPlayer memory={memory} />}
-        {stepPhotos.length > 0 && <PhotoCarousel photos={stepPhotos} index={photoIndex} onChange={setPhotoIndex} />}
-        {contentError && <div role="alert" className="text-sm text-amber-900"><p>{contentError}</p><button className="mt-2 font-semibold underline" onClick={() => setContentAttempt((value) => value + 1)}>Actualizar recuerdos y fotos</button></div>}
-        {memory?.type === "anecdote" && !paused && <GuidedConversation
-          key={memory.id} memoryId={memory.id} title={memory.title}
-          onPause={(message, speak) => { setAdaptivePause({ message, speak }); setPaused(true); }}
-          onNextActivity={() => { setStep((value) => Math.min(guide.steps.length - 1, value + 1)); setPhotoIndex(0); }}
-        />}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2"><div className="flex gap-2"><Button variant="outline" disabled={paused || step === 0} onClick={() => { setStep((value) => value - 1); setPhotoIndex(0); }} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>{step < guide.steps.length - 1 && <Button variant="outline" disabled={paused} onClick={() => { setStep((value) => value + 1); setPhotoIndex(0); }} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}</div><div className="flex gap-2"><Button variant="outline" onClick={() => { setAdaptivePause(null); setPaused((value) => !value); }} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button><Button variant="secondary" onClick={() => { setStarted(false); setReviewOpen(true); }} className="w-auto"><Square className="mr-2 size-4" />Terminar</Button></div></div>
-        {paused && <p role="status" className="text-sm text-slate-500">{adaptivePause?.message ?? "La sesión está en pausa. No hay apuro para continuar."}</p>}
-        {elapsed >= duration && <p role="status" className="text-sm text-slate-600">Pueden cerrar la actividad cuando quieran.</p>}
+      {loadError && <p role="alert" className="text-sm text-red-700">{loadError}</p>}
+      {!started && !reviewOpen && <section aria-labelledby="prepare-session" className="max-w-2xl rounded-xl border border-slate-200 bg-[#f5faf8] p-5 sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-[#193745] text-[#f4d784]"><Bot aria-hidden="true" className="size-6" /></div>
+          <div>
+            <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
+            <p className="mt-1 text-base text-slate-700">Te haré una pregunta y esperaré tu respuesta. Puedes hablar o escribir a tu ritmo.</p>
+          </div>
+        </div>
+        {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="mt-5 space-y-4">
+          <p className="text-sm text-slate-700">Ayni usará los recuerdos positivos de esta guía y recordará lo que compartan durante la conversación.</p>
+          <button type="button" onClick={onOpenMemories} className="min-h-11 text-sm font-semibold underline">Agregar o revisar mis recuerdos</button>
+          <p className="text-sm text-slate-600">Groq recibe el texto de sus respuestas y los recuerdos necesarios para responder. Los mensajes se guardan en el historial familiar. Una foto o captura solo se comparte al pulsar Analizar.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" disabled={busy} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
+          </div>
+          <p className="text-sm text-slate-600">Al empezar, tu navegador pedirá permiso para usar la cámara y el micrófono. El dictado y el seguimiento facial se procesan en este dispositivo. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
+        </div>}
       </section>}
+      {!started && !reviewOpen && <section className="space-y-3" aria-labelledby="saved-guides">
+        <h2 id="saved-guides" className="text-lg font-semibold">Mis guías y conversaciones</h2>
+        {historyLoading ? <p role="status">Cargando historial…</p> : historyError ? <div role="alert"><p>{historyError}</p><Button variant="outline" onClick={() => refreshHistory()}>Reintentar historial</Button></div> : <>
+          {total === 0 && <p className="text-sm">Tu primera guía y conversación aparecerán aquí.</p>}
+          <ul className="space-y-2">{history.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+            <span>Guía del {new Date(item.created_at).toLocaleString("es-PE")} · {item.duration_minutes} minutos</span>
+            <Button variant="outline" disabled={busy} onClick={() => void begin(false, item.id)}>Continuar conversación</Button>
+          </li>)}</ul>
+          {total > 10 && <nav aria-label="Páginas del historial" className="flex flex-wrap gap-3"><Button variant="outline" disabled={offset === 0 || busy} onClick={() => refreshHistory(Math.max(0, offset - 10))}>Página anterior</Button><Button variant="outline" disabled={offset + 10 >= total || busy} onClick={() => refreshHistory(offset + 10)}>Página siguiente</Button></nav>}
+        </>}
+      </section>}
+      {started && guide && <GuidedConversation
+        key={guide.id}
+        sessionId={guide.id}
+        photo={activity === "photo" ? photoBlob : undefined}
+        withDevices={withDevices}
+        title={activityTitle ?? "Recuerdo familiar"}
+        elapsed={formatTime(elapsed)}
+        paused={paused}
+        activity={activityContent}
+        onPause={() => setPaused(true)}
+        onResume={() => setPaused(false)}
+        onNextActivity={nextActivity}
+        onFinish={finish}
+      />}
+      {started && <Button variant="outline" onClick={() => { setStarted(false); refreshHistory(); }}>Volver al historial</Button>}
 
       {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
-        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo les fue?</h2><p className="mt-1 text-sm text-slate-600">Elige lo que observaste durante el momento compartido.</p></div>
-        <fieldset className="space-y-2" disabled={busy}><legend className="text-sm font-medium text-[#264653]">¿Cómo reaccionó tu familiar?</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
-        <div className="flex flex-wrap gap-3"><Button disabled={!reaction || busy} onClick={() => { void saveReview(); }} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando reacción…" : "Guardar reacción"}</Button><Button variant="outline" disabled={busy} onClick={returnToHistory} className="w-auto">Omitir por ahora</Button></div>
+        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
+        <fieldset className="space-y-2" disabled={busy || reactionSaved}><legend className="text-sm font-medium text-[#264653]">Elige una reacción</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
+        {reviewError && <p role="alert" className="text-sm text-red-700">{reviewError}</p>}
+        <div className="flex flex-wrap gap-3"><Button disabled={!reaction || busy || reactionSaved} onClick={() => void saveReview()} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando reacción…" : reactionSaved ? "Reacción ya guardada" : "Guardar reacción"}</Button><Button variant="outline" disabled={busy} onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir por ahora</Button></div>
       </section>}
-      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">{reactions.find(([value]) => value === reaction)?.[1]}. Puedes consultarla al volver a abrir esta guía.</p><Button variant="outline" onClick={returnToHistory} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
-      <p className="text-xs text-slate-500">Esto no es un diagnóstico. Es un registro de actividades familiares.</p>
+
+      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
     </CardContent>
   </Card>;
 }
 
-function PhotoCarousel({ photos, index, onChange }: { photos: MemoryPhoto[]; index: number; onChange: (index: number) => void }) {
+function PhotoCarousel({ photos, index, onChange, large = false }: { photos: MemoryPhoto[]; index: number; onChange: (index: number) => void; large?: boolean }) {
   const photo = photos[index % photos.length];
-  const [failed, setFailed] = useState(false);
-  useEffect(() => { setFailed(false); }, [photo?.url]);
   if (!photo) return null;
-  return <figure className="mt-3 max-w-2xl">
-    {!failed ? <img src={photo.url} alt="Foto del recuerdo familiar" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="max-h-[420px] w-full rounded-lg object-cover" /> : <p className="text-sm text-slate-600">La foto no está disponible. Las imágenes se actualizan automáticamente cada cuatro minutos.</p>}
-    <figcaption className="mt-2 text-xs text-slate-600">Foto {index % photos.length + 1} de {photos.length}</figcaption>
+  return <figure className={`mt-3 ${large ? "max-w-2xl" : "max-w-sm"}`}>
+    <img src={photo.url} alt="Foto familiar" className={`w-full rounded-lg object-cover ${large ? "max-h-[420px]" : "aspect-video"}`} />
+    <figcaption className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-600"><span className="truncate">Foto familiar</span><span>{index + 1} / {photos.length}</span></figcaption>
     {photos.length > 1 && <div className="mt-2 flex gap-2"><button type="button" onClick={() => onChange((index - 1 + photos.length) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Foto anterior"><ArrowLeft className="size-4" /></button><button type="button" onClick={() => onChange((index + 1) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Siguiente foto"><ArrowRight className="size-4" /></button></div>}
   </figure>;
 }
