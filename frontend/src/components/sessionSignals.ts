@@ -9,7 +9,7 @@ export function requestsVisualContext(text: string): boolean {
   return /\b(?:mira|mire|miren|observa|fijate|veamos)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:aca|aqui|esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
     /\b(?:te muestro|te estoy mostrando|que ves|que es lo que ves)\b/.test(phrase) ||
     /\b(?:describe|describeme|analiza|puedes ver|alcanzas a ver)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
-    /\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
+    /\b(?:que (?:hay|aparece|se ve)|de que color es)\b[^.?!]*\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
 }
 
 export function interpretReply(transcript: string): SpokenChoice {
@@ -69,8 +69,10 @@ export function createFaceCueTracker() {
 
 export function spanishVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   const score = (voice: SpeechSynthesisVoice) =>
-    (/natural|neural|premium|enhanced|mejorada/i.test(voice.name) ? 100 : 0) +
-    (/^es-PE$/i.test(voice.lang) ? 40 : /^es-(MX|US|CO|CL|AR)/i.test(voice.lang) ? 30 : 0);
+    (/natural|neural|premium|enhanced|mejorada|alta calidad/i.test(voice.name) ? 100 : 0) +
+    (/^es-PE$/i.test(voice.lang) ? 40 : /^es-(MX|US|CO|CL|AR)/i.test(voice.lang) ? 30 : 0) -
+    (/^(?:paulina|m[oó]nica)\b/i.test(voice.name) ? 12 : 0) -
+    (/espeak|compact|robot|^(?:eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i.test(voice.name) ? 60 : 0);
   return voices.filter((voice) => voice.localService && /^es(?:-|$)/i.test(voice.lang))
     .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
 }
@@ -84,7 +86,8 @@ export function speakLocally(text: string, onSpeaking?: (speaking: boolean) => v
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.voice = voice;
   utterance.lang = voice.lang;
-  utterance.rate = 0.95;
+  utterance.rate = 0.92;
+  utterance.pitch = 1;
   if (onSpeaking) {
     utterance.onstart = () => onSpeaking(true);
     utterance.onend = () => onSpeaking(false);

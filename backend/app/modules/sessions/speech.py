@@ -85,8 +85,7 @@ def transcribe_audio(data: AudioRequest) -> Transcript:
                     code="audio_not_understood",
                     status_code=422,
                     message=(
-                        "No te entendí bien. "
-                        "¿Puedes repetirlo un poco más cerca del micrófono?"
+                        "No te entendí bien. ¿Puedes repetirlo un poco más cerca del micrófono?"
                     ),
                 )
             return Transcript(text=text)

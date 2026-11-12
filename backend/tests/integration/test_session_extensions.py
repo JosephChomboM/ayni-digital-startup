@@ -213,6 +213,14 @@ def test_chat_keeps_visual_details_with_their_original_turn(
     assert "captura anterior" in history[1]["content"]
     assert assistant_provider[-1][0].text == "¿Qué te mostré antes?"
 
+    ordinary = client.post(
+        path, headers=auth(caregiver_account), json={"text": "Ahora me gusta cantar"}
+    )
+    assert ordinary.status_code == 200
+    ordinary_history = str(assistant_provider[-1][2])
+    assert "Árboles verdes" not in ordinary_history
+    assert "paseábamos entre esos árboles" not in ordinary_history
+
 
 def test_visual_context_requires_consent_and_cannot_use_a_foreign_session(
     client, caregiver_account, memory_profile_id, other_caregiver_account, assistant_provider

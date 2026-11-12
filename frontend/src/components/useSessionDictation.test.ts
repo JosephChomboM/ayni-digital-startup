@@ -55,15 +55,23 @@ it("vuelve a escuchar sin pulsar reintentar cuando el audio no se entiende", asy
   expect(getUserMedia).toHaveBeenCalledTimes(2);
 });
 
-it("distingue un servicio caído de una frase que no se entendió", async () => {
+it("usa el mismo audio para el dictado local si el servicio mejorado no responde", async () => {
   const cloud = vi.fn().mockRejectedValue(new ApiError("Servicio no disponible", "transcription_unavailable", 503));
-  const { result } = renderHook(() => useSessionDictation(vi.fn(), true, cloud));
+  const transcript = vi.fn();
+  class LocalWorker {
+    onmessage?: (event: { data: { kind: string; text: string } }) => void;
+    postMessage() { this.onmessage?.({ data: { kind: "result", text: "Paseamos por el parque" } }); }
+    terminate() {}
+  }
+  vi.stubGlobal("Worker", LocalWorker);
+  const { result } = renderHook(() => useSessionDictation(transcript, true, cloud));
   await act(async () => { await vi.advanceTimersByTimeAsync(750); });
   await act(async () => { result.current.finish(); });
-  expect(result.current.error).toBe("Servicio no disponible");
+  expect(result.current.error).toBe("");
   expect(result.current.notice).toBe("");
-  await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
-  expect(getUserMedia).toHaveBeenCalledTimes(1);
+  expect(transcript).toHaveBeenCalledWith("Paseamos por el parque");
+  await act(async () => { await vi.advanceTimersByTimeAsync(750); });
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
 });
 
 it("descarta una transcripción tardía cuando se cancela la escucha", async () => {

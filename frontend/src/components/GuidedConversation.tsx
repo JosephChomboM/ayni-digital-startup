@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, clearScene, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
@@ -58,6 +59,7 @@ export function GuidedConversation({
   const [voiceNotice, setVoiceNotice] = useState("");
   const request = useRef<AbortController | null>(null);
   const [aiError, setAiError] = useState("");
+  const [recovering, setRecovering] = useState(false);
   const [suggestion, setSuggestion] = useState("continue");
   const [observations, setObservations] = useState<string[]>([]);
   const lastAttempt = useRef<ChatInput | null>(null);
@@ -99,25 +101,51 @@ export function GuidedConversation({
     request.current = controller;
     setPending(true);
     setAiError("");
+    setRecovering(false);
     lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
-      if (!retry?.image && !image && !cue && requestsVisualContext(text) && camera && liveScene) {
-        if (!cameraCapture.current) throw new Error("La cámara todavía no está lista. Espera a ver la imagen antes de enviar tu respuesta.");
-        image = await cameraCapture.current();
-        if (controller.signal.aborted) return;
+      if (!retry?.image && !image && !cue && requestsVisualContext(text)) {
+        if (camera && liveScene && cameraCapture.current) {
+          try { image = await cameraCapture.current(); }
+          catch { /* The camera may still be starting or may have lost access. */ }
+          if (controller.signal.aborted) return;
+        }
+        if (!image) {
+          lastAttempt.current = null;
+          setObservations([]);
+          setSuggestion("continue");
+          show(camera && liveScene
+            ? "La cámara todavía no me muestra la imagen. ¿Puedes enseñármela otra vez?"
+            : "Si quieres que mire algo, activa la cámara y el contexto visual o usa Analizar foto con IA.");
+          return;
+        }
       }
       const payload: ChatInput = { ...lastAttempt.current, ...(image ? { image, image_consent: true } : {}) };
       lastAttempt.current = payload;
-      const result = await sendMessage(sessionId, payload, controller.signal);
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
+      const result = await sendMessage(sessionId, payload, signal);
       if (controller.signal.aborted) return;
       setFailedTurns(0);
       setSuggestion(result.suggestion);
-      setObservations(result.observations);
+      setObservations(image ? result.observations : []);
       show(result.text);
     } catch (cause) {
-      if (!controller.signal.aborted) {
-        setFailedTurns((count) => count + 1);
-        setAiError(cause instanceof Error ? cause.message : "No pude responder en este momento. Puedes seguir con otra pregunta.");
+      if (controller.signal.aborted) return;
+      if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && cause.status !== 429) {
+        setAiError(cause.message);
+        return;
+      }
+      const failures = failedTurns + 1;
+      setFailedTurns(failures);
+      setSuggestion("continue");
+      setObservations([]);
+      if (!cue) {
+        show(image ? "No pude ver bien la imagen esta vez. ¿Qué querías mostrarme?" :
+          text ? "Podemos seguir a tu ritmo. ¿Qué más te gustaría contar de ese momento?" : SESSION_GREETING);
+      }
+      if (failures >= 2 && !cue) {
+        setRecovering(true);
+        setAiError("La conexión con Ayni está intermitente. Puedes seguir conversando.");
       }
     } finally {
       if (request.current === controller) { request.current = null; setPending(false); }
@@ -143,7 +171,7 @@ export function GuidedConversation({
       if (!reviewVoice || intent === "pause" || intent === "end") receive(reply);
       else setInput(reply);
     },
-    mic && !paused && !pending && !speaking && !input.trim() && failedTurns < 2,
+    mic && !paused && !pending && !speaking && !input.trim(),
     cloudVoice ? (recording, signal) => transcribeAudio(sessionId, recording, signal) : undefined,
   );
 
@@ -189,12 +217,14 @@ export function GuidedConversation({
         setMessages(saved.map((item, index) => ({ id: index, from: item.role === "assistant" ? "ayni" : "you", text: item.text })));
         nextMessage.current = saved.length;
         const last = saved.filter((item) => item.role === "assistant").at(-1);
-        if (last) { setLine(last.text); setSuggestion(last.suggestion); setObservations(last.observations); }
+        if (last) { setLine(last.text); setSuggestion(last.suggestion); }
       } else {
         await follow("", undefined, undefined, { text: "", request_id: greetingId.current });
       }
     } catch (cause) {
-      if (isActive()) setAiError(cause instanceof Error ? cause.message : "No pudimos recuperar la conversación.");
+      if (!isActive()) return;
+      if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) setAiError(cause.message);
+      else show(SESSION_GREETING);
     }
   }
   const initialize = useEffectEvent(loadConversation);
@@ -356,14 +386,14 @@ export function GuidedConversation({
             <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
           </div>
         </div>)}
-        {aiError && <div role={failedTurns >= 2 ? "alert" : "status"} className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+        {aiError && <div role={recovering ? "alert" : "status"} className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
           <p>{aiError}</p>
-          <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
+          {recovering && <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
             const attempt = lastAttempt.current;
             if (attempt) void follow(attempt.text, attempt.image, attempt.cue, attempt);
             else void loadConversation(() => true);
-          }}>Reintentar con IA</button>
-          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); setFailedTurns(0); lastAttempt.current = null; }}>Seguir con otra pregunta</button>
+          }}>Reintentar con IA</button>}
+          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); setRecovering(false); }}>Seguir conversando</button>
         </div>}
         {!aiError && suggestion !== "continue" && <div className="rounded-lg bg-sky-50 p-3 text-sm">
           <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
@@ -402,7 +432,10 @@ export function GuidedConversation({
           <label className="block py-2">Voz de Ayni
             <select aria-label="Voz de Ayni" className="mt-1 block w-full rounded border p-2" value={voiceURI} onChange={(event) => {
               setVoiceURI(event.target.value);
-              if (sound) speakLocally("Hola, soy Ayni. Conversemos a tu ritmo.", setSpeaking, event.target.value);
+              if (sound && speakLocally("Hola, soy Ayni. Conversemos a tu ritmo.", setSpeaking, event.target.value)) {
+                setSpeaking(true);
+                setVoiceNotice("");
+              }
             }}>
               <option value="">Automática: mejor voz local disponible</option>
               {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)}

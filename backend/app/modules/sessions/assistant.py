@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+import unicodedata
 from io import BytesIO
 from typing import Literal
 from uuid import UUID, uuid4
@@ -22,7 +23,9 @@ Si el mensaje es incompleto o no lo entiendes, pide una aclaración breve y amab
 por ejemplo «No entendí bien esa parte, ¿me la cuentas de otra manera?».
 No presentes una dificultad para comprender como un error de conexión.
 No describas imágenes ni menciones observaciones visuales anteriores espontáneamente.
-Solo comenta detalles visuales cuando la persona pida mirar, mostrar o describir algo.
+Solo comenta detalles visuales si el turno actual incluye una imagen o una observación
+visual autorizada, o pregunta explícitamente por una captura anterior. Si dice que te
+muestra algo pero no hay imagen, aclara que no la ves.
 Responde primero a su pregunta concreta usando el historial. Si comparte imagen,
 relaciónala con lo que está diciendo; no cambies a una descripción genérica ni
 inventes lo que no se ve. Distingue observaciones anteriores de la imagen actual.
@@ -50,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 def response_format(model: str) -> dict:
-    if model not in {"openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"}:
+    if model not in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
         return {"type": "json_object"}
     # El esquema restringe la salida sin depender de que el modelo recuerde las claves.
     return {
@@ -93,6 +96,21 @@ class GeneratedReply(BaseModel):
     message: str = Field(min_length=5, max_length=650)
     suggestion: Literal["continue", "slow_down", "pause", "change_activity"]
     observations: list[str] = Field(default_factory=list, max_length=5)
+
+
+def asks_about_previous_image(text: str) -> bool:
+    phrase = "".join(
+        char
+        for char in unicodedata.normalize("NFD", text.casefold())
+        if not unicodedata.combining(char)
+    )
+    return bool(
+        re.search(
+            r"\b(?:que (?:te )?(?:mostre|ensene|viste|observaste)|"
+            r"(?:que|cual)[^?!.]*\b(?:foto|imagen|captura) (?:anterior|de antes))\b",
+            phrase,
+        )
+    )
 
 
 def redact_contacts(text: str) -> str:
@@ -203,7 +221,9 @@ def generate_reply(
         "max_completion_tokens": 2048,
         "response_format": response_format(model),
     }
-    if model.startswith("openai/gpt-oss-"):
+    if model == "qwen/qwen3.8-27b":
+        payload["reasoning_effort"] = "none"
+    elif model.startswith("openai/gpt-oss-"):
         payload.update(reasoning_effort="low", include_reasoning=False)
     deadline = time.monotonic() + settings.conversation_timeout_seconds
     result = None
@@ -212,7 +232,13 @@ def generate_reply(
         if remaining <= 0:
             break
         try:
-            result = _request_reply(payload, remaining, settings.groq_api_key)
+            # Leave time for a second request when the first transport stalls.
+            timeout = (
+                min(remaining, settings.conversation_timeout_seconds * 0.55)
+                if not attempt
+                else remaining
+            )
+            result = _request_reply(payload, timeout, settings.groq_api_key)
             break
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code

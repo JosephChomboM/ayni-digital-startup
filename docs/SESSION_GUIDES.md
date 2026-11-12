@@ -112,16 +112,19 @@ La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
    por separado. Los dispositivos se liberan al pausar, cerrar la sesión o
    cambiar de pestaña.
 
-El detector de voz cierra el turno después de una pausa breve o al llegar al
-límite de 18 segundos desde que empiezas a hablar. Whisper se descarga la
-primera vez y transcribe en el navegador. La salida de voz usa una voz local
-en español si el dispositivo la tiene. Cámara y micrófono requieren HTTPS o
-localhost. Si no carga el detector facial, la vista previa sigue disponible.
+El detector de voz cierra el turno tras una pausa sostenida o al llegar a 30
+segundos desde que empiezas a hablar. Si el dictado no entiende la frase, te
+pide repetirla y vuelve a escuchar. En **Opciones de voz** puedes elegir la
+voz en español, revisar el texto antes de enviarlo o activar **Mejor precisión
+con Groq**. Esta última opción comparte grabaciones breves con Whisper Large
+V3. Si el servicio falla, la misma grabación se transcribe en el navegador.
+La cámara y el micrófono requieren HTTPS o localhost.
 
-Para una anécdota elegible, `POST /sessions/conversation/{memory_id}` comprueba
-el JWT y la familia y recibe un tema y los identificadores de preguntas recientes.
-Groq elige entre preguntas preparadas. La API reutiliza `GROQ_API_KEY`,
-`GROQ_MODEL` y `LLM_TIMEOUT_SECONDS`. Cuando falta Groq o el recuerdo, Ayni
-puede responder con preguntas locales. El texto escrito, la transcripción, el
-audio y el video se quedan en el navegador durante la conversación. Los
-gestos orientan el ritmo con reglas de interacción, sin calificación clínica.
+La conversación guardada usa `POST /sessions/{session_id}/chat`. Groq recibe
+el texto, los recuerdos autorizados y el historial reciente pertinente. Con
+**Contexto visual en vivo**, decir «mira acá» o preguntar «¿qué ves?» comparte
+una captura actual. **Analizar foto con IA** permite compartir una foto
+familiar. El chat guarda el texto y las observaciones, sin guardar el audio,
+las capturas ni el video. Los turnos normales no incluyen las observaciones
+de capturas anteriores. Si falla la conexión, Ayni puede continuar con una
+pregunta de apoyo. Los mensajes locales de apoyo no se guardan en el historial.
