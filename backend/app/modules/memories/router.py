@@ -19,6 +19,7 @@ from app.modules.memories.schemas import (
     MemoryResponse,
 )
 from app.modules.memories.service import MemoriesService
+from app.modules.memories.song_metadata import SongSelection
 
 router = APIRouter(prefix="/memories", tags=["memories"])
 router.include_router(photo_router)
@@ -66,6 +67,24 @@ def get_memory(
     memory_id: UUID, user_id: AuthenticatedUserId, service: MemoriesServiceDep
 ) -> MemoryResponse:
     return service.get_memory(user_id, memory_id)
+
+
+@router.get("/{memory_id}/song-context")
+def song_context(
+    memory_id: UUID,
+    user_id: AuthenticatedUserId,
+    service: MemoriesServiceDep,
+    lookup: bool = False,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+) -> dict:
+    return service.get_song_context(user_id, memory_id, lookup, search)
+
+
+@router.post("/{memory_id}/song-context")
+def confirm_song_context(
+    memory_id: UUID, data: SongSelection, user_id: AuthenticatedUserId, service: MemoriesServiceDep
+) -> dict:
+    return service.confirm_song_context(user_id, memory_id, data.recording_id)
 
 
 @router.patch("/{memory_id}", response_model=MemoryResponse)

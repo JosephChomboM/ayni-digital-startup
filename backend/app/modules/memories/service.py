@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -26,11 +28,68 @@ from app.modules.memories.schemas import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class SessionMemoryCandidate:
+    id: UUID
+    elder_profile_id: UUID
+    type: str
+    title: str
+    is_positive: bool
+    is_sensitive: bool
+    deletion_pending: bool
+
+
 class MemoriesError(ApplicationError):
     """A public error raised by the memories module."""
 
 
 class MemoriesService:
+    def get_song_context(
+        self, actor_id: UUID, memory_id: UUID, lookup: bool = False, search: str | None = None
+    ) -> dict:
+        from app.modules.memories.song_metadata import search_song
+
+        profile_id, _ = self._context(actor_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id)
+            if memory.type != MemoryType.SONG:
+                raise MemoriesError(
+                    code="song_required", status_code=422, message="Elige una canción."
+                )
+            if memory.song_context:
+                return dict(memory.song_context)
+            url, title = memory.url, memory.title
+        return (
+            (search_song(url, title, search) if search else search_song(url, title))
+            if lookup
+            else {"status": "unavailable", "candidates": []}
+        )
+
+    def confirm_song_context(self, actor_id: UUID, memory_id: UUID, recording_id: UUID) -> dict:
+        from app.modules.memories.song_metadata import recording_context
+
+        profile_id, is_caregiver = self._context(actor_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id)
+            self._require_editor(memory, actor_id, is_caregiver)
+            if memory.type != MemoryType.SONG:
+                raise MemoriesError(
+                    code="song_required", status_code=422, message="Elige una canción."
+                )
+            url = memory.url
+        context = recording_context(recording_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id, for_update=True)
+            self._require_editor(memory, actor_id, is_caregiver)
+            if memory.url != url:
+                raise MemoriesError(
+                    code="song_changed",
+                    status_code=409,
+                    message="La canción cambió. Consulta sus datos de nuevo.",
+                )
+            memory.song_context = dict(context)
+        return dict(context)
+
     """Use a dedicated session and own the transaction for every operation."""
 
     def __init__(self, session: Session, *, photo_storage: PhotoStorage | None = None) -> None:
@@ -51,13 +110,27 @@ class MemoriesService:
         )
 
     def _require_memory(
-        self, memory_id: UUID, profile_id: UUID, *, for_update: bool = False
+        self,
+        memory_id: UUID,
+        profile_id: UUID,
+        *,
+        for_update: bool = False,
+        allow_deleting: bool = False,
     ) -> Memory:
         memory = self.repository.get_memory(
             memory_id, elder_profile_id=profile_id, for_update=for_update
         )
         if memory is None:
             raise self._not_found()
+        if memory.deletion_pending and not allow_deleting:
+            raise MemoriesError(
+                code="memory_deletion_pending",
+                status_code=409,
+                message=(
+                    "Este recuerdo tiene un borrado pendiente. "
+                    "Vuelve a eliminarlo para completarlo."
+                ),
+            )
         return memory
 
     @staticmethod
@@ -131,8 +204,18 @@ class MemoriesService:
 
     def delete_memory(self, actor_id: UUID, memory_id: UUID) -> None:
         profile_id, is_caregiver = self._context(actor_id)
+        # Persist intent before irreversible Storage calls. A failed batch or
+        # process interruption can then be retried without exposing broken photos.
         with self.session.begin():
-            memory = self._require_memory(memory_id, profile_id, for_update=True)
+            memory = self._require_memory(
+                memory_id, profile_id, for_update=True, allow_deleting=True
+            )
+            self._require_editor(memory, actor_id, is_caregiver)
+            memory.deletion_pending = True
+        with self.session.begin():
+            memory = self._require_memory(
+                memory_id, profile_id, for_update=True, allow_deleting=True
+            )
             self._require_editor(memory, actor_id, is_caregiver)
             self._remove_photo_objects(
                 self.repository.list_photos(memory_id, elder_profile_id=profile_id)
@@ -265,6 +348,27 @@ class MemoriesService:
             for start in range(0, len(keys), 100):
                 self.photo_storage.remove(bucket, keys[start : start + 100])
 
+    def purge_account_memories(self, actor_id: UUID) -> None:
+        context = self.families.get_account_deletion_context(actor_id)
+        if context.elder_profile_id is None:
+            return
+        with self.session.begin():
+            self.repository.mark_account_memories_for_deletion(
+                context.elder_profile_id,
+                actor_id,
+                whole_family=context.whole_family,
+            )
+        with self.session.begin():
+            self._remove_photo_objects(
+                self.repository.account_photos(
+                    context.elder_profile_id,
+                    actor_id,
+                    whole_family=context.whole_family,
+                )
+            )
+        # Preserve DB object keys until families.service completes the hard delete.
+        # A provider failure can then be retried, including already removed keys.
+
     def delete_photo(self, actor_id: UUID, memory_id: UUID, photo_id: UUID) -> None:
         profile_id, _, caregiver = self._photo_context(actor_id)
         with self.session.begin():
@@ -278,3 +382,32 @@ class MemoriesService:
                 )
             self._remove_photo_objects([photo])
             self.repository.delete_photo(photo)
+
+    def select_session_memories(
+        self, elder_profile_id: UUID, memory_id: UUID | None = None
+    ) -> list[SessionMemoryCandidate]:
+        """Trusted module interface; caller derives the profile and owns the transaction.
+
+        Locks eligible rows until the caller persists the generated session.
+        Never expose the profile argument directly to an HTTP client.
+        """
+        if not self.session.in_transaction():
+            raise RuntimeError("Session memory selection requires a transaction")
+        return [
+            SessionMemoryCandidate(
+                id=memory.id,
+                elder_profile_id=memory.elder_profile_id,
+                type=str(memory.type),
+                title=memory.title,
+                is_positive=memory.is_positive,
+                is_sensitive=memory.is_sensitive,
+                deletion_pending=memory.deletion_pending,
+            )
+            for memory in self.repository.select_session_memories(elder_profile_id, memory_id)
+        ]
+
+    def available_session_memory_ids(
+        self, elder_profile_id: UUID, memory_ids: Sequence[UUID]
+    ) -> set[UUID]:
+        """Check current eligibility without exposing content from another family."""
+        return self.repository.available_session_memory_ids(elder_profile_id, memory_ids)

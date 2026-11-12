@@ -2,18 +2,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { UploadModule } from "../components/UploadModule";
-const photoStore = vi.hoisted(() => ({ items: [] as Array<Record<string, unknown>> }));
-vi.mock("../api/localMedia", () => ({
-  getLocalFamilyPhotos: vi.fn(async () => [...photoStore.items]),
-  saveLocalFamilyPhoto: vi.fn(async (photo: Record<string, unknown>) => { photoStore.items.push(photo); }),
-  deleteLocalFamilyPhoto: vi.fn(async (id: string) => { photoStore.items = photoStore.items.filter((photo) => photo.id !== id); }),
-}));
 import type { User } from "./auth";
 import type { Memory } from "./memories";
 
 const fetchMock = vi.fn<typeof fetch>();
 const canvasGetContextDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext");
 const canvasToBlobDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "toBlob");
+let photoRecords: Array<Record<string, unknown>>;
 let actor: User;
 let records: Memory[];
 let profile: Record<string, unknown> | null;
@@ -56,6 +51,24 @@ async function backend(input: RequestInfo | URL, options?: RequestInit): Promise
     const offset = Number(url.searchParams.get("offset") ?? 0);
     return json({ items: items.slice(offset, offset + 20), total: items.length, limit: 20, offset });
   }
+  const photoRoute = url.pathname.match(/^\/memories\/([^/]+)\/photos(?:\/([^/]+))?$/);
+  if (photoRoute) {
+    const memoryId = photoRoute[1];
+    if (method === "POST") {
+      const photo = { id: crypto.randomUUID(), memory_id: memoryId, created_by: actor.id,
+        content_type: "image/jpeg", size_bytes: 5, width: 20, height: 10,
+        created_at: new Date().toISOString(), url: "https://signed.example.test/photo",
+        url_expires_at: new Date(Date.now() + 300000).toISOString() };
+      photoRecords.push(photo);
+      return json(photo, 201);
+    }
+    if (method === "DELETE") {
+      photoRecords = photoRecords.filter((photo) => photo.id !== photoRoute[2]);
+      return new Response(null, { status: 204 });
+    }
+    const items = photoRecords.filter((photo) => photo.memory_id === memoryId);
+    return json({ items, total: items.length, limit: 100, offset: 0 });
+  }
   const index = records.findIndex((item) => url.pathname === `/memories/${item.id}`);
   if (index < 0) return json({ detail: { code: "memory_not_found", message: "No encontramos este recuerdo." } }, 404);
   if (method === "DELETE") { records.splice(index, 1); return new Response(null, { status: 204 }); }
@@ -69,7 +82,7 @@ beforeEach(() => {
     name: "Persona de prueba", role: "cuidador_principal", created_at: "2026-10-27T00:00:00Z",
   };
   records = [];
-  photoStore.items = [];
+  photoRecords = [];
   profile = null;
   localStorage.setItem("ayni_token", crypto.randomUUID());
   vi.stubEnv("VITE_API_URL", "https://api.example.test");
@@ -198,12 +211,21 @@ it("saves selected photos with an anecdote and clears the selection after confir
   fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseamos en familia." } });
   fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
   fireEvent.click(await screen.findByRole("button", { name: "OK" }));
-  expect(await screen.findByText("Las fotos seleccionadas se guardan solo en este navegador al guardar el recuerdo. No se sincronizan con otros dispositivos.")).toBeInTheDocument();
+  expect(await screen.findByText("Las fotos se guardarán de forma privada y podrás verlas desde otros dispositivos de tu familia.")).toBeInTheDocument();
   expect(screen.getByText("Foto familiar")).toBeInTheDocument();
   expect(screen.queryByText(/<img src=x/)).not.toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toBeInTheDocument();
-  expect(photoStore.items).toHaveLength(1);
-  expect(photoStore.items[0].blob).toMatchObject({ type: "image/png" });
+  expect(photoRecords).toHaveLength(1);
+  const call = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/photos") && options?.method === "POST");
+  expect(call?.[1]?.body).toBeInstanceOf(FormData);
+  expect(String(call?.[0])).toContain(`/memories/${records[0].id}/photos`);
+  expect(new Headers(call?.[1]?.headers).has("Content-Type")).toBe(false);
+  cleanup();
+  render(<UploadModule />);
+  expect(await screen.findByRole("img", { name: "Foto familiar guardada" })).toHaveAttribute("src", "https://signed.example.test/photo");
+  fireEvent.click(screen.getByRole("button", { name: "Eliminar foto familiar" }));
+  await waitFor(() => expect(screen.queryByRole("img", { name: "Foto familiar guardada" })).toBeNull());
+  expect(photoRecords).toHaveLength(0);
 });
 
 it("loads actual contributions, hides sensitive records and respects member permissions", async () => {
@@ -250,4 +272,55 @@ it("opens the existing profile and family screen so the caregiver can complete t
   expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/families/me/invitations"))).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Volver a recuerdos" }));
   expect(screen.getByLabelText("Título del recuerdo")).toBeInTheDocument();
+});
+
+
+it("retries only remaining photos without creating a duplicate memory or reporting false success", async () => {
+  let attempts = 0;
+  fetchMock.mockImplementation(async (input, options) => {
+    if (String(input).endsWith("/photos") && options?.method === "POST" && ++attempts === 2) {
+      return json({ detail: { code: "photo_storage_unavailable", message: "No pudimos subir la foto." } }, 503);
+    }
+    return backend(input, options);
+  });
+  render(<UploadModule />);
+  await screen.findByText("Todavía no hay recuerdos para mostrar.");
+  const files = [new File(["one"], "one.jpg", { type: "image/jpeg" }), new File(["two"], "two.jpg", { type: "image/jpeg" })];
+  fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files } });
+  await screen.findByText("2 fotos seleccionadas; se guardarán junto con el recuerdo.");
+  fireEvent.change(screen.getByLabelText("Título del recuerdo"), { target: { value: "Un paseo" } });
+  fireEvent.change(screen.getByLabelText("Una anécdota especial"), { target: { value: "Paseo familiar." } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar anécdota" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos subir la foto.");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(records).toHaveLength(1);
+  expect(photoRecords).toHaveLength(1);
+  await screen.findByText("1 foto seleccionada; se guardarán junto con el recuerdo.");
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByRole("dialog");
+  expect(records).toHaveLength(1);
+  expect(photoRecords).toHaveLength(2);
+  expect(fetchMock.mock.calls.filter(([url, options]) => String(url).endsWith("/memories") && options?.method === "POST")).toHaveLength(1);
+});
+
+it("shows remote photos to a family member without offering deletion of another author's memory photos", async () => {
+  actor.role = "familiar";
+  records = [memory({ created_by: crypto.randomUUID() })];
+  photoRecords = [{ id: "photo", memory_id: records[0].id, created_by: records[0].created_by,
+    url: "https://signed.example.test/original" }];
+  render(<UploadModule />);
+  expect(await screen.findByRole("img", { name: "Foto familiar guardada" })).toHaveAttribute("src", "https://signed.example.test/original");
+  expect(screen.queryByRole("button", { name: "Eliminar foto familiar" })).toBeNull();
+  photoRecords[0].url = "https://signed.example.test/renewed";
+  fireEvent.click(screen.getByRole("button", { name: "Actualizar enlace de foto" }));
+  await waitFor(() => expect(screen.getByRole("img", { name: "Foto familiar guardada" })).toHaveAttribute("src", "https://signed.example.test/renewed"));
+});
+
+it("keeps a pending deletion retryable and never requests its unavailable photo links", async () => {
+  records = [memory({ deletion_pending: true })];
+  render(<UploadModule />);
+  await screen.findByText("Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.");
+  expect(screen.getByRole("button", { name: "Editar Un paseo" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Eliminar Un paseo" })).toBeEnabled();
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/photos"))).toBe(false);
 });

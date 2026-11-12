@@ -80,18 +80,18 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
   }
 
   return (
-    <section id="billing-panel" aria-labelledby="billing-title" className={embedded ? "space-y-6 py-1 text-[#264653]" : "relative left-1/2 w-screen -translate-x-1/2 scroll-mt-20 bg-[#17232d] px-4 py-10 text-white sm:px-8 sm:py-14"}>
+    <section id="billing-panel" aria-labelledby="billing-title" className={embedded ? "space-y-6 py-1 text-[#223e38]" : "billing-feature scroll-mt-20 text-white"}>
       <div className={embedded ? "flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between" : "mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"}>
         <div className="max-w-2xl space-y-3">
-          <p className={`text-sm font-semibold ${embedded ? "text-[#e76f51]" : "text-[#e9c46a]"}`}>Plan suscrito</p>
-          <h2 id="billing-title" className={`text-2xl font-semibold ${embedded ? "text-[#2c5f7c]" : "text-white sm:text-3xl"}`}>Plan Familia</h2>
+          <p className={`text-sm font-semibold ${embedded ? "text-[#b94c35]" : "text-[#edce84]"}`}>Plan suscrito</p>
+          <h2 id="billing-title" className={`text-2xl font-semibold ${embedded ? "text-[#235c50]" : "text-white sm:text-3xl"}`}>Plan Familia</h2>
           <p className={`text-sm leading-relaxed ${embedded ? "text-slate-600" : "text-white/75"}`}>El Plan Familia reúne herramientas para organizar recuerdos y acompañar conversaciones en casa.</p>
           <ul className={`space-y-2 text-sm leading-relaxed ${embedded ? "text-slate-600" : "text-white/80"}`}>
             <li>• Espacio para reunir fotos, anécdotas y canciones significativas.</li>
             <li>• Guía de conversación de aproximadamente 15 minutos, que pueden pausar o terminar.</li>
             <li>• Un momento para conversar sobre cómo se sintió cada persona al finalizar.</li>
           </ul>
-          {loading ? <p role="status" className={`text-sm ${embedded ? "text-slate-500" : "text-white/70"}`}>Consultando el plan...</p> : status && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Plan actual: <strong className={embedded ? "text-[#264653]" : "text-white"}>{status.plan === "family" ? "Familia" : "Gratis"}</strong>. {statusMessages[status.subscription_status]}</p>}
+          {loading ? <p role="status" className={`text-sm ${embedded ? "text-slate-500" : "text-white/70"}`}>Consultando el plan...</p> : status && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Plan actual: <strong className={embedded ? "text-[#223e38]" : "text-white"}>{status.plan === "family" ? "Familia" : "Gratis"}</strong>. {statusMessages[status.subscription_status]}</p>}
           {status?.paid_until && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>Periodo pagado hasta el {new Date(status.paid_until).toLocaleDateString("es-PE")}.</p>}
           {status?.cancel_at_period_end && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>La renovación está cancelada. Conservas el periodo pagado.</p>}
           {!caregiver && status && <p className={`text-sm ${embedded ? "text-slate-600" : "text-white/75"}`}>La persona cuidadora principal gestiona el plan de la familia.</p>}
@@ -101,24 +101,24 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
           {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
         </div>
         <div className={embedded ? "flex shrink-0 flex-col items-start gap-3 lg:min-w-56 lg:items-end" : "flex shrink-0 flex-col items-start gap-4 sm:items-end"}>
-          <p className={`text-3xl font-bold ${embedded ? "text-[#2c5f7c]" : "text-white sm:text-4xl"}`}>S/ 19.90 <span className={`text-base font-medium ${embedded ? "text-slate-500" : "text-white/70"}`}>al mes</span></p>
+          <p className={`text-3xl font-bold ${embedded ? "text-[#235c50]" : "text-white sm:text-4xl"}`}>S/ 19.90 <span className={`text-base font-medium ${embedded ? "text-slate-500" : "text-white/70"}`}>al mes</span></p>
           {caregiver && canSubscribe && !loading && <Button type="button" variant="secondary" disabled={saving} onClick={checkout} className="w-auto min-h-11 px-5 text-sm">{saving ? "Abriendo pago..." : status?.subscription_status === "canceled" ? "Renovar suscripción" : status?.subscription_status === "incomplete_expired" ? "Reintentar pago" : "Suscribirme"}</Button>}
           {caregiver && !loading && status && status.subscription_status !== "canceled" && !status.cancel_at_period_end && !confirmCancel && (
-            <Button type="button" variant="outline" disabled={saving} onClick={() => { setNotice(""); setConfirmCancel(true); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
+            <Button type="button" variant="outline" disabled={saving} onClick={() => { setNotice(""); setConfirmCancel(true); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#235c50] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
           <p className={`max-w-xs text-xs ${embedded ? "text-slate-500 lg:text-right" : "text-white/60 sm:text-right"}`}>Los pagos están en modo de prueba y todavía no se realizan cobros reales.</p>
         </div>
       </div>
       {confirmCancel && <div role="group" aria-label="Confirmación de cancelación" className={`mt-6 space-y-3 pt-5 ${embedded ? "border-t border-slate-200" : "mx-auto max-w-7xl border-t border-white/20"}`}>
-        <p className={`text-sm ${embedded ? "text-[#264653]" : "text-white"}`}>
+        <p className={`text-sm ${embedded ? "text-[#223e38]" : "text-white"}`}>
           {canCancel
             ? `¿Estás segura de cancelar la suscripción? La renovación se detendrá y conservarás el acceso${status?.paid_until ? ` hasta el ${new Date(status.paid_until).toLocaleDateString("es-PE")}` : " durante el periodo pagado"}.`
             : "Actualmente usas el Plan Gratis. No hay una suscripción activa para cancelar."}
         </p>
         <div className="flex flex-wrap gap-3">
           {canCancel ? <>
-            <Button type="button" variant="outline" disabled={saving} onClick={() => { setConfirmCancel(false); setNotice("No se realizaron cambios. Tu suscripción sigue activa."); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>No cancelar</Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => { setConfirmCancel(false); setNotice("No se realizaron cambios. Tu suscripción sigue activa."); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#235c50] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>No cancelar</Button>
             <Button type="button" variant="destructive" disabled={saving} onClick={cancel} className="w-auto">{saving ? "Cancelando…" : "Sí, cancelar"}</Button>
-          </> : <Button type="button" disabled={saving} onClick={() => setConfirmCancel(false)} className="w-auto bg-[#2c5f7c] text-white hover:bg-[#224a61]">OK</Button>}
+          </> : <Button type="button" disabled={saving} onClick={() => setConfirmCancel(false)} className="w-auto bg-[#235c50] text-white hover:bg-[#194b40]">OK</Button>}
         </div>
       </div>}
     </section>

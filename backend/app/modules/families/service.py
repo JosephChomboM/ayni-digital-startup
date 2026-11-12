@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated, cast
@@ -20,12 +21,26 @@ from app.core.security import (
 )
 from app.core.security_settings import get_security_settings
 from app.modules.families.consent import CONSENT_TEXT, CONSENT_TEXT_VERSION, ONBOARDING_NOTICE
+from app.modules.families.google_identity import (
+    GoogleIdentityVerifier,
+    VerifiedGoogleIdentity,
+    get_google_settings,
+)
+from app.modules.families.google_schemas import (
+    GoogleChallengeResponse,
+    GoogleConfigResponse,
+    GoogleCredentialRequest,
+    GoogleLinkRequest,
+    GoogleRegisterRequest,
+    UserProfilePatchRequest,
+)
 from app.modules.families.models import Family, Invitation, User, UserRole
 from app.modules.families.repository import FamiliesRepository
 from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
     CurrentUserResponse,
+    DeleteAccountRequest,
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
@@ -72,6 +87,14 @@ class FamiliesError(ApplicationError):
     """A public error raised by the families module."""
 
 
+@dataclass(frozen=True)
+class AccountDeletionContext:
+    user_id: UUID
+    family_id: UUID
+    elder_profile_id: UUID | None
+    whole_family: bool
+
+
 class FamiliesService:
     """Own the transaction for each write operation; use a dedicated session."""
 
@@ -103,6 +126,23 @@ class FamiliesService:
         with self.session.begin():
             return FamilyResponse.model_validate(
                 self._family_for_actor(self._require_actor(actor_id))
+            )
+
+    def update_user_profile(
+        self, actor_id: UUID, data: UserProfilePatchRequest
+    ) -> CurrentUserResponse:
+        changes = data.model_dump(exclude_unset=True)
+        if not changes or ("name" in changes and changes["name"] is None):
+            raise FamiliesError(
+                code="validation_error", message="Revisa los datos de tu perfil.", status_code=422
+            )
+        with self.session.begin():
+            actor = self._require_actor(actor_id)
+            for key, value in changes.items():
+                setattr(actor, key, value)
+            self.session.flush()
+            return CurrentUserResponse.model_validate(
+                {"user": actor, "consent": self.repository.get_consent(actor.id)}
             )
 
     def update_family(self, actor_id: UUID, *, name: str) -> FamilyResponse:
@@ -233,7 +273,74 @@ class FamiliesService:
                 message="Solo quien cuida principalmente puede hacer esto.",
                 status_code=403,
             )
+        family = self.repository.get_family(actor.family_id)
+        if actor.deletion_pending or (family is not None and family.deletion_pending):
+            raise FamiliesError(
+                code="account_deletion_pending",
+                status_code=409,
+                message="El borrado está pendiente. Vuelve a confirmarlo para completarlo.",
+            )
         return actor
+
+    def get_account_deletion_context(self, actor_id: UUID) -> AccountDeletionContext:
+        """Trusted cleanup interface; never accepts client-supplied family/profile IDs."""
+        with self.session.begin():
+            actor = self.repository.get_user(actor_id)
+            if actor is None:
+                raise FamiliesError(
+                    code="unauthorized", message="Vuelve a iniciar sesión.", status_code=401
+                )
+            family = self.repository.get_family(actor.family_id)
+            whole_family = actor.role is UserRole.PRIMARY_CAREGIVER
+            if (
+                not actor.deletion_pending
+                or family is None
+                or (whole_family and not family.deletion_pending)
+            ):
+                raise FamiliesError(
+                    code="deletion_not_requested",
+                    message="Primero confirma el borrado de tu cuenta.",
+                    status_code=409,
+                )
+            profile = self.repository.get_elder_profile(family.id)
+            return AccountDeletionContext(
+                actor.id, family.id, profile.id if profile else None, whole_family
+            )
+
+    def delete_account(self, actor_id: UUID, request: DeleteAccountRequest) -> None:
+        # Lazy imports avoid cycles: each module uses families.service for authorization.
+        from app.modules.billing.service import BillingService
+        from app.modules.memories.service import MemoriesService
+
+        with self.session.begin():
+            actor = self.repository.get_user(actor_id)
+            if actor is None:
+                raise FamiliesError(
+                    code="unauthorized", message="Vuelve a iniciar sesión.", status_code=401
+                )
+            if not verify_password(request.password.get_secret_value(), actor.password_hash):
+                raise FamiliesError(
+                    code="invalid_password",
+                    message="La contraseña no es correcta.",
+                    status_code=403,
+                )
+            family = self.repository.get_family(actor.family_id, for_update=True)
+            if family is None:
+                raise FamiliesError(
+                    code="family_not_found", message="No encontramos tu familia.", status_code=404
+                )
+            actor.deletion_pending = True
+            if actor.role is UserRole.PRIMARY_CAREGIVER:
+                family.deletion_pending = True
+        # Persist intent before irreversible provider calls. Only the delete endpoint
+        # permits retrying an account in this state; regular data access is blocked.
+        context = self.get_account_deletion_context(actor_id)
+        BillingService(self.session).prepare_account_deletion(actor_id)
+        MemoriesService(self.session).purge_account_memories(actor_id)
+        with self.session.begin():
+            self.repository.delete_account(
+                actor_id, context.family_id, whole_family=context.whole_family
+            )
 
     def _family_for_actor(self, actor: User, *, for_update: bool = False) -> Family:
         family = self.repository.get_family(actor.family_id, for_update=for_update)
@@ -293,6 +400,8 @@ class FamiliesService:
         family_name: str,
         accepted: bool = False,
         text_version: str | None = None,
+        _google_identity: VerifiedGoogleIdentity | None = None,
+        _google_challenge_id: UUID | None = None,
     ) -> RegisterResponse:
         self._validate_consent(accepted, text_version)
         request = RegisterRequest(
@@ -318,6 +427,8 @@ class FamiliesService:
                 consent = self.repository.create_consent(
                     user_id=user.id, text_version=CONSENT_TEXT_VERSION, text=CONSENT_TEXT
                 )
+                if _google_identity is not None:
+                    self._bind_google_registration(user, _google_identity, _google_challenge_id)
                 response = RegisterResponse.model_validate(
                     {"user": user, "family": family, "consent": consent}
                 )
@@ -339,6 +450,8 @@ class FamiliesService:
         invitation_token: SecretStr | str,
         accepted: bool = False,
         text_version: str | None = None,
+        _google_identity: VerifiedGoogleIdentity | None = None,
+        _google_challenge_id: UUID | None = None,
     ) -> RegisterResponse:
         self._validate_consent(accepted, text_version)
         request = RegisterRequest(
@@ -356,7 +469,7 @@ class FamiliesService:
                     raise self._invitation_not_found()
                 # All invitation operations lock the family before the invitation.
                 family = self.repository.get_family(invitation.family_id, for_update=True)
-                if family is None:
+                if family is None or family.deletion_pending:
                     raise self._invitation_not_found()
                 invitation = self._require_active_invitation(
                     self.repository.get_invitation_by_token_hash(digest, for_update=True),
@@ -381,6 +494,8 @@ class FamiliesService:
                     user_id=user.id, text_version=CONSENT_TEXT_VERSION, text=CONSENT_TEXT
                 )
                 at = _utc_now()
+                if _google_identity is not None:
+                    self._bind_google_registration(user, _google_identity, _google_challenge_id)
                 self._require_active_invitation(invitation, at)
                 if (
                     self.repository.accept_invitation(
@@ -404,6 +519,18 @@ class FamiliesService:
                 raise self._email_already_registered() from None
             raise
         return response
+
+    def _bind_google_registration(
+        self, user: User, identity: VerifiedGoogleIdentity, challenge_id: UUID | None
+    ) -> None:
+        if identity.email != user.email:
+            raise FamiliesError(
+                code="invalid_google_credential",
+                message="No pudimos verificar tu correo con Google.",
+                status_code=401,
+            )
+        GoogleAuthService(self.session)._consume(challenge_id, identity.nonce)
+        self.repository.link_google(user.id, identity.subject)
 
     @staticmethod
     def _validate_consent(accepted: bool, text_version: str | None) -> None:
@@ -453,3 +580,137 @@ class FamiliesService:
             message="Este correo ya está registrado. Inicia sesión.",
             status_code=409,
         )
+
+
+class GoogleAuthService:
+    def __init__(self, session: Session, verifier: GoogleIdentityVerifier | None = None) -> None:
+        self.session = session
+        self.repository = FamiliesRepository(session)
+        self.families = FamiliesService(session)
+        self.verifier = verifier or GoogleIdentityVerifier()
+
+    @staticmethod
+    def config() -> GoogleConfigResponse:
+        settings = get_google_settings()
+        return GoogleConfigResponse(
+            enabled=settings.enabled,
+            client_id=settings.google_client_id if settings.enabled else None,
+        )
+
+    def challenge(self) -> GoogleChallengeResponse:
+        get_google_settings().require()
+        nonce = secrets.token_urlsafe(32)
+        now = _utc_now()
+        with self.session.begin():
+            record = self.repository.create_google_challenge(
+                hashlib.sha256(nonce.encode()).hexdigest(), now + timedelta(minutes=5), now
+            )
+            return GoogleChallengeResponse(
+                challenge_id=record.id, nonce=nonce, expires_at=record.expires_at
+            )
+
+    def _consume(self, challenge_id: UUID | None, nonce: str) -> None:
+        if challenge_id is None or not self.repository.consume_google_challenge(
+            challenge_id, hashlib.sha256(nonce.encode()).hexdigest(), _utc_now()
+        ):
+            raise FamiliesError(
+                code="invalid_google_challenge",
+                status_code=401,
+                message="El acceso con Google venció o ya se usó. Inténtalo de nuevo.",
+            )
+
+    def login(self, request: GoogleCredentialRequest) -> AuthenticationResponse:
+        identity = self.verifier.verify(request.credential)
+        with self.session.begin():
+            link = self.repository.google_identity(identity.subject)
+            if link is None:
+                exists = self.repository.get_user_by_email(identity.email) is not None
+                raise FamiliesError(
+                    code="google_link_required" if exists else "google_account_not_registered",
+                    status_code=409 if exists else 404,
+                    message="Inicia sesión con tu contraseña y vincula Google desde tu cuenta."
+                    if exists
+                    else "Completa tu registro y acepta el consentimiento para usar Google.",
+                )
+            user = self.families._require_actor(link.user_id)
+            self._consume(request.challenge_id, identity.nonce)
+            return AuthenticationResponse.model_validate(
+                {
+                    "access_token": create_access_token(user.id),
+                    "expires_in": get_security_settings().jwt_access_token_expire_minutes * 60,
+                    "user": user,
+                }
+            )
+
+    def register(self, request: GoogleRegisterRequest) -> RegisterResponse:
+        self.families._validate_consent(request.consent.accepted, request.consent.text_version)
+        identity = self.verifier.verify(request.credential)
+        fields = dict(
+            email=identity.email,
+            name=request.name,
+            password=request.password,
+            accepted=request.consent.accepted,
+            text_version=request.consent.text_version,
+            _google_identity=identity,
+            _google_challenge_id=request.challenge_id,
+        )
+        # Reuse the original registration contract and its single SQL transaction.
+        RegisterRequest(
+            email=identity.email,
+            name=request.name,
+            password=request.password,
+            consent=request.consent,
+            family_name=request.family_name,
+            invitation_token=request.invitation_token,
+        )
+        try:
+            if request.invitation_token is not None:
+                return self.families.register_invited(
+                    **fields, invitation_token=request.invitation_token
+                )
+            return self.families.register_caregiver(
+                **fields, family_name=cast(str, request.family_name)
+            )
+        except IntegrityError:
+            raise FamiliesError(
+                code="google_account_already_linked",
+                message="Esta cuenta de Google ya está vinculada. Inicia sesión.",
+                status_code=409,
+            ) from None
+
+    def link(self, actor_id: UUID, request: GoogleLinkRequest) -> None:
+        identity = self.verifier.verify(request.credential)
+        try:
+            with self.session.begin():
+                user = self.families._require_actor(actor_id)
+                if not verify_password(request.password.get_secret_value(), user.password_hash):
+                    raise FamiliesError(
+                        code="invalid_password",
+                        message="La contraseña no es correcta.",
+                        status_code=403,
+                    )
+                if user.email != identity.email:
+                    raise FamiliesError(
+                        code="google_email_mismatch",
+                        message="Elige la cuenta de Google con el mismo correo de Ayni.",
+                        status_code=403,
+                    )
+                existing = self.repository.google_identity(identity.subject)
+                previous = self.repository.user_google_identity(user.id)
+                if (existing and existing.user_id != user.id) or (
+                    previous and previous.subject != identity.subject
+                ):
+                    raise FamiliesError(
+                        code="google_account_already_linked",
+                        message="Esta cuenta ya tiene una vinculación diferente.",
+                        status_code=409,
+                    )
+                self._consume(request.challenge_id, identity.nonce)
+                if previous is None:
+                    self.repository.link_google(user.id, identity.subject)
+        except IntegrityError:
+            raise FamiliesError(
+                code="google_account_already_linked",
+                message="Esta cuenta ya está vinculada.",
+                status_code=409,
+            ) from None

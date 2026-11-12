@@ -19,8 +19,9 @@ it("uses billing routes, Bearer auth and empty mutation bodies", async () => {
     "https://api.example.test/billing/status", "https://api.example.test/billing/checkout",
     "https://api.example.test/billing/cancel",
   ]);
+  expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Authorization")).toBe("Bearer synthetic-test-token");
   expect(fetchMock.mock.calls[1][1]).toMatchObject({
-    method: "POST", body: "{}", headers: { Authorization: "Bearer synthetic-test-token" },
+    method: "POST", body: "{}",
   });
 });
 

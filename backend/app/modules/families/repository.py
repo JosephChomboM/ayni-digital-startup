@@ -1,13 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.modules.families.models import (
     ElderProfile,
     Family,
+    GoogleAuthChallenge,
+    GoogleIdentity,
     Invitation,
     User,
     UserConsent,
@@ -46,8 +48,51 @@ class FamiliesRepository:
     def get_user(self, user_id: UUID) -> User | None:
         return self.session.get(User, user_id)
 
+    def delete_account(self, user_id: UUID, family_id: UUID, *, whole_family: bool) -> None:
+        if whole_family:
+            self.session.execute(delete(Family).where(Family.id == family_id))
+        else:
+            self.session.execute(
+                delete(User).where(User.id == user_id, User.family_id == family_id)
+            )
+
     def get_user_by_email(self, email: str) -> User | None:
         return self.session.scalar(select(User).where(User.email == email))
+
+    def google_identity(self, subject: str) -> GoogleIdentity | None:
+        return self.session.scalar(select(GoogleIdentity).where(GoogleIdentity.subject == subject))
+
+    def user_google_identity(self, user_id: UUID) -> GoogleIdentity | None:
+        return self.session.get(GoogleIdentity, user_id)
+
+    def link_google(self, user_id: UUID, subject: str) -> None:
+        self.session.add(GoogleIdentity(user_id=user_id, subject=subject))
+        self.session.flush()
+
+    def create_google_challenge(
+        self, nonce_hash: str, expires_at: datetime, at: datetime
+    ) -> GoogleAuthChallenge:
+        self.session.execute(
+            delete(GoogleAuthChallenge).where(GoogleAuthChallenge.expires_at <= at)
+        )
+        challenge = GoogleAuthChallenge(nonce_hash=nonce_hash, expires_at=expires_at)
+        self.session.add(challenge)
+        self.session.flush()
+        return challenge
+
+    def consume_google_challenge(self, challenge_id: UUID, nonce_hash: str, at: datetime) -> bool:
+        statement = (
+            update(GoogleAuthChallenge)
+            .where(
+                GoogleAuthChallenge.id == challenge_id,
+                GoogleAuthChallenge.nonce_hash == nonce_hash,
+                GoogleAuthChallenge.consumed_at.is_(None),
+                GoogleAuthChallenge.expires_at > at,
+            )
+            .values(consumed_at=at)
+            .returning(GoogleAuthChallenge.id)
+        )
+        return self.session.scalar(statement) is not None
 
     def list_members(self, family_id: UUID) -> list[User]:
         return list(

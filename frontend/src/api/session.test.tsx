@@ -92,3 +92,15 @@ it("restores the plan after checkout using the session return marker", async () 
   expect(await screen.findByRole("heading", { name: "Tu plan familiar" })).toBeInTheDocument();
   expect(sessionStorage.getItem("ayni_checkout_return")).toBeNull();
 });
+
+it("returns to login with a truthful confirmation after successful account deletion", async () => {
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ user, consent: {}, enabled: false, client_id: null })));
+  render(<App />);
+  await screen.findByRole("button", { name: "Cerrar sesión" });
+  sessionStorage.setItem("ayni_account_deleted", "1");
+  localStorage.removeItem("ayni_token");
+  act(() => { window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT)); });
+  expect(await screen.findByRole("heading", { name: "Qué bueno verte de nuevo" })).toBeInTheDocument();
+  expect(screen.getByText("Tu cuenta y los datos correspondientes se eliminaron correctamente.")).toBeInTheDocument();
+  expect(sessionStorage.getItem("ayni_account_deleted")).toBeNull();
+});

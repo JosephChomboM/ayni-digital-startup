@@ -3,6 +3,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -71,6 +72,7 @@ class Memory(Base):
     title: Mapped[str] = mapped_column(String(100))
     text: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(String(2048))
+    song_context: Mapped[dict | None] = mapped_column(JSON)
     is_positive: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=sql_text("false")
     )
@@ -87,6 +89,9 @@ class Memory(Base):
         ),
         default=EntitiesStatus.PENDING,
         server_default=sql_text("'pending'"),
+    )
+    deletion_pending: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sql_text("false")
     )
     content_version: Mapped[int] = mapped_column(Integer, default=1, server_default=sql_text("1"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

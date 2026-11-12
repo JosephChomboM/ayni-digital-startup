@@ -42,13 +42,27 @@ Todas requieren Bearer JWT. Fotos: bucket privado de Supabase, enlaces de 5 minu
 10 fotos por familia gratis y sin ese límite durante el periodo pagado del Plan Familia.
 Contrato, errores y coordinación con frontend: [PHOTOS.md](PHOTOS.md).
 
-## 3. Sesiones y Respuestas (Propuesto)
-Módulo de generación de las guías de 15 a 20 minutos.
+## 3. Guías familiares (implementadas en rama local; PR pendiente)
 
-*   **`POST /sessions/generate`**: Genera una sesión usando reglas y plantillas (sin depender del LLM o recomendador en esta fase). **Regla estricta:** solo usa recuerdos con `is_positive=true` e `is_sensitive=false`.
-*   **`GET /sessions`**: Lista el historial de sesiones de la familia.
-*   **`GET /sessions/{id}`**: Devuelve el contenido detallado de la sesión.
-*   **`POST /sessions/{id}/response`**: Registra cómo reaccionó el adulto mayor (receptivo, emocionado, indiferente, agitado). Cada sesión admite una sola respuesta; si se envía una segunda, debe manejarse sin duplicar.
+AYNI-46 y AYNI-48: backend en hats/ayni-46-session-templates, todavía sin publicar.
+Contrato completo: [SESSION_GUIDES.md](SESSION_GUIDES.md). JWT Bearer; ambos roles.
+
+* **POST /sessions/generate**: sin cuerpo o JSON {}; devuelve 201 con la guía persistida.
+  El servidor selecciona hasta tres recuerdos positivos, no sensibles y de la familia;
+  nunca acepta perfil, autor ni contenido proporcionados por el cliente.
+* **GET /sessions**: limit 1–100 (20 por defecto), offset >= 0; devuelve items/total/limit/offset.
+* **GET /sessions/{id}**: devuelve los pasos originales y la disponibilidad actual de sus recuerdos.
+  Una sesión ajena o inexistente devuelve session_not_found (404).
+
+Generación sin IA, duración de 15 minutos. Plan gratis: una guía por familia en siete días;
+Plan Familia vigente sin ese límite. Errores con detail.code/detail.message, incluidos
+no_eligible_memories y session_limit_reached (409). Consultar no consume cuota.
+La pantalla de frontend sigue pendiente de conexión; no se implementan respuestas aquí.
+
+### Respuestas (propuesto, no implementado)
+
+* **POST /sessions/{id}/response**: propuesta para registrar receptivo, emocionado,
+  indiferente o agitado, con una respuesta por sesión. Pertenece a AYNI-49.
 
 ## 4. Insights y Alertas (Propuesto)
 Generación de patrones descriptivos a partir de las respuestas.

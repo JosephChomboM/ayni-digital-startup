@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthPage } from "./AuthPage";
+vi.mock("../components/GoogleSignInButton", () => ({ GoogleSignInButton: () => null }));
 
 const texts = {
   text_version: "1.0", text: "Texto exacto recibido del servidor.",
@@ -25,6 +26,7 @@ function successfulResponse(url: string): Response {
     user, family: { id: user.family_id }, consent: { text_version: "1.0", accepted_at: user.created_at },
   }, 201);
   if (url.endsWith("/auth/login")) return json({ user, access_token: token, token_type: "bearer", expires_in: 1800 });
+  if (url.endsWith("/users/me")) return json({ user, consent: {} });
   throw new Error("Ruta de prueba inesperada.");
 }
 
@@ -94,6 +96,7 @@ describe("AuthPage families contract", () => {
     });
     expect(posts()[0][1]).not.toHaveProperty("invitation_token");
     expect(localStorage.getItem("ayni_token")).toBe(token);
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH").map(([, options]) => JSON.parse(String(options?.body)))).toEqual([{ phone: "+51 987 654 321", city: "Lima", district: "Surco" }]);
   });
 
   it("registers with an invitation instead of family_name", async () => {

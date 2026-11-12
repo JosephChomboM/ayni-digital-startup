@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState } from "react";
+import { PageIntro } from "../components/PageIntro";
+import React, { useEffect, useState } from "react";
 import { Button } from "../components/Button";
 import { UserRound, Users, Mail } from "lucide-react";
 import type { User } from "../api/auth";
@@ -177,10 +178,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="profile-page space-y-6">
+      <PageIntro eyebrow="LAS PERSONAS DETRÁS DE LAS HISTORIAS" title="Nuestra familia">Sus gustos, sus historias y quienes los acompañan.</PageIntro>
       {/* Encabezado */}
-      <div className="border-b border-slate-200 px-2 py-6 text-center">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 text-[#2c5f7c]">
+      <div className="profile-banner">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 text-[#235c50]">
           <UserRound className="size-8" aria-hidden="true" />
         </div>
         <h2 className="text-xl font-bold text-ayni-green mt-3">
@@ -195,7 +197,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-4">
         <div className="flex justify-between items-center border-b border-gray-100 pb-2">
           <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <UserRound className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Perfil del Adulto Mayor
+            <UserRound className="size-4 text-[#235c50]" aria-hidden="true" /> Perfil del Adulto Mayor
           </h3>
           {!isCuidador && (
             <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm font-medium">
@@ -302,7 +304,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       {/* Miembros de la Familia */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
         <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-          <Users className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Miembros de la Familia
+          <Users className="size-4 text-[#235c50]" aria-hidden="true" /> Miembros de la Familia
         </h3>
 
         {membersError && <div role="alert" className="space-y-2 text-sm text-red-700"><p>No pudimos consultar todos los miembros o invitaciones de tu familia.</p><button type="button" onClick={() => setProfileAttempt(value => value + 1)} className="min-h-11 underline">Volver a intentar</button></div>}
@@ -317,7 +319,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                   <p className="font-bold text-gray-800">{m.name}{m.id === currentUser.id && <span className="ml-2 font-normal">(Tú)</span>}</p>
                   <p className="text-[10px] text-gray-500 capitalize">{m.role.replace("_", " ")}</p>
                 </div>
-                <span className="text-[10px] bg-white text-[#2c5f7c] px-2 py-1 rounded-sm font-semibold border border-slate-200">Activo</span>
+                <span className="text-[10px] bg-white text-[#235c50] px-2 py-1 rounded-sm font-semibold border border-slate-200">Activo</span>
               </div>
             ))}
           </div>
@@ -328,7 +330,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
       {isCuidador && (
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
           <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <Mail className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Invitar Familiar
+            <Mail className="size-4 text-[#235c50]" aria-hidden="true" /> Invitar Familiar
           </h3>
 
           <form onSubmit={handleCreateInvitation} className="flex gap-2">
@@ -342,7 +344,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
             />
             <button
               type="submit"
-              className="px-3 py-2 bg-[#e76f51] text-white font-semibold text-xs rounded-lg hover:bg-[#d65d3f]"
+              className="px-3 py-2 bg-[#b94c35] text-white font-semibold text-xs rounded-lg hover:bg-[#d65d3f]"
             >
               Invitar
             </button>

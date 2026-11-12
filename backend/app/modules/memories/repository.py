@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -20,6 +20,24 @@ class MemoriesRepository:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def account_photos(
+        self, profile_id: UUID, actor_id: UUID, *, whole_family: bool
+    ) -> list[MemoryPhoto]:
+        statement = select(MemoryPhoto).join(Memory).where(Memory.elder_profile_id == profile_id)
+        if not whole_family:
+            statement = statement.where(
+                or_(Memory.created_by == actor_id, MemoryPhoto.created_by == actor_id)
+            )
+        return list(self.session.scalars(statement))
+
+    def mark_account_memories_for_deletion(
+        self, profile_id: UUID, actor_id: UUID, *, whole_family: bool
+    ) -> None:
+        statement = update(Memory).where(Memory.elder_profile_id == profile_id)
+        if not whole_family:
+            statement = statement.where(Memory.created_by == actor_id)
+        self.session.execute(statement.values(deletion_pending=True))
 
     def create_memory(
         self,
@@ -137,6 +155,8 @@ class MemoriesRepository:
             memory.content_version += 1
             memory.entities.clear()
             memory.entities_status = EntitiesStatus.PENDING
+        if "url" in changes and changes["url"] != memory.url:
+            memory.song_context = None
         for name, value in changes.items():
             setattr(memory, name, value)
         self.session.flush()
@@ -261,3 +281,41 @@ class MemoriesRepository:
     def delete_photo(self, photo: MemoryPhoto) -> None:
         self.session.delete(photo)
         self.session.flush()
+
+    @staticmethod
+    def _session_eligible(profile_id: UUID) -> list[ColumnElement[bool]]:
+        return [
+            Memory.elder_profile_id == profile_id,
+            Memory.is_positive.is_(True),
+            Memory.is_sensitive.is_(False),
+            Memory.deletion_pending.is_(False),
+        ]
+
+    def select_session_memories(
+        self, profile_id: UUID, memory_id: UUID | None = None
+    ) -> list[Memory]:
+        return list(
+            self.session.scalars(
+                select(Memory)
+                .where(
+                    *self._session_eligible(profile_id),
+                    *([Memory.id == memory_id] if memory_id else []),
+                )
+                .order_by(Memory.id)
+                .limit(3)
+                .with_for_update()
+            )
+        )
+
+    def available_session_memory_ids(
+        self, profile_id: UUID, memory_ids: Sequence[UUID]
+    ) -> set[UUID]:
+        if not memory_ids:
+            return set()
+        return set(
+            self.session.scalars(
+                select(Memory.id).where(
+                    *self._session_eligible(profile_id), Memory.id.in_(memory_ids)
+                )
+            )
+        )

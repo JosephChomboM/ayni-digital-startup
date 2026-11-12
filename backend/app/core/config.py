@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-20b"
     llm_timeout_seconds: float = 5.0
+    groq_vision_model: str = "qwen/qwen3.8-27b"
+    conversation_timeout_seconds: float = Field(default=20, ge=1, le=60)
 
     # Pending validation with the clinical adviser; preserve CLAUDE.md defaults.
     pause_agitated_streak: int = Field(default=3, ge=1)
