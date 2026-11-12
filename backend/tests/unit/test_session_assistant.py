@@ -19,6 +19,7 @@ def photo() -> str:
 
 @pytest.fixture
 def provider(monkeypatch):
+    monkeypatch.setattr(assistant.time, "sleep", lambda _: None)
     calls = []
     settings = Settings(
         groq_api_key="test-only", groq_model="chat-model", groq_vision_model="vision-model"
@@ -165,3 +166,78 @@ def test_reply_keeps_only_one_question(provider):
     reply = assistant.generate_reply(assistant.ChatRequest(text="Hola"), context=[], history=[])
     assert reply.message.count("?") == 1
     assert "Mencionaste el parque" in reply.message
+
+
+@pytest.mark.parametrize("failure", ["timeout", "http", "format", "truncated"])
+def test_transient_failure_recovers_without_a_fake_reply(monkeypatch, failure):
+    monkeypatch.setattr(assistant, "get_settings", lambda: Settings(groq_api_key="test"))
+    monkeypatch.setattr(assistant.time, "sleep", lambda _: None)
+    calls = []
+    real_client = httpx.Client
+
+    def respond(request):
+        calls.append(json.loads(request.content))
+        if len(calls) == 1:
+            if failure == "timeout":
+                raise httpx.ReadTimeout("timeout", request=request)
+            if failure == "http":
+                return httpx.Response(502)
+            content = '{"message":' if failure == "truncated" else '{"other":true}'
+        else:
+            content = json.dumps(
+                {
+                    "message": "Me contaste que te gustan los helados. ¿Cuál prefieres?",
+                    "suggestion": "continue",
+                    "observations": [],
+                }
+            )
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    monkeypatch.setattr(
+        assistant.httpx, "Client", lambda **_: real_client(transport=httpx.MockTransport(respond))
+    )
+    result = assistant.generate_reply(
+        assistant.ChatRequest(text="Los helados"), context=[], history=[]
+    )
+    assert "helados" in result.message
+    assert len(calls) == 2
+    assert calls[0]["messages"][-1] == calls[1]["messages"][-1]
+    assert calls[0]["response_format"]["json_schema"]["strict"] is True
+    assert calls[0]["reasoning_effort"] == "low"
+
+
+@pytest.mark.parametrize("status,headers", [(401, {}), (429, {"Retry-After": "60"})])
+def test_credentials_and_long_rate_limits_do_not_trigger_repeated_requests(
+    monkeypatch, status, headers
+):
+    monkeypatch.setattr(assistant, "get_settings", lambda: Settings(groq_api_key="test"))
+    real_client = httpx.Client
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return httpx.Response(status, headers=headers)
+
+    monkeypatch.setattr(
+        assistant.httpx, "Client", lambda **_: real_client(transport=httpx.MockTransport(respond))
+    )
+    with pytest.raises(ApplicationError):
+        assistant.generate_reply(assistant.ChatRequest(text="Hola"), context=[], history=[])
+    assert len(calls) == 1
+
+
+def test_ambiguous_input_can_receive_clarification_as_a_normal_turn(provider):
+    calls, _, setup = provider
+    setup(
+        content={
+            "message": "No entendí bien esa parte. ¿Me la cuentas de otra manera?",
+            "suggestion": "continue",
+            "observations": [],
+        }
+    )
+    result = assistant.generate_reply(
+        assistant.ChatRequest(text="Eso de allá, antes"), context=[], history=[]
+    )
+    assert result.suggestion == "continue"
+    assert "No entendí bien" in result.message
+    assert len(calls) == 1

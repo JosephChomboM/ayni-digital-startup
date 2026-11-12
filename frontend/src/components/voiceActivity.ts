@@ -19,6 +19,6 @@ export function createVoiceActivity() {
       if (firstSpeech === null) floor = Math.min(0.015, floor * 0.95 + rms * 0.05);
     }
     return { started, active: firstSpeech !== null, ended: lastSpeech !== null &&
-      (now - lastSpeech >= 2400 || now - firstSpeech! >= 30_000) };
+      (now - lastSpeech >= 3200 || now - firstSpeech! >= 30_000) };
   };
 }

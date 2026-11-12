@@ -3,6 +3,15 @@ import type { ConversationTopic } from "../api/conversation";
 export type SessionActivity = "anecdote" | "photo" | "song";
 export type SpokenChoice = ConversationTopic | SessionActivity | "pause" | "end" | "next";
 
+export function requestsVisualContext(text: string): boolean {
+  const phrase = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (/\b(?:no|sin)\s+(?:mires|mirar|analices|analizar|describas|describir)\b/.test(phrase)) return false;
+  return /\b(?:mira|mire|miren|observa|fijate|veamos)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:aca|aqui|esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
+    /\b(?:te muestro|te estoy mostrando|que ves|que es lo que ves)\b/.test(phrase) ||
+    /\b(?:describe|describeme|analiza|puedes ver|alcanzas a ver)\s+(?:(?:en|la|el|esta|este|esa|ese)\s+)*(?:esto|eso|imagen|foto|fotografia|camara|objeto|lo que)\b/.test(phrase) ||
+    /\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
+}
+
 export function interpretReply(transcript: string): SpokenChoice {
   const reply = transcript.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim()
     .replace(/^ayni[ ,]+/, "");
@@ -58,15 +67,24 @@ export function createFaceCueTracker() {
   };
 }
 
-export function speakLocally(text: string, onSpeaking?: (speaking: boolean) => void): boolean {
+export function spanishVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  const score = (voice: SpeechSynthesisVoice) =>
+    (/natural|neural|premium|enhanced|mejorada/i.test(voice.name) ? 100 : 0) +
+    (/^es-PE$/i.test(voice.lang) ? 40 : /^es-(MX|US|CO|CL|AR)/i.test(voice.lang) ? 30 : 0);
+  return voices.filter((voice) => voice.localService && /^es(?:-|$)/i.test(voice.lang))
+    .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+}
+
+export function speakLocally(text: string, onSpeaking?: (speaking: boolean) => void, voiceURI?: string): boolean {
   const speech = window.speechSynthesis;
-  const voice = speech?.getVoices().find((item) => item.localService && /^es(?:-|$)/i.test(item.lang));
+  const voices = spanishVoices(speech?.getVoices() ?? []);
+  const voice = voices.find((item) => item.voiceURI === voiceURI) ?? voices[0];
   if (!voice) return false;
   speech.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.voice = voice;
   utterance.lang = voice.lang;
-  utterance.rate = 0.9;
+  utterance.rate = 0.95;
   if (onSpeaking) {
     utterance.onstart = () => onSpeaking(true);
     utterance.onend = () => onSpeaking(false);

@@ -61,7 +61,7 @@ def transcribe_audio(data: AudioRequest) -> Transcript:
                     "file": ("voice." + extensions[data.content_type], audio, data.content_type)
                 },
                 data={
-                    "model": "whisper-large-v3-turbo",
+                    "model": "whisper-large-v3",
                     "language": "es",
                     "temperature": "0",
                     "response_format": "verbose_json",
@@ -71,9 +71,24 @@ def transcribe_audio(data: AudioRequest) -> Transcript:
             result = response.json()
             if not isinstance(result, dict) or float(result.get("duration", 0)) > 40:
                 raise ValueError
-            text = re.sub(r"\s+", " ", str(result.get("text", ""))).strip()[:500]
-            if not text:
+            if not isinstance(result.get("text"), str):
                 raise ValueError
+            text = re.sub(r"\s+", " ", result["text"]).strip()[:500]
+            segments = result.get("segments") or []
+            unclear = bool(segments) and all(
+                float(segment.get("avg_logprob", 0)) < -1
+                and float(segment.get("no_speech_prob", 0)) > 0.6
+                for segment in segments
+            )
+            if not text or unclear:
+                raise ApplicationError(
+                    code="audio_not_understood",
+                    status_code=422,
+                    message=(
+                        "No te entendí bien. "
+                        "¿Puedes repetirlo un poco más cerca del micrófono?"
+                    ),
+                )
             return Transcript(text=text)
     except (httpx.HTTPError, ValueError, TypeError, KeyError):
         raise ApplicationError(

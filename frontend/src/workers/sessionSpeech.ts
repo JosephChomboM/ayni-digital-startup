@@ -30,7 +30,8 @@ self.onmessage = async (event: MessageEvent<{ samples: Float32Array }>) => {
     const result = await transcribe(event.data.samples, {
       language: "spanish",
       task: "transcribe",
-      max_new_tokens: 100,
+      max_new_tokens: 224,
+      num_beams: 3,
     });
     const text = (Array.isArray(result) ? result[0]?.text : result.text)?.trim() ?? "";
     self.postMessage({ kind: "result", text });

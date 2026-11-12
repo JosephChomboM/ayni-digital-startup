@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createVoiceActivity } from "./voiceActivity";
+import { ApiError } from "../api/client";
 
 const LIMIT_MS = 30_000;
 const SAMPLE_RATE = 16_000;
@@ -49,6 +50,7 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
   cloud?: (recording: Blob, signal: AbortSignal) => Promise<string>) {
   const [state, setState] = useState<DictationState>("idle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const active = useRef<Capture | null>(null);
   const worker = useRef<Worker | null>(null);
   const callback = useRef(onTranscript);
@@ -103,6 +105,12 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     setError(message);
   }
 
+  function askToRepeat() {
+    discard();
+    setState("idle");
+    setNotice("No te entendí bien. ¿Puedes repetirlo un poco más cerca del micrófono?");
+  }
+
   async function start() {
     if (active.current || state !== "idle" || document.hidden) return;
     setError("");
@@ -143,7 +151,7 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
           if (active.current !== capture) return;
           const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
           if (samples.length < SAMPLE_RATE * 0.4 || rms < 0.0015) {
-            fail("No escuché una respuesta. Acércate al micrófono o escribe lo que querías decir.");
+            askToRepeat();
             return;
           }
 
@@ -152,6 +160,7 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
             const text = await cloudCallback.current(recording, capture.transcription.signal);
             if (active.current !== capture) return;
             active.current = null; release(capture); setState("idle");
+            setNotice("");
             callback.current(text);
             return;
           }
@@ -172,14 +181,17 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
               active.current = null;
               release(capture);
               setState("idle");
-              if (data.text) callback.current(data.text);
-              else setError("No pude entenderte. Puedes intentarlo otra vez o escribir.");
+              if (data.text) { setNotice(""); callback.current(data.text); }
+              else askToRepeat();
             }
           };
           timeout.current = window.setTimeout(failure, 120_000);
           transcriber.postMessage({ samples }, [samples.buffer]);
         } catch (cause) {
-          if (active.current === capture) fail(cause instanceof Error ? cause.message : "No pude leer la grabación. Puedes escribir tu respuesta.");
+          if (active.current === capture) {
+            if (cause instanceof ApiError && cause.code === "audio_not_understood") askToRepeat();
+            else fail(cause instanceof Error ? cause.message : "No pude leer la grabación. Puedes escribir tu respuesta.");
+          }
         }
       };
       recorder.start(250);
@@ -238,5 +250,5 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     return () => window.clearTimeout(delay);
   }, [enabled, visible, state, error, cancel]);
 
-  return { state, error, cancel, finish: stop, retry: () => setError("") };
+  return { state, error, notice, cancel, finish: stop, retry: () => setError("") };
 }

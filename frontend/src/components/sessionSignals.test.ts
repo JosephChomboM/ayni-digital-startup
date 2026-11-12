@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { createFaceCueTracker, interpretReply } from "./sessionSignals";
+import { createFaceCueTracker, interpretReply, requestsVisualContext, spanishVoices } from "./sessionSignals";
+
+it.each([
+  ["Mira acá, este es mi álbum", true], ["¿Qué ves aquí?", true],
+  ["¿Qué hay en esta imagen?", true], ["Fíjate en la foto", true],
+  ["Te estoy mostrando algo", true], ["¿Puedes ver lo que sostengo?", true],
+  ["Me gustaba caminar en el parque", false], ["¿Qué hay para conversar?", false],
+  ["Mira, me gustaban los helados", false], ["No mires la imagen", false],
+  ["No recuerdo qué hacíamos", false],
+])("solo usa la cámara ante una petición visual: %s", (text, expected) => {
+  expect(requestsVisualContext(text)).toBe(expected);
+});
+
+it("prioriza voces naturales locales en español y excluye las voces remotas", () => {
+  const voice = (name: string, lang: string, localService = true) => ({ name, lang, localService } as SpeechSynthesisVoice);
+  const voices = [voice("Española", "es-ES"), voice("Peruana", "es-PE"),
+    voice("Natural mexicana", "es-MX"), voice("Natural remota", "es-PE", false), voice("English", "en-US")];
+  expect(spanishVoices(voices).map(v => v.name)).toEqual(["Natural mexicana", "Peruana", "Española"]);
+});
 
 describe("spoken session preferences", () => {
   it.each([
