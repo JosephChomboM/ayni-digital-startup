@@ -78,3 +78,14 @@ class SessionListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class SessionMessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    role: Literal["user", "assistant"]
+    text: str
+    suggestion: Literal["continue", "slow_down", "pause", "change_activity"]
+    observations: list[str]
+    created_at: UTCDateTime

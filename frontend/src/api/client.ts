@@ -43,7 +43,8 @@ export async function apiFetch<T>(
       ...options,
       headers,
     });
-  } catch {
+  } catch (cause) {
+    if (options.signal?.aborted) throw cause;
     throw new ApiError(
       "No pudimos conectar. Inténtalo de nuevo.",
       "network_error",

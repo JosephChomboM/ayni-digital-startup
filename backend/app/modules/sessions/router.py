@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.modules.families.service import get_authenticated_user_id
+from app.modules.sessions.assistant import ChatRequest
 from app.modules.sessions.conversation import ConversationRequest, ConversationTurn
 from app.modules.sessions.schemas import (
     GenerateSessionRequest,
     SessionDetail,
     SessionListRequest,
     SessionListResponse,
+    SessionMessageResponse,
 )
 from app.modules.sessions.service import SessionsService
 
@@ -54,3 +56,17 @@ def converse_about_memory(
 @router.get("/{session_id}", response_model=SessionDetail)
 def get_session(session_id: UUID, actor_id: ActorId, service: Service) -> SessionDetail:
     return service.get_session(actor_id, session_id)
+
+
+@router.get("/{session_id}/messages", response_model=list[SessionMessageResponse])
+def list_messages(
+    session_id: UUID, actor_id: ActorId, service: Service
+) -> list[SessionMessageResponse]:
+    return service.list_messages(actor_id, session_id)
+
+
+@router.post("/{session_id}/chat", response_model=SessionMessageResponse)
+def chat(
+    session_id: UUID, data: ChatRequest, actor_id: ActorId, service: Service
+) -> SessionMessageResponse:
+    return service.chat(actor_id, session_id, data)

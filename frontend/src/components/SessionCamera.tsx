@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import { createFaceCueTracker } from "./sessionSignals";
 import type { FaceCue, FaceObservation } from "./sessionSignals";
+import { imageForConversation } from "../api/sessions";
 
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 const wasmAssets = {
@@ -25,9 +26,11 @@ const statusText: Record<FaceObservation, string> = {
 interface SessionCameraProps {
   onCue: (cue: FaceCue) => void;
   canFollowExpression: () => boolean;
+  onAnalyzeFrame?: (image: string) => void;
+  analyzing?: boolean;
 }
 
-export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps) {
+export function SessionCamera({ onCue, canFollowExpression, onAnalyzeFrame, analyzing }: SessionCameraProps) {
   const preview = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState("Esperando permiso de cámara…");
   const [ratio, setRatio] = useState("4 / 3");
@@ -183,5 +186,13 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
         style={{ left: `${face.x}%`, top: `${face.y}%`, width: `${face.width}%`, height: `${face.height}%` }} />}
     </div>
     <p role="status" className="text-sm text-slate-600">{status}</p>
+    {onAnalyzeFrame && <div className="space-y-2">
+      <button type="button" disabled={analyzing} className="min-h-11 rounded-lg border px-3 text-sm font-semibold disabled:opacity-50" onClick={async () => {
+        if (!preview.current) return;
+        try { onAnalyzeFrame(await imageForConversation(preview.current)); }
+        catch { setStatus("Espera a que la cámara muestre la imagen e inténtalo otra vez."); }
+      }}>Conversar sobre esta imagen</button>
+      <p className="text-xs">Al pulsar, compartes una captura con Groq. El video continuo permanece en tu dispositivo.</p>
+    </div>}
   </div>;
 }

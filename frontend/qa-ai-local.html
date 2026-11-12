@@ -1,0 +1,42 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Validación local de IA de Ayni</title><body><h1>Validación real de modelos</h1><p>Voz sintética y fotos ilustrativas del proyecto.</p><button id="voz">Probar Whisper en español</button><pre id="voz-result">Sin ejecutar</pre><button id="rostro">Probar detector facial</button><pre id="rostro-result">Sin ejecutar</pre><script type="module">
+import SpeechWorker from '/src/workers/sessionSpeech.ts?worker';
+import {FaceLandmarker, FilesetResolver} from '@mediapipe/tasks-vision';
+const out = (id, value) => document.getElementById(id).textContent = value;
+document.getElementById('voz').onclick = async () => {
+ out('voz-result','Cargando audio sintético…');
+ try {
+  const audio = new AudioContext();
+  const decoded = await audio.decodeAudioData(await (await fetch('/qa-voz-temporal.wav')).arrayBuffer());
+  const render = new OfflineAudioContext(1,Math.ceil(decoded.duration*16000),16000);
+  const source = render.createBufferSource(); source.buffer = decoded; source.connect(render.destination); source.start();
+  const samples = (await render.startRendering()).getChannelData(0); await audio.close();
+  const start = performance.now();
+  const worker = new SpeechWorker();
+  worker.onmessage = ({data}) => {
+   out('voz-result',JSON.stringify({...data,segundos:Math.round((performance.now()-start)/1000)},null,2));
+   if(data.kind==='result'||data.kind==='error') worker.terminate();
+  };
+  worker.onerror = (e) => {out('voz-result','ERROR: '+e.message);worker.terminate();};
+  worker.postMessage({samples},[samples.buffer]);
+ } catch(e) {out('voz-result','ERROR: '+e.message);}
+};
+document.getElementById('rostro').onclick = async () => {
+ out('rostro-result','Descargando y preparando modelo facial…');
+ try {
+  const simd = await FilesetResolver.isSimdSupported();
+  const suffix = simd ? 'internal' : 'nosimd_internal';
+  const detector = await FaceLandmarker.createFromOptions({
+   wasmLoaderPath:'/node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_'+suffix+'.js',
+   wasmBinaryPath:'/node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_'+suffix+'.wasm'
+  },{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'CPU'},runningMode:'VIDEO',numFaces:2,outputFaceBlendshapes:true});
+  const image = new Image(); image.src='/images/recuerdos.jpg'; await image.decode();
+  const result=detector.detectForVideo(image,performance.now());
+  const crop=document.createElement('canvas');crop.width=320;crop.height=400;
+  crop.getContext('2d').drawImage(image,280,75,160,200,0,0,320,400);
+  const single=detector.detectForVideo(crop,performance.now()+1000);
+  const blank=document.createElement('canvas');blank.width=320;blank.height=240;
+  const empty=detector.detectForVideo(blank,performance.now()+2000);
+  out('rostro-result',JSON.stringify({estado:'modelo ejecutado',rostros_en_foto:result.faceLandmarks.length,rostros_en_primer_plano:single.faceLandmarks.length,senales_faciales:single.faceBlendshapes[0]?.categories.length??0,rostros_en_imagen_vacia:empty.faceLandmarks.length},null,2));detector.close();
+ }catch(e){out('rostro-result','ERROR: '+e.message);}
+};
+</script></body></html>
