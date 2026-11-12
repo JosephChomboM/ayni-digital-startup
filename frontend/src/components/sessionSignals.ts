@@ -12,6 +12,13 @@ export function requestsVisualContext(text: string): boolean {
     /\b(?:que (?:hay|aparece|se ve)|de que color es)\b[^.?!]*\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
 }
 
+export function visualSource(text: string): "camera" | "memory" | "auto" {
+  const phrase = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (/\b(?:camara|webcam|en vivo|te muestro|te estoy mostrando|mira aca|mira aqui)\b/.test(phrase)) return "camera";
+  if (/\b(?:foto|fotografia|recuerdo|album|imagen guardada)\b/.test(phrase)) return "memory";
+  return "auto";
+}
+
 export function interpretReply(transcript: string): SpokenChoice {
   const reply = transcript.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim()
     .replace(/^ayni[ ,]+/, "");
