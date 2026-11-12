@@ -1,11 +1,15 @@
-import { AyniCompanion } from "./AyniCompanion";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
-import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import type { FormEvent } from "react";
+import { AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import type { Memory } from "../api/memories";
 import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, clearScene, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
+import type { CompanionState } from "./AyniCompanion";
+import { CompanionScene } from "./CompanionScene";
+import type { StageScene } from "./CompanionScene";
 import { SessionCamera } from "./SessionCamera";
+import { SongContext } from "./SongContext";
 import { interpretReply, requestsVisualContext, speakLocally } from "./sessionSignals";
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
@@ -20,10 +24,11 @@ interface GuidedConversationProps {
   onSelectMemory?: (id: string) => void;
   photo?: Blob;
   withDevices: boolean;
-  title: string;
   elapsed: string;
   paused: boolean;
-  activity: ReactNode;
+  scene?: StageScene;
+  activities: SessionActivity[];
+  songMemory?: Memory;
   onPause: (message: string) => void;
   onResume: () => void;
   onNextActivity: (preferred?: SessionActivity) => string;
@@ -31,7 +36,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
+  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   const [liveScene, setLiveScene] = useState(withDevices);
   const cameraCapture = useRef<(() => Promise<string>) | null>(null);
@@ -309,138 +314,159 @@ export function GuidedConversation({
       transcribing: "Pasando tu voz a texto…",
     })[dictation.state];
 
+  const companionState: CompanionState = paused ? "paused" : speaking ? "speaking" :
+    pending || dictation.state === "transcribing" || dictation.state === "loading" ? "thinking" :
+      mic && !dictation.error && (dictation.state === "listening" || dictation.state === "recording") ? "listening" : "idle";
+  const choices: [SessionActivity, string, typeof Images][] = [
+    ["photo", "Ver la foto", Images],
+    ["song", "Escuchar la canción", Music],
+    ["anecdote", "Contar la historia", BookOpen],
+  ];
+  const listeningNow = mic && !dictation.error && (dictation.state === "listening" || dictation.state === "recording");
+
   return <section aria-label="Sesión con Ayni" className="conversation-room">
-    <header className="flex flex-wrap items-center justify-between gap-3 bg-[#193e35] px-4 py-4 text-white sm:px-6">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#edce84] text-[#193e35]"><Bot aria-hidden="true" className="size-6" /></span>
-        <div>
-          <h2 ref={heading} tabIndex={-1} className="text-xl font-bold leading-tight focus:outline-none">Conversación con Ayni</h2>
-          <p className="mt-1 text-sm tabular-nums text-[#d2e8eb]">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
-        </div>
+    <header className="conversation-bar">
+      <div className="min-w-0">
+        <h2 ref={heading} tabIndex={-1} className="focus:outline-none">Conversación con Ayni</h2>
+        <p className="tabular-nums">{elapsed} · Sesión {paused ? "en pausa" : "en curso"}</p>
       </div>
       <div className="flex items-center gap-1">
         <button type="button" title={sound ? "Silenciar a Ayni" : "Activar voz"} aria-label={sound ? "Silenciar a Ayni" : "Activar voz"}
-          className="grid size-11 place-items-center rounded-md text-white hover:bg-white/15" onClick={toggleSound}>
+          className="bar-icon" onClick={toggleSound}>
           {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
         </button>
-        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={() => {
+        <button type="button" className="bar-action" onClick={() => {
           if (paused) { onResume(); show("Seguimos a tu ritmo. ¿Qué te gustaría contar ahora?"); }
           else pause("Hagamos una pausa. Seguimos cuando quieras.");
         }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</button>
-        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 font-semibold hover:bg-white/15" onClick={finish}><Square className="size-4" />Terminar</button>
+        <button type="button" className="bar-action" onClick={finish}><Square className="size-4" />Terminar</button>
       </div>
     </header>
 
-    <div className="conversation-stage">
-      <AyniCompanion state={paused ? "paused" : speaking ? "speaking" : pending || dictation.state === "transcribing" || dictation.state === "loading" ? "thinking" : mic && !dictation.error && (dictation.state === "listening" || dictation.state === "recording") ? "listening" : "idle"}/>
-      <div><span className="eyebrow">TU COMPAÑERO DE CONVERSACIÓN</span><p>{paused ? "Tomemos un respiro." : speaking ? "Una historia nos lleva a otra." : pending ? "Estoy preparando mi respuesta…" : "Te acompaño, a tu ritmo."}</p><span className="stage-status"><i/>{status}</span></div>
-      <span className="stage-flower" aria-hidden="true">✳</span>
-    </div>
-    <div className="conversation-layout grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
-      <aside className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#cddbdc] px-4 py-3 md:col-start-2 md:row-span-2 md:row-start-1 md:block md:border-b-0 md:border-l md:px-5 md:py-5" aria-label="Cámara y recuerdo">
-        {Boolean(memoryOptions?.length) && <label className="col-span-2 mb-3 block text-sm font-semibold">Recuerdo activo
-          <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} className="mt-1 w-full rounded border bg-white p-2 font-normal" onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
-            {!activeMemoryId && <option value="">Fotos de la sesión</option>}
-            {memoryOptions?.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}
-          </select>
-        </label>}
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="font-bold text-[#223e38]">Tu cámara</h3>
-            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
-              className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#223e38] hover:bg-[#e8f5e9]" disabled={paused}
-              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
-          </div>
-          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
-            live={false} /> :
-            <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
-        </div>
-        <label className="mt-3 flex min-h-11 items-start gap-2 text-sm">
-          <input type="checkbox" checked={liveScene} disabled={!camera || paused} onChange={(event) => {
-            const enabled = event.target.checked; setLiveScene(enabled);
-            if (!enabled) {
-              setObservations([]);
-              void clearScene(sessionId).catch(() => setSceneNotice("No se pudo limpiar el contexto anterior. No se usarán más capturas mientras esté desactivado."));
-            }
-          }} />Contexto visual en vivo
-        </label>
-        <p className="text-xs">Di «mira acá» o pregunta por la imagen para compartir una captura actual con Groq, sin pulsar un botón. En los demás mensajes no se envían capturas. No se guardan fotos ni video; solo la conversación y los detalles que pidas analizar.</p>
-        {sceneNotice && <p role="status" className="text-xs">{sceneNotice}</p>}
-        <div className="my-3 flex flex-wrap gap-2">
-          <button type="button" disabled={paused || pending} onClick={() => changeActivity()} className="min-h-11 rounded-lg border px-3 text-sm">Cambiar actividad</button>
-          {photo && <button type="button" disabled={paused || pending} className="min-h-11 rounded-lg border px-3 text-sm" onClick={async () => {
-            try { await follow("Exploremos juntos esta foto familiar.", await imageForConversation(photo)); }
-            catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
-          }}>Analizar foto con IA</button>}
-        </div>
-        {photo && <p className="text-xs">Al analizar, compartes esta foto con Groq para conversar sobre sus detalles visibles.</p>}
-        {observations.length > 0 && <div className="my-3 text-sm"><strong>Detalles que observó Ayni:</strong><ul className="list-inside list-disc">{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
-        {activity && <details key={title} className="min-w-0 md:mt-3 md:border-t md:border-[#cddbdc] md:pt-3" open>
-          <summary className="cursor-pointer break-words font-semibold text-[#223e38]">{title}</summary>
-          {activity}
-        </details>}
-      </aside>
+    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} extra={<>
+      {scene?.kind === "photo" && photo && <button type="button" className="prop-action" disabled={paused || pending} onClick={async () => {
+        try { await follow("Exploremos juntos esta foto familiar.", await imageForConversation(photo)); }
+        catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
+      }}><Sparkles aria-hidden="true" className="size-4" />Analizar foto con IA</button>}
+    </>} />
 
-      <div ref={transcript} role="log" aria-label="Mensajes de la conversación" tabIndex={0}
-        onScroll={({ currentTarget: view }) => {
-          followLatest.current = view.scrollHeight - view.scrollTop - view.clientHeight < 24;
-        }}
-        className="h-[clamp(13rem,36dvh,28rem)] md:h-[clamp(16rem,49dvh,30rem)] min-w-0 space-y-3 sm:space-y-5 overflow-y-auto bg-white px-4 py-5 focus-visible:outline-offset-[-3px] sm:px-6 md:col-start-1 md:row-start-1">
-        {messages.map(({ id, from, text }) => <div key={id} className={from === "you" ? "flex justify-end" : "flex"}>
-          <div className={`max-w-[88%] rounded-xl px-4 py-3 text-[#193e35] ${from === "you" ? "bg-[#e6f0f4]" : "bg-[#edf6ef]"}`}>
-            <p className="text-sm font-bold">{from === "ayni" ? "Ayni" : "Tú"}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
-          </div>
-        </div>)}
-        {aiError && <div role={recovering ? "alert" : "status"} className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
-          <p>{aiError}</p>
-          {recovering && <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
+    {(observations.length > 0 || aiError || (!aiError && suggestion !== "continue")) && <div className="stage-notes">
+      {observations.length > 0 && <div className="note-observed"><strong>Ayni notó:</strong><ul>{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
+      {aiError && <div role={recovering ? "alert" : "status"} className="note-warning">
+        <p>{aiError}</p>
+        <div className="flex flex-wrap gap-x-4">
+          {recovering && <button type="button" disabled={pending || paused} onClick={() => {
             const attempt = lastAttempt.current;
             if (attempt) void follow(attempt.text, attempt.image, attempt.cue, attempt);
             else void loadConversation(() => true);
           }}>Reintentar con IA</button>}
-          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); setRecovering(false); }}>Seguir conversando</button>
+          <button type="button" disabled={paused} onClick={() => { setAiError(""); setRecovering(false); }}>Seguir conversando</button>
+        </div>
+      </div>}
+      {!aiError && suggestion !== "continue" && <div className="note-suggestion">
+        <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
+        <div className="flex flex-wrap gap-x-4">
+          <button type="button" onClick={() => pause("La sesión está en pausa. Continúen cuando quieran.")}>Hacer una pausa</button>
+          <button type="button" onClick={() => changeActivity()}>Probar otra actividad</button>
+        </div>
+      </div>}
+    </div>}
+
+    <div className="conversation-layout">
+      <div className="conversation-main">
+        {activities.length > 0 && <div className="stage-choices" role="group" aria-label="¿Qué hacemos ahora?">
+          {choices.filter(([kind]) => activities.includes(kind)).map(([kind, label, Icon]) =>
+            <button key={kind} type="button" aria-pressed={scene?.kind === kind} disabled={paused || pending}
+              onClick={() => changeActivity(kind)}><Icon aria-hidden="true" />{label}</button>)}
         </div>}
-        {!aiError && suggestion !== "continue" && <div className="rounded-lg bg-sky-50 p-3 text-sm">
-          <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
-          <button type="button" className="min-h-11 font-semibold underline" onClick={() => pause("La sesión está en pausa. Continúen cuando quieran.")}>Hacer una pausa</button>
-          <button type="button" className="ml-3 min-h-11 font-semibold underline" onClick={() => changeActivity()}>Cambiar actividad</button>
-        </div>}
-        {pending && <p className="text-sm text-[#435d60]">Ayni está respondiendo…</p>}
+
+        <form onSubmit={submit} className="reply-dock">
+          <div role="status" className="reply-status">
+            <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
+          </div>
+          <div className="flex items-end gap-2">
+            <button type="button" aria-label={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"} title={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"}
+              className="reply-mic" data-on={(mic && !dictation.error) || undefined} data-listening={listeningNow || undefined} disabled={paused}
+              onClick={() => {
+                if (dictation.error) { dictation.retry(); setMic(true); }
+                else setMic(!mic);
+              }}>{mic && !dictation.error ? <Mic className="size-6" /> : <MicOff className="size-6" />}</button>
+            <label htmlFor="session-reply" className="sr-only">Tu respuesta</label>
+            <textarea id="session-reply" maxLength={500} rows={1} value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder="O escribe aquí tu respuesta…" disabled={paused} />
+            <button type="submit" aria-label="Enviar" className="reply-send" disabled={!input.trim() || paused || pending}><Send className="size-5" /></button>
+          </div>
+          {dictation.state === "recording" && <Button type="button" variant="outline" onClick={dictation.finish}>Listo, ya hablé</Button>}
+          {(voiceNotice || (mic && (dictation.error || dictation.notice))) && <p role="status" className="reply-notice">{(mic && (dictation.error || dictation.notice)) || voiceNotice}</p>}
+        </form>
       </div>
 
-      <form onSubmit={submit} className="min-w-0 space-y-2 border-t border-[#cddbdc] bg-white px-4 py-3 sm:px-6 md:col-start-1 md:row-start-2">
-        <div role="status" className="flex min-h-6 items-center gap-2 text-sm font-semibold text-[#223e38]">
-          <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
+      <aside className="companion-tools" aria-label="Herramientas para quien acompaña">
+        <h3>Para quien acompaña</h3>
+        {Boolean(memoryOptions?.length) && <label className="tool-field">Recuerdo activo
+          <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
+            {!activeMemoryId && <option value="">Fotos de la sesión</option>}
+            {memoryOptions?.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}
+          </select>
+        </label>}
+
+        <div className="tool-block">
+          <h4>Lo que hemos conversado</h4>
+          <div ref={transcript} role="log" aria-label="Mensajes de la conversación" tabIndex={0} className="transcript"
+            onScroll={({ currentTarget: view }) => {
+              followLatest.current = view.scrollHeight - view.scrollTop - view.clientHeight < 24;
+            }}>
+            {messages.map(({ id, from, text }) => <p key={id} data-from={from}>
+              <strong>{from === "ayni" ? "Ayni" : "Tú"}</strong>{text}
+            </p>)}
+            {pending && <p className="transcript-pending">Ayni está respondiendo…</p>}
+          </div>
         </div>
-        <div className="flex items-end gap-2">
-          <label htmlFor="session-reply" className="sr-only">Tu respuesta</label>
-          <textarea id="session-reply" maxLength={500} rows={1} value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
+
+        <div className="tool-block">
+          <div className="flex items-center justify-between gap-2">
+            <h4>Tu cámara</h4>
+            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
+              className="tool-icon" disabled={paused}
+              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
+          </div>
+          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
+            live={false} /> :
+            <p className="tool-hint">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
+          <label className="tool-check">
+            <input type="checkbox" checked={liveScene} disabled={!camera || paused} onChange={(event) => {
+              const enabled = event.target.checked; setLiveScene(enabled);
+              if (!enabled) {
+                setObservations([]);
+                void clearScene(sessionId).catch(() => setSceneNotice("No se pudo limpiar el contexto anterior. No se usarán más capturas mientras esté desactivado."));
               }
-            }}
-            className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-[#a9bfc0] px-3 py-2.5 text-base text-[#223e38] placeholder:text-[#536c70] focus-visible:outline-2 focus-visible:outline-[#235c50]"
-            placeholder="Escribe tu respuesta…" disabled={paused} />
-          <button type="button" aria-label={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"} title={mic && !dictation.error ? "Apagar micrófono" : "Activar micrófono"}
-            className="grid size-11 shrink-0 place-items-center rounded-md border border-[#a9bfc0] text-[#223e38] hover:bg-[#edf6ef]" disabled={paused}
-            onClick={() => {
-              if (dictation.error) { dictation.retry(); setMic(true); }
-              else setMic(!mic);
-            }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
-          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
+            }} />Contexto visual en vivo
+          </label>
+          <p className="tool-hint">Di «mira acá» o pregunta por la imagen para compartir una captura actual con Groq, sin pulsar un botón. En los demás mensajes no se envían capturas. No se guardan fotos ni video; solo la conversación y los detalles que pidas analizar.</p>
+          {sceneNotice && <p role="status" className="tool-hint">{sceneNotice}</p>}
         </div>
-        {dictation.state === "recording" && <Button type="button" variant="outline" onClick={dictation.finish}>Listo, ya hablé</Button>}
-        <details className="text-sm"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Opciones de dictado</summary>
-          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
-          <p className="text-xs">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español con el modelo de mayor precisión. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
-          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={reviewVoice} onChange={(event) => setReviewVoice(event.target.checked)} />Revisar el dictado antes de enviarlo</label>
+
+        <div className="tool-block">
+          <button type="button" className="tool-button" disabled={paused || pending} onClick={() => changeActivity()}>Cambiar actividad</button>
+          {photo && scene?.kind === "photo" && <p className="tool-hint">Al analizar, compartes esta foto con Groq para conversar sobre sus detalles visibles.</p>}
+        </div>
+
+        {scene?.kind === "song" && songMemory && <SongContext key={songMemory.id} memoryId={songMemory.id} />}
+
+        <details className="tool-block">
+          <summary>Opciones de dictado</summary>
+          <label className="tool-check"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
+          <p className="tool-hint">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español con el modelo de mayor precisión. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
+          <label className="tool-check"><input type="checkbox" checked={reviewVoice} onChange={(event) => setReviewVoice(event.target.checked)} />Revisar el dictado antes de enviarlo</label>
         </details>
-        {(voiceNotice || (mic && (dictation.error || dictation.notice))) && <p role="status" className="text-sm text-[#435d60]">{(mic && (dictation.error || dictation.notice)) || voiceNotice}</p>}
-      </form>
+      </aside>
     </div>
   </section>;
 }

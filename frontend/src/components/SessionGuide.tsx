@@ -1,7 +1,7 @@
 import { AyniCompanion } from "./AyniCompanion";
 import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Play, RotateCcw } from "lucide-react";
+import { Check, Play, RotateCcw } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -9,8 +9,8 @@ import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
 import { recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
 import type { Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
-import { SongContext } from "./SongContext";
 import { GuidedConversation } from "./GuidedConversation";
+import type { StageScene } from "./CompanionScene";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
@@ -25,22 +25,6 @@ const reactions: Array<[Reaction, string]> = [
   ["receptivo", "Receptivo"], ["emocionado", "Emocionado"],
   ["indiferente", "Indiferente"], ["agitado", "Agitado"],
 ];
-
-function playerUrl(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    const youtubeId = url.hostname === "youtu.be"
-      ? url.pathname.slice(1)
-      : url.hostname === "youtube.com" || url.hostname === "www.youtube.com"
-        ? url.searchParams.get("v") ?? url.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]{11})/)?.[1]
-        : null;
-    if (youtubeId && /^[\w-]{11}$/.test(youtubeId)) return `https://www.youtube-nocookie.com/embed/${youtubeId}`;
-    const spotifyId = url.hostname === "open.spotify.com" ? url.pathname.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] : null;
-    if (spotifyId) return `https://open.spotify.com/embed/track/${spotifyId}`;
-  } catch { return null; }
-  return null;
-}
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -230,13 +214,9 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     } finally { setBusy(false); }
   };
 
-  const activityTitle = activity === "anecdote" ? selectedAnecdote?.title :
-    activity === "photo" ? "Foto familiar" : selectedSong?.title;
-  const activityContent = activity === "anecdote" ? (
-    <p className="mt-2 break-words text-sm leading-relaxed text-slate-700">{selectedAnecdote?.text}</p>
-  ) : activity === "photo" && photos.length ? (
-    <PhotoCarousel photos={photos} index={photoIndex} onChange={setPhotoIndex} />
-  ) : activity === "song" && selectedSong && !paused ? <MusicPlayer memory={selectedSong} /> : null;
+  const scene: StageScene | undefined = activity === "anecdote" && selectedAnecdote ? { kind: "anecdote", title: selectedAnecdote.title, text: selectedAnecdote.text ?? "" } :
+    activity === "photo" && photos.length ? { kind: "photo", photos, index: photoIndex, onChange: setPhotoIndex } :
+      activity === "song" && selectedSong ? { kind: "song", memory: selectedSong } : undefined;
 
   return <Card className="session-page border-0 shadow-none">
     {!started && <PageIntro eyebrow="UN MOMENTO PARA CONECTAR" title="Guía de sesión">Conversen a su ritmo con la ayuda de Ayni.</PageIntro>}
@@ -298,10 +278,11 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
         }}
         photo={activity === "photo" ? photoBlob : undefined}
         withDevices={withDevices}
-        title={activityTitle ?? "Recuerdo familiar"}
         elapsed={formatTime(elapsed)}
         paused={paused}
-        activity={activityContent}
+        scene={scene}
+        activities={availableActivities}
+        songMemory={selectedSong}
         onPause={() => setPaused(true)}
         onResume={() => setPaused(false)}
         onNextActivity={nextActivity}
@@ -319,25 +300,6 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#235c50]" /><h2 className="text-xl font-semibold text-[#235c50]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
     </CardContent>
   </Card>;
-}
-
-function PhotoCarousel({ photos, index, onChange, large = false }: { photos: MemoryPhoto[]; index: number; onChange: (index: number) => void; large?: boolean }) {
-  const photo = photos[index % photos.length];
-  if (!photo) return null;
-  return <figure className={`mt-3 ${large ? "max-w-2xl" : "max-w-sm"}`}>
-    <img src={photo.url} alt="Foto familiar" className={`w-full rounded-lg object-cover ${large ? "max-h-[420px]" : "aspect-video"}`} />
-    <figcaption className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-600"><span className="truncate">Foto familiar</span><span>{index + 1} / {photos.length}</span></figcaption>
-    {photos.length > 1 && <div className="mt-2 flex gap-2"><button type="button" onClick={() => onChange((index - 1 + photos.length) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#235c50]" aria-label="Foto anterior"><ArrowLeft className="size-4" /></button><button type="button" onClick={() => onChange((index + 1) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#235c50]" aria-label="Siguiente foto"><ArrowRight className="size-4" /></button></div>}
-  </figure>;
-}
-
-function MusicPlayer({ memory }: { memory: Memory }) {
-  const src = playerUrl(memory.url);
-  return <div className="mt-3 space-y-2">
-    <p className="text-sm font-medium text-[#223e38]">{memory.title}</p>
-    <SongContext key={memory.id} memoryId={memory.id} />
-    {src ? <iframe title={`Reproducir ${memory.title}`} src={src} className="aspect-video w-full max-w-xl rounded-lg border-0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[#235c50] underline">Abrir canción en otra pestaña</a>}
-  </div>;
 }
 
 function Choice({ children, selected, onClick }: { children: string; selected: boolean; onClick: () => void }) {
