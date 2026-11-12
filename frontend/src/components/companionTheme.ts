@@ -1,17 +1,10 @@
+import type { LookSpec } from "../api/sessions";
+
 /**
- * Ambienta la sala y viste a Ayni según los gustos registrados en el perfil.
- * Se decide en el navegador con palabras clave: no se envían gustos a la IA.
+ * Look de respaldo cuando la IA no está disponible: palabras clave de los gustos del
+ * perfil (y, si no hay, de los recuerdos) llevan a un diseño fijo. Se decide en el navegador.
  */
 export type ThemeId = "music" | "garden" | "cooking" | "football" | "knitting" | "reading" | "pets" | "sea";
-
-export interface CompanionTheme {
-  /** Ropa de Ayni: la del primer gusto reconocido. */
-  outfit: ThemeId | null;
-  /** Objetos de la sala: hasta dos gustos distintos. */
-  decor: ThemeId[];
-  /** Frase accesible que explica el look, por ejemplo «Ayni lleva gorro de cocinero». */
-  description: string;
-}
 
 const keywords: [ThemeId, RegExp][] = [
   ["music", /\b(?:music\w*|cant\w*|bolero\w*|criollo|criolla|vals\w*|marinera|huayno\w*|salsa|cumbia|guitarr\w*|piano|radio|bail\w*|tango|orquesta|chabuca)\b/],
@@ -24,15 +17,16 @@ const keywords: [ThemeId, RegExp][] = [
   ["sea", /\b(?:playa\w*|mar|pesca\w*|pescar|viaj\w*|barco\w*|malecon\w*|chorrillos|ancon)\b/],
 ];
 
-const descriptions: Record<ThemeId, string> = {
-  music: "Ayni lleva sombrero y corbatín, y hay una guitarra en la sala",
-  garden: "Ayni lleva sombrero de paja con una flor, y hay macetas en la sala",
-  cooking: "Ayni lleva gorro y mandil de cocina, y hay ollas en la repisa",
-  football: "Ayni lleva la franja roja, y hay una pelota en la sala",
-  knitting: "Ayni lleva bufanda tejida y boina, y hay una canasta de lana",
-  reading: "Ayni lleva lentes de lectura, y hay un librero en la sala",
-  pets: "Ayni lleva pañoleta, y un perrito la acompaña en la sala",
-  sea: "Ayni lleva sombrero de pescador, y hay un cuadro del mar",
+type Look = Omit<LookSpec, "decor"> & { decor: LookSpec["decor"] };
+const looks: Record<ThemeId, Look> = {
+  music: { hat: "fedora", body: "bowtie", glasses: false, hat_color: "#3d4a46", outfit_color: "#b94c35", accent_color: "#b94c35", wall: ["#f6ece0", "#f1e2d2"], decor: [{ icon: "guitar", place: "floor" }, { icon: "music", place: "wall" }], description: "Ayni se puso sombrero y corbatín, y trajo su guitarra" },
+  garden: { hat: "straw", body: "apron", glasses: false, hat_color: "#edce84", outfit_color: "#7fa58d", accent_color: "#f2a097", wall: ["#eef3e4", "#e5eed9"], decor: [{ icon: "flower-2", place: "floor" }, { icon: "sprout", place: "wall" }], description: "Ayni lleva sombrero de paja con una flor y mandil de jardín" },
+  cooking: { hat: "chef", body: "apron", glasses: false, hat_color: "#fffefa", outfit_color: "#fffefa", accent_color: "#b94c35", wall: ["#f8efe2", "#f8efe2"], decor: [{ icon: "cooking-pot", place: "wall" }, { icon: "soup", place: "floor" }], description: "Ayni lleva gorro y mandil de cocina" },
+  football: { hat: "cap", body: "sash", glasses: false, hat_color: "#d83a3a", outfit_color: "#d83a3a", accent_color: "#fffefa", wall: ["#f7efe6", "#f3e6dc"], decor: [{ icon: "volleyball", place: "floor" }, { icon: "trophy", place: "wall" }], description: "Ayni lleva gorra y la franja roja" },
+  knitting: { hat: "beret", body: "scarf", glasses: false, hat_color: "#b94c35", outfit_color: "#b94c35", accent_color: "#edce84", wall: ["#f7ece4", "#f2e2d8"], decor: [{ icon: "scissors", place: "wall" }, { icon: "shirt", place: "floor" }], description: "Ayni lleva bufanda tejida y boina" },
+  reading: { hat: "none", body: "cardigan", glasses: true, hat_color: "#c98a62", outfit_color: "#c98a62", accent_color: "#edce84", wall: ["#f4eee0", "#ece3cf"], decor: [{ icon: "library", place: "floor" }, { icon: "book-open", place: "wall" }], description: "Ayni lleva lentes de lectura y chompa" },
+  pets: { hat: "none", body: "bandana", glasses: false, hat_color: "#235c50", outfit_color: "#235c50", accent_color: "#fffefa", wall: ["#f5f0e2", "#efe7d2"], decor: [{ icon: "dog", place: "floor" }, { icon: "paw-print", place: "wall" }], description: "Ayni lleva pañoleta y un perrito la acompaña" },
+  sea: { hat: "bucket", body: "stripes", glasses: false, hat_color: "#7fa5b8", outfit_color: "#7fa5b8", accent_color: "#fffefa", wall: ["#eaf2f2", "#e0ecee"], decor: [{ icon: "sailboat", place: "wall" }, { icon: "shell", place: "floor" }], description: "Ayni lleva sombrero de pescador y hay un cuadro del mar" },
 };
 
 function normalize(text: string) {
@@ -40,7 +34,7 @@ function normalize(text: string) {
 }
 
 /** Elige el look en el orden en que la familia escribió los gustos; los recuerdos son respaldo. */
-export function themeFor(interests: string[], memoryTexts: string[] = []): CompanionTheme {
+export function lookFor(interests: string[], memoryTexts: string[] = []): LookSpec | null {
   const found: ThemeId[] = [];
   for (const source of [interests, memoryTexts]) {
     for (const text of source) {
@@ -54,6 +48,8 @@ export function themeFor(interests: string[], memoryTexts: string[] = []): Compa
     }
     if (found.length) break;
   }
-  const outfit = found[0] ?? null;
-  return { outfit, decor: found.slice(0, 2), description: outfit ? descriptions[outfit] : "" };
+  if (!found.length) return null;
+  const main = looks[found[0]];
+  const second = found[1] ? looks[found[1]].decor[0] : undefined;
+  return { ...main, wall: [...main.wall] as [string, string], decor: second ? [main.decor[0], second] : main.decor };
 }
