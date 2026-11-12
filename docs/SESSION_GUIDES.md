@@ -94,46 +94,30 @@ o recargar la pantalla. Debe mostrar carga, vacío y errores como estados distin
 leer detail.message/detail.code y cerrar sesión ante 401 como hace el cliente existente.
 La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
 
-## Conversar con Ayni
+## Sesión con Ayni
 
-En la guía, elige una anécdota marcada como bonita y sin la marca de tema
-delicado. Comienza la actividad, avanza a **Conversen sin apuro** y pulsa
-**Conversar**. Tras leer o escuchar la pregunta, la familia puede hablar y
-elegir **El lugar**, **Lo que hicimos** u **Otro detalle** para seguir. La
-conversación ofrece hasta cinco preguntas distintas y puede terminarse en
-cualquier momento.
+1. En **Guía de sesión**, elige una anécdota bonita si tienen una y pulsa
+   **Empezar con Ayni**. La guía también funciona sin un recuerdo guardado.
+2. Ayni saluda y hace una pregunta. Usa **Hablar → Listo, ya hablé** o
+   **Tu respuesta → Enviar**. Para escuchar otra vez, pulsa **Volver a escuchar**.
+3. **Activar cámara** abre la vista en vivo al dar permiso. Cuando el detector
+   encuadra un solo rostro, muestra un marco. Una expresión sostenida puede
+   producir una invitación a seguir o cambiar. Si sale de cuadro durante siete
+   segundos, Ayni ofrece continuar cuando la persona regrese.
+4. «Quiero descansar» pausa, «otra actividad» cambia entre los recuerdos
+   disponibles y «quiero terminar» abre el cierre de la sesión.
 
-- **Pregunta elegida por IA** indica que Groq seleccionó una pregunta del
-  catálogo de Ayni. El modelo recibe únicamente una categoría amplia del
-  recuerdo, el tema elegido y opciones de preguntas. La extracción de
-  entidades de las anécdotas sigue siendo una función independiente.
-- **Pregunta de la guía** indica que se usó el catálogo local cuando Groq
-  está desconfigurado o no responde de manera válida.
-- **Leer las preguntas en voz alta** y **Escuchar pregunta** usan una voz
-  local en español. **Responder por voz** analiza una respuesta breve
-  con el reconocimiento local del navegador. «Fuimos al parque» lleva
-  a una pregunta sobre el lugar. «No me acuerdo» ofrece una pregunta
-  más sencilla. «Quiero descansar» pausa la guía y «otra actividad»
-  avanza al paso de la canción. Los botones ofrecen el recorrido manual.
-  Si el navegador permite instalar el paquete de español, se puede
-  descargar desde la conversación.
-- **Activar cámara** abre la vista con permiso del navegador. MediaPipe
-  analiza las expresiones en el dispositivo. Una sonrisa sostenida puede
-  traer una pregunta adicional. Un ceño sostenido ofrece una alternativa
-  más tranquila. Cada conversación aplica como máximo una sugerencia
-  por expresión. Tras siete segundos de ausencia de un rostro previamente
-  encuadrado, la guía se pausa. Con más de un rostro se suspenden las
-  sugerencias. Los umbrales son reglas iniciales de interacción.
-- Ayni descarta la transcripción y procesa el video localmente, sin
-  almacenarlo. La cámara se apaga al pausar, cambiar de paso o salir
-  de la pestaña. Requiere HTTPS o localhost y descarga el modelo
-  de MediaPipe la primera vez que se activa. El backend comprueba que el recuerdo pertenece a la
-  familia autenticada y sigue siendo apto en cada turno. La conversación
-  se mantiene en memoria durante el paso y se reinicia al salir o pausar.
+La respuesta por voz graba hasta 18 segundos por turno. Whisper se descarga al
+navegador la primera vez y transcribe localmente. El modelo puede tardar en
+cargar en conexiones lentas. Los mensajes se leen con una voz local en español
+si el dispositivo la tiene. La cámara y el micrófono requieren HTTPS o localhost.
+El detector facial descarga su modelo por separado. Si falla esa descarga, la
+vista previa de la cámara sigue disponible.
 
-Para probar el flujo, guarda una anécdota ficticia como «Caminamos por el
-parque y luego compartimos la merienda» y márcala como bonita. El endpoint
-`POST /sessions/conversation/{memory_id}` usa la configuración existente
-`GROQ_API_KEY`, `GROQ_MODEL` y `LLM_TIMEOUT_SECONDS`. Requiere el JWT de
-Ayni y recibe únicamente `topic` y los identificadores de preguntas ya
-mostradas. No crea una sesión persistida ni consume el cupo de generación.
+Para una anécdota elegible, `POST /sessions/conversation/{memory_id}` comprueba
+el JWT y la familia y recibe un tema y los identificadores de preguntas recientes.
+Groq elige entre preguntas preparadas. La API reutiliza `GROQ_API_KEY`,
+`GROQ_MODEL` y `LLM_TIMEOUT_SECONDS`. Cuando falta Groq o el recuerdo, Ayni
+puede responder con preguntas locales. El texto escrito, la transcripción, el
+audio y el video se quedan en el navegador durante la conversación. Los
+gestos orientan el ritmo con reglas de interacción, sin calificación clínica.
