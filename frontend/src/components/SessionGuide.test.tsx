@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionGuide } from "./SessionGuide";
-import { listMemories, getMemory } from "../api/memories";
+import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import { clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
-vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn() }));
+vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
 vi.mock("../api/sessions", () => ({ clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
@@ -281,4 +281,23 @@ it("no usa la cámara cuando se pide una foto que no está abierta", async () =>
  act(()=>speech.receive?.("Mira la foto del recuerdo"));
  await screen.findByText(/Abre la foto del recuerdo/);
  expect(speech.capture).not.toHaveBeenCalled();
+});
+
+it("permite confirmar un recuerdo nuevo antes de incluirlo en la sesión", async () => {
+ vi.mocked(listMemories).mockResolvedValue({items:[{...memory,is_positive:false}],total:1,limit:50,offset:0});
+ vi.mocked(updateMemory).mockResolvedValue(memory);
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()}/>);
+ const select=await screen.findByRole("combobox",{name:"Recuerdo para la sesión"});
+ await screen.findByRole("option",{name:/Confirma que es un recuerdo bonito/});
+ fireEvent.change(select,{target:{value:memory.id}});
+ expect(screen.getByRole("button",{name:"Empezar con Ayni"})).toBeDisabled();
+ fireEvent.click(screen.getByRole("button",{name:"Confirmar que es un recuerdo bonito"}));
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Empezar con Ayni"})).toBeEnabled());
+ expect(updateMemory).toHaveBeenCalledWith(memory.id,{is_positive:true});
+});
+it("carga también los recuerdos que quedan fuera de la primera página", async () => {
+ vi.mocked(listMemories).mockResolvedValueOnce({items:[memory],total:2,limit:50,offset:0}).mockResolvedValueOnce({items:[{...memory,id:"new",title:"Recuerdo nuevo con imagen"}],total:2,limit:50,offset:1});
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()}/>);
+ expect(await screen.findByRole("option",{name:/Recuerdo nuevo con imagen/})).toBeInTheDocument();
+ expect(listMemories).toHaveBeenCalledWith(expect.objectContaining({offset:1}));
 });
