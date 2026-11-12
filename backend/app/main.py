@@ -13,6 +13,7 @@ from app.core.security_settings import lifespan
 from app.modules.billing.router import router as billing_router
 from app.modules.families.router import router as families_router
 from app.modules.memories.router import router as memories_router
+from app.modules.responses.router import router as responses_router
 from app.modules.sessions.router import router as sessions_router
 
 app = FastAPI(title="Ayni Digital API", lifespan=lifespan)
@@ -21,6 +22,7 @@ app.include_router(billing_router)
 app.include_router(families_router)
 app.include_router(memories_router)
 app.include_router(sessions_router)
+app.include_router(responses_router)
 configure_cors(app)
 
 
