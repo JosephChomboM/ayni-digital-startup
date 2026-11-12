@@ -103,3 +103,13 @@ it("uses video frames locally, reports a sustained smile and releases the camera
   expect(stop).toHaveBeenCalledOnce();
   expect(detector.close).toHaveBeenCalledOnce();
 });
+
+it("describe el gesto visible de la cara sin interpretarlo como sentimiento", async () => {
+  const { readExpression } = await import("./sessionSignals");
+  const face = (values: Record<string, number>) => readExpression((name) => values[name] ?? 0);
+  expect(face({ mouthSmileLeft: 0.7, mouthSmileRight: 0.6 })).toBe("smile");
+  expect(face({ jawOpen: 0.5, browInnerUp: 0.5 })).toBe("surprise");
+  expect(face({ browDownLeft: 0.6, browDownRight: 0.6 })).toBe("brow");
+  expect(face({ mouthFrownLeft: 0.3, mouthFrownRight: 0.3 })).toBe("sad");
+  expect(face({})).toBe("calm");
+});
