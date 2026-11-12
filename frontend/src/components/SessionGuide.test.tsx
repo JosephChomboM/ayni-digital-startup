@@ -6,11 +6,18 @@ import { getMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
 import type { SessionResponse } from "../api/sessions";
+import { nextConversationTurn } from "../api/conversation";
+import type { FaceCue } from "./sessionSignals";
 
 vi.mock("../api/sessions", () => ({ generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("../api/memories", () => ({ getMemory: vi.fn(), memoryErrorMessage: (error: Error) => error.message }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
 
+vi.mock("../api/conversation", () => ({ nextConversationTurn: vi.fn() }));
+vi.mock("./SessionCamera", () => ({
+  SessionCamera: ({ onCue }: { onCue: (cue: FaceCue) => void }) =>
+    <button type="button" onClick={() => onCue("away")}>Simular salida de cuadro</button>,
+}));
 const user = { id: "u", name: "Persona de prueba", email: "persona@example.test", role: "familiar" as const, family_id: "f", created_at: "2026-11-11T12:00:00Z" };
 const guide = { id: "saved-guide", elder_profile_id: "p", created_by: "u", created_at: "2026-11-11T12:00:00Z", template_version: "1.0", duration_minutes: 15, steps: [
   { position: 1, duration_minutes: 2, instruction: "Busca un lugar tranquilo.", memory_id: null, source_memory_id: null, memory_available: false },
@@ -29,7 +36,7 @@ beforeEach(() => {
   vi.mocked(listPhotos).mockResolvedValue([]);
   vi.mocked(getMemory).mockResolvedValue({ id: "memory", elder_profile_id: "p", created_by: "u", type: "anecdote", title: "Paseo en familia", text: "Un paseo agradable.", url: null, is_positive: true, is_sensitive: false, entities: [], entities_status: "completed", created_at: guide.created_at, updated_at: guide.created_at });
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); localStorage.clear(); });
+afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 
 async function begin() {
   render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
@@ -89,4 +96,53 @@ it("keeps the reaction form open with the error when save fails", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar.");
   expect(screen.getByRole("button", { name: "Guardar reacción" })).toBeEnabled();
   expect(screen.queryByRole("heading", { name: "Reacción guardada en tu familia" })).not.toBeInTheDocument();
+});
+
+it("aborts a pending turn and releases the camera panel when framing pauses the guide", async () => {
+ vi.mocked(nextConversationTurn)
+   .mockResolvedValueOnce({ question_id: "first", question: "¿Qué parte quieres contar?", source: "ai" })
+   .mockImplementationOnce(() => new Promise(() => {}));
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+ await screen.findByText("Un paseo agradable.");
+ expect(nextConversationTurn).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole("button", { name: "Conversar" }));
+ expect(await screen.findByText("Pregunta elegida por IA")).toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button", { name: "Activar cámara" }));
+ fireEvent.click(screen.getByRole("button", { name: "El lugar" }));
+ const [memoryId, topic, asked, signal] = vi.mocked(nextConversationTurn).mock.calls[1];
+ expect([memoryId, topic, asked]).toEqual(["memory", "place", ["first"]]);
+ fireEvent.click(screen.getByRole("button", { name: "Simular salida de cuadro" }));
+ expect(signal.aborted).toBe(true);
+ expect(screen.queryByRole("region", { name: "Conversar con Ayni" })).not.toBeInTheDocument();
+ expect(screen.getByText(/salió del cuadro/)).toBeInTheDocument();
+ expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+});
+
+it("acts on a spoken request to rest without submitting the transcript", async () => {
+ let recognition: FakeRecognition;
+ class FakeRecognition {
+   static available = vi.fn().mockResolvedValue("available");
+   processLocally = false;
+   lang = "";
+   start = vi.fn();
+   abort = vi.fn();
+   onresult: ((event: { results: { transcript: string }[][] }) => void) | null = null;
+   constructor() { recognition = this; }
+ }
+ vi.stubGlobal("SpeechRecognition", FakeRecognition);
+ vi.mocked(nextConversationTurn).mockResolvedValue({
+   question_id: "first", question: "¿Qué parte quieres contar?", source: "ai",
+ });
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+ await screen.findByText("Un paseo agradable.");
+ fireEvent.click(screen.getByRole("button", { name: "Conversar" }));
+ fireEvent.click(await screen.findByRole("button", { name: "Responder por voz" }));
+ await waitFor(() => expect(recognition.start).toHaveBeenCalledOnce());
+ expect(recognition!.processLocally).toBe(true);
+ act(() => recognition.onresult?.({ results: [[{ transcript: "Quiero descansar un rato" }]] }));
+ expect(screen.getByText("Claro, tomemos una pausa.")).toBeInTheDocument();
+ expect(recognition!.abort).toHaveBeenCalledOnce();
+ expect(nextConversationTurn).toHaveBeenCalledOnce();
 });

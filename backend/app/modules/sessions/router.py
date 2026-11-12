@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.modules.families.service import get_authenticated_user_id
+from app.modules.sessions.conversation import ConversationRequest, ConversationTurn
 from app.modules.sessions.schemas import (
     GenerateSessionRequest,
     SessionDetail,
@@ -41,6 +42,13 @@ def list_sessions(
     service: Service,
 ) -> SessionListResponse:
     return service.list_sessions(actor_id, query)
+
+
+@router.post("/conversation/{memory_id}", response_model=ConversationTurn)
+def converse_about_memory(
+    memory_id: UUID, data: ConversationRequest, actor_id: ActorId, service: Service
+) -> ConversationTurn:
+    return service.converse_about_memory(actor_id, memory_id, data)
 
 
 @router.get("/{session_id}", response_model=SessionDetail)

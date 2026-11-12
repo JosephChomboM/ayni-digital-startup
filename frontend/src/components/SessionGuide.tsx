@@ -8,6 +8,8 @@ import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
 import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
 import type { Reaction, SessionGuide as SavedGuide, SessionSummary } from "../api/sessions";
+import { GuidedConversation } from "./GuidedConversation";
+import { speakLocally } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
@@ -53,6 +55,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   const [photoIndex, setPhotoIndex] = useState(0);
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [adaptivePause, setAdaptivePause] = useState<{ message: string; speak: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [step, setStep] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -107,13 +110,19 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
     return () => window.clearInterval(timer);
   }, [started, paused]);
 
+  useEffect(() => {
+    if (!paused || !adaptivePause?.speak) return;
+    speakLocally(adaptivePause.message);
+    return () => window.speechSynthesis?.cancel();
+  }, [paused, adaptivePause]);
+
   async function begin(existingId?: string) {
     setBusy(true); setError("");
     try {
       const record = existingId ? await getSession(existingId) : await generateSession();
       const response = existingId ? await getRecordedReaction(existingId) : null;
       setGuide(record); setReaction(response?.reaction ?? null); setSaved(response !== null);
-      setStarted(true); setPaused(false); setElapsed(0); setStep(0); setPhotoIndex(0); setReviewOpen(false);
+      setStarted(true); setPaused(false); setAdaptivePause(null); setElapsed(0); setStep(0); setPhotoIndex(0); setReviewOpen(false);
     } catch (reason) { setError(memoryErrorMessage(reason)); }
     finally { setBusy(false); }
   }
@@ -167,8 +176,13 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
         {memory?.type === "song" && <MusicPlayer memory={memory} />}
         {stepPhotos.length > 0 && <PhotoCarousel photos={stepPhotos} index={photoIndex} onChange={setPhotoIndex} />}
         {contentError && <div role="alert" className="text-sm text-amber-900"><p>{contentError}</p><button className="mt-2 font-semibold underline" onClick={() => setContentAttempt((value) => value + 1)}>Actualizar recuerdos y fotos</button></div>}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2"><div className="flex gap-2"><Button variant="outline" disabled={paused || step === 0} onClick={() => { setStep((value) => value - 1); setPhotoIndex(0); }} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>{step < guide.steps.length - 1 && <Button variant="outline" disabled={paused} onClick={() => { setStep((value) => value + 1); setPhotoIndex(0); }} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}</div><div className="flex gap-2"><Button variant="outline" onClick={() => setPaused((value) => !value)} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button><Button variant="secondary" onClick={() => { setStarted(false); setReviewOpen(true); }} className="w-auto"><Square className="mr-2 size-4" />Terminar</Button></div></div>
-        {paused && <p role="status" className="text-sm text-slate-500">La sesión está en pausa. No hay apuro para continuar.</p>}
+        {memory?.type === "anecdote" && !paused && <GuidedConversation
+          key={memory.id} memoryId={memory.id} title={memory.title}
+          onPause={(message, speak) => { setAdaptivePause({ message, speak }); setPaused(true); }}
+          onNextActivity={() => { setStep((value) => Math.min(guide.steps.length - 1, value + 1)); setPhotoIndex(0); }}
+        />}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2"><div className="flex gap-2"><Button variant="outline" disabled={paused || step === 0} onClick={() => { setStep((value) => value - 1); setPhotoIndex(0); }} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>{step < guide.steps.length - 1 && <Button variant="outline" disabled={paused} onClick={() => { setStep((value) => value + 1); setPhotoIndex(0); }} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}</div><div className="flex gap-2"><Button variant="outline" onClick={() => { setAdaptivePause(null); setPaused((value) => !value); }} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button><Button variant="secondary" onClick={() => { setStarted(false); setReviewOpen(true); }} className="w-auto"><Square className="mr-2 size-4" />Terminar</Button></div></div>
+        {paused && <p role="status" className="text-sm text-slate-500">{adaptivePause?.message ?? "La sesión está en pausa. No hay apuro para continuar."}</p>}
         {elapsed >= duration && <p role="status" className="text-sm text-slate-600">Pueden cerrar la actividad cuando quieran.</p>}
       </section>}
 

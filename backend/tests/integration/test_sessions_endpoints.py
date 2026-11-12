@@ -51,6 +51,51 @@ def other_profile(account: SimpleNamespace) -> None:
         )
 
 
+def test_conversation_uses_only_eligible_memories_from_the_authenticated_family(
+    client: TestClient,
+    caregiver_account: SimpleNamespace,
+    memory_profile_id: UUID,
+    other_caregiver_account: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.sessions import conversation
+
+    monkeypatch.setattr(conversation, "get_settings", lambda: SimpleNamespace(groq_api_key=""))
+    memory_id = seed(caregiver_account)
+    path = f"/sessions/conversation/{memory_id}"
+    assert client.post(path, json={"topic": "start"}).status_code == 401
+
+    other_profile(other_caregiver_account)
+    assert (
+        client.post(
+            path, json={"topic": "start"}, headers=auth(other_caregiver_account)
+        ).status_code
+        == 404
+    )
+
+    headers = auth(caregiver_account)
+    first = client.post(path, json={"topic": "place"}, headers=headers)
+    assert first.status_code == 200
+    assert first.json()["source"] == "guide"
+    second = client.post(
+        path, json={"topic": "place", "asked": [first.json()["question_id"]]}, headers=headers
+    )
+    assert second.status_code == 200
+    assert second.json()["question_id"] != first.json()["question_id"]
+    assert (
+        client.post(
+            path, json={"topic": "start", "transcript": "respuesta privada"}, headers=headers
+        ).status_code
+        == 422
+    )
+
+    patch = client.patch(f"/memories/{memory_id}", json={"is_sensitive": True}, headers=headers)
+    assert patch.status_code == 200
+    blocked = client.post(path, json={"topic": "start"}, headers=headers)
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "conversation_memory_unavailable"
+
+
 @pytest.mark.parametrize("role", ["caregiver", "member"])
 def test_post_generates_and_persists_for_both_family_roles(
     client: TestClient,
