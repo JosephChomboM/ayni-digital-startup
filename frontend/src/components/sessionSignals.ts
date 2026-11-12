@@ -67,49 +67,29 @@ export function createFaceCueTracker() {
   };
 }
 
-const VOICE_PREFERENCE_KEY = "ayni_voice_uri";
+const LATIN_AMERICAN_REGIONS = new Set([
+  "419", "AR", "BO", "BZ", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX",
+  "NI", "PA", "PE", "PR", "PY", "SV", "UY", "VE",
+]);
 
-export function preferredVoiceURI(): string {
-  try { return localStorage.getItem(VOICE_PREFERENCE_KEY) ?? ""; }
-  catch { return ""; }
-}
+export function latinAmericanVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  return voices.flatMap((voice) => {
+    const region = /^es(?:-[a-z]{4})?-([a-z]{2}|419)(?:-|$)/i.exec(voice.lang)?.[1].toUpperCase();
+    if (!voice.localService || !region || !LATIN_AMERICAN_REGIONS.has(region)) return [];
 
-export function saveVoicePreference(voiceURI: string): void {
-  try {
-    if (voiceURI) localStorage.setItem(VOICE_PREFERENCE_KEY, voiceURI);
-    else localStorage.removeItem(VOICE_PREFERENCE_KEY);
-  } catch {
-    // The selected voice still works for this session if storage is blocked.
-  }
-}
-
-const spanishRegions = new Intl.DisplayNames("es", { type: "region" });
-
-export function spanishVoiceLabel(voice: SpeechSynthesisVoice): string {
-  const region = new Intl.Locale(voice.lang).region;
-  return `${voice.name} · ${region ? spanishRegions.of(region) : "Español"}`;
-}
-
-export function spanishVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
-  const score = (voice: SpeechSynthesisVoice) => {
-    const region = new Intl.Locale(voice.lang).region;
-    const accent = region === "PE" ? 600
-      : region && ["419", "AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX", "NI", "PA", "PR", "PY", "SV", "UY", "VE"].includes(region) ? 400
-      : region === "ES" ? 200 : 0;
     const identity = `${voice.name} ${voice.voiceURI ?? ""}`;
     const quality = /natural|neural|premium|enhanced|mejorada|alta calidad/i.test(identity) ? 100 : 0;
-    const standardVoice = /^(?:paulina|m[oó]nica)\b/i.test(voice.name) ? 12 : 0;
+    const standardVoice = /^paulina\b/i.test(voice.name) ? 12 : 0;
     const noveltyVoice = /espeak|compact|robot|^(?:eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i.test(voice.name);
-    return accent + quality + standardVoice - (noveltyVoice ? 1000 : 0);
-  };
-  return voices.filter((voice) => voice.localService && /^es(?:-[a-z\d]{2,8})*$/i.test(voice.lang))
-    .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+    const score = (region === "PE" ? 200 : 0) + quality + standardVoice - (noveltyVoice ? 1000 : 0);
+    return [{ voice, score }];
+  }).sort((a, b) => b.score - a.score || a.voice.name.localeCompare(b.voice.name))
+    .map(({ voice }) => voice);
 }
 
-export function speakLocally(text: string, onSpeaking?: (speaking: boolean) => void, voiceURI = preferredVoiceURI()): boolean {
+export function speakLocally(text: string, onSpeaking?: (speaking: boolean) => void): boolean {
   const speech = window.speechSynthesis;
-  const voices = spanishVoices(speech?.getVoices() ?? []);
-  const voice = voices.find((item) => item.voiceURI === voiceURI) ?? voices[0];
+  const [voice] = latinAmericanVoices(speech?.getVoices() ?? []);
   if (!voice) return false;
   speech.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
