@@ -5,8 +5,9 @@ import { listMemories, getMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
-import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
-import type { Reaction, SavedSession, SessionSummary } from "../api/sessions";
+import { recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
+import type { Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
+import { SongContext } from "./SongContext";
 import { GuidedConversation } from "./GuidedConversation";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
@@ -50,6 +51,9 @@ export function SessionGuide(props: SessionGuideProps) {
 }
 
 function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProps) {
+  const [memoryChoice, setMemoryChoice] = useState("");
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [recommending, setRecommending] = useState(false);
   const [guide, setGuide] = useState<SavedSession | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [offset, setOffset] = useState(0);
@@ -157,7 +161,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     setBusy(true);
     setLoadError("");
     try {
-      const saved = id ? await getSession(id) : await generateSession();
+      const saved = id ? await getSession(id) : await generateSession(memoryChoice || undefined);
       setGuide(saved);
       refreshHistory(0);
       const ids = [...new Set(saved.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
@@ -248,14 +252,27 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
           </div>
         </div>
         {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="mt-5 space-y-4">
+          <label className="block text-sm font-semibold">¿Con qué recuerdo quieres empezar?
+            <select aria-label="Recuerdo para la sesión" className="mt-2 w-full rounded border bg-white p-3 font-normal" value={memoryChoice} onChange={(event) => setMemoryChoice(event.target.value)}>
+              <option value="">Dejar que Ayni prepare una selección</option>
+              {memories.filter((item) => item.is_positive && !item.is_sensitive).map((item) => <option key={item.id} value={item.id}>{item.title} · {item.type === "song" ? "Canción" : "Anécdota"}</option>)}
+            </select>
+          </label>
+          <Button variant="outline" disabled={recommending || busy} onClick={async () => {
+            setRecommending(true); setLoadError("");
+            try { const result = await recommendMemory(); setRecommendation(result); setMemoryChoice(result.memory_id); }
+            catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos recomendar un recuerdo."); }
+            finally { setRecommending(false); }
+          }}>{recommending ? "Buscando una opción…" : "Recomendar un recuerdo"}</Button>
+          {recommendation && <div className="rounded border bg-sky-50 p-3 text-sm"><strong>{recommendation.source === "ai" ? "Recomendación con IA" : "Sugerencia por historial"}: {recommendation.title}</strong><p>{recommendation.reason}</p><p>Puedes cambiar la selección antes de empezar. Esto no es un diagnóstico. Es un registro de actividades familiares.</p></div>}
           <p className="text-sm text-slate-700">Ayni usará los recuerdos positivos de esta guía y recordará lo que compartan durante la conversación.</p>
           <button type="button" onClick={onOpenMemories} className="min-h-11 text-sm font-semibold underline">Agregar o revisar mis recuerdos</button>
-          <p className="text-sm text-slate-600">Groq recibe el texto de sus respuestas y los recuerdos necesarios para responder. Los mensajes se guardan en el historial familiar. Una foto o captura solo se comparte al pulsar Analizar.</p>
+          <p className="text-sm text-slate-600">Groq recibe sus respuestas y los recuerdos necesarios para conversar. Los mensajes y detalles observados se guardan en el historial familiar. Al empezar con Ayni y permitir la cámara, se comparten capturas al responder y cada 15 segundos. Puedes desactivar «Contexto visual en vivo». No se guardan fotos ni video de la cámara.</p>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" disabled={busy} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
             <Button type="button" variant="ghost" disabled={busy} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
           </div>
-          <p className="text-sm text-slate-600">Al empezar, tu navegador pedirá permiso para usar la cámara y el micrófono. El dictado y el seguimiento facial se procesan en este dispositivo. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
+          <p className="text-sm text-slate-600">Al empezar con Ayni, tu navegador pedirá permiso para la cámara y el micrófono. El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
         </div>}
       </section>}
       {!started && !reviewOpen && <section className="space-y-3" aria-labelledby="saved-guides">
@@ -272,6 +289,14 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {started && guide && <GuidedConversation
         key={guide.id}
         sessionId={guide.id}
+        activeMemoryId={activity === "song" ? selectedSong?.id : activity === "anecdote" ? selectedAnecdote?.id : undefined}
+        memoryOptions={memories.map((item) => ({ id: item.id, title: item.title }))}
+        onSelectMemory={(id) => {
+          const item = memories.find((value) => value.id === id);
+          if (!item) return;
+          if (item.type === "song") setSongId(item.id); else setAnecdoteId(item.id);
+          setActivity(item.type);
+        }}
         photo={activity === "photo" ? photoBlob : undefined}
         withDevices={withDevices}
         title={activityTitle ?? "Recuerdo familiar"}
@@ -311,6 +336,7 @@ function MusicPlayer({ memory }: { memory: Memory }) {
   const src = playerUrl(memory.url);
   return <div className="mt-3 space-y-2">
     <p className="text-sm font-medium text-[#264653]">{memory.title}</p>
+    <SongContext key={memory.id} memoryId={memory.id} />
     {src ? <iframe title={`Reproducir ${memory.title}`} src={src} className="aspect-video w-full max-w-xl rounded-lg border-0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[#2c5f7c] underline">Abrir canción en otra pestaña</a>}
   </div>;
 }

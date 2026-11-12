@@ -3,6 +3,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -71,6 +72,7 @@ class Memory(Base):
     title: Mapped[str] = mapped_column(String(100))
     text: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(String(2048))
+    song_context: Mapped[dict | None] = mapped_column(JSON)
     is_positive: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=sql_text("false")
     )

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { createVoiceActivity } from "./voiceActivity";
 
-const LIMIT_MS = 18_000;
-const QUIET_MS = 1800;
+const LIMIT_MS = 30_000;
 const SAMPLE_RATE = 16_000;
 const formats = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"];
 
@@ -13,6 +13,7 @@ interface Capture {
   timer?: number;
   meter?: number;
   audio?: AudioContext;
+  transcription?: AbortController;
 }
 
 async function monoSamples(recording: Blob) {
@@ -33,6 +34,7 @@ async function monoSamples(recording: Blob) {
 
 function release(capture: Capture | null) {
   if (!capture) return;
+  capture.transcription?.abort();
   window.clearTimeout(capture.timer);
   window.clearInterval(capture.meter);
   void capture.audio?.close().catch(() => undefined);
@@ -43,15 +45,18 @@ function release(capture: Capture | null) {
   capture.stream?.getTracks().forEach((track) => track.stop());
 }
 
-export function useSessionDictation(onTranscript: (text: string) => void, enabled: boolean) {
+export function useSessionDictation(onTranscript: (text: string) => void, enabled: boolean,
+  cloud?: (recording: Blob, signal: AbortSignal) => Promise<string>) {
   const [state, setState] = useState<DictationState>("idle");
   const [error, setError] = useState("");
   const active = useRef<Capture | null>(null);
   const worker = useRef<Worker | null>(null);
   const callback = useRef(onTranscript);
+  const cloudCallback = useRef(cloud);
   const timeout = useRef<number | undefined>(undefined);
 
   useEffect(() => { callback.current = onTranscript; }, [onTranscript]);
+  useEffect(() => { cloudCallback.current = cloud; }, [cloud]);
 
   const discard = useCallback(() => {
     const capture = active.current;
@@ -109,7 +114,7 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     active.current = capture;
     setState("permission");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
       if (active.current !== capture) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -133,13 +138,25 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
       recorder.onstop = async () => {
         if (active.current !== capture) return;
         try {
-          const samples = await monoSamples(new Blob(chunks, { type: recorder.mimeType }));
+          const recording = new Blob(chunks, { type: recorder.mimeType });
+          const samples = await monoSamples(recording);
           if (active.current !== capture) return;
           const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
-          if (samples.length < SAMPLE_RATE * 0.4 || rms < 0.004) {
+          if (samples.length < SAMPLE_RATE * 0.4 || rms < 0.0015) {
             fail("No escuché una respuesta. Acércate al micrófono o escribe lo que querías decir.");
             return;
           }
+
+          if (cloudCallback.current) {
+            capture.transcription = new AbortController();
+            const text = await cloudCallback.current(recording, capture.transcription.signal);
+            if (active.current !== capture) return;
+            active.current = null; release(capture); setState("idle");
+            callback.current(text);
+            return;
+          }
+          const gain = Math.min(8, 0.08 / Math.max(rms, 0.0015));
+          if (gain > 1) for (let index = 0; index < samples.length; index++) samples[index] = Math.max(-1, Math.min(1, samples[index] * gain));
 
           worker.current ??= new Worker(new URL("../workers/sessionSpeech.ts", import.meta.url), { type: "module" });
           const transcriber = worker.current;
@@ -161,34 +178,25 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
           };
           timeout.current = window.setTimeout(failure, 120_000);
           transcriber.postMessage({ samples }, [samples.buffer]);
-        } catch {
-          if (active.current === capture) fail("No pude leer la grabación. Puedes escribir tu respuesta.");
+        } catch (cause) {
+          if (active.current === capture) fail(cause instanceof Error ? cause.message : "No pude leer la grabación. Puedes escribir tu respuesta.");
         }
       };
       recorder.start(250);
-      let recentSpeech = 0;
-      let consecutive = 0;
+      const detectVoice = createVoiceActivity();
       let idleSince = performance.now();
       capture.meter = window.setInterval(() => {
         if (recorder.state !== "recording") return;
         analyser.getFloatTimeDomainData(waveform);
         const rms = Math.sqrt(waveform.reduce((sum, sample) => sum + sample * sample, 0) / waveform.length);
         const now = performance.now();
-        if (rms >= 0.013) {
-          consecutive += 1;
-          if (consecutive >= 3) {
-            if (!recentSpeech) {
-              setState("recording");
-              capture.timer = window.setTimeout(stop, LIMIT_MS);
-            }
-            recentSpeech = now;
-          }
-        } else {
-          consecutive = 0;
-          if (recentSpeech && now - recentSpeech >= QUIET_MS) stop();
+        const voice = detectVoice(rms, now);
+        if (voice.started) { setState("recording"); capture.timer = window.setTimeout(stop, LIMIT_MS); }
+        if (voice.ended) stop();
+        if (!voice.active) {
           // Reset silent recordings periodically to bound memory. Each blob
           // submitted to Whisper starts with a complete container header.
-          if (!recentSpeech && now - idleSince > 7000) {
+          if (now - idleSince > 7000) {
             const onstop = recorder.onstop;
             recorder.onstop = () => {
               if (active.current !== capture) return;
@@ -226,9 +234,9 @@ export function useSessionDictation(onTranscript: (text: string) => void, enable
     }
     if (state !== "idle" || error) return;
     // Keep Ayni's last syllable out of the next recording.
-    const delay = window.setTimeout(openMic, 400);
+    const delay = window.setTimeout(openMic, 750);
     return () => window.clearTimeout(delay);
   }, [enabled, visible, state, error, cancel]);
 
-  return { state, error, cancel, retry: () => setError("") };
+  return { state, error, cancel, finish: stop, retry: () => setError("") };
 }

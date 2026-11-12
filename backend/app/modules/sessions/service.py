@@ -19,6 +19,7 @@ from app.modules.sessions.repository import SessionsRepository
 from app.modules.sessions.schemas import (
     GuideMemory,
     GuideStep,
+    SceneResponse,
     SessionDetail,
     SessionGuide,
     SessionListRequest,
@@ -126,6 +127,18 @@ class SessionsService:
                     message="Ese recuerdo ya no está disponible para conversar.",
                 )
             context.append((memory.title + ": " + (memory.text or "Canción familiar"))[:1800])
+            if memory.type == "song":
+                music = self.memories.get_song_context(actor_id, memory.id)
+                if music.get("status") == "confirmed":
+                    context.append(
+                        "Datos de la grabación confirmada por la familia, fuente MusicBrainz: "
+                        + str(music)
+                    )
+                else:
+                    context.append(
+                        "No se han confirmado artista, año ni género de esta canción. "
+                        "No los inventes; ofrece consultarlos."
+                    )
         return context
 
     def list_messages(self, actor_id: UUID, session_id: UUID) -> list[SessionMessageResponse]:
@@ -138,10 +151,33 @@ class SessionsService:
 
     def chat(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SessionMessageResponse:
         context = self._chat_context(actor_id, session_id)
+        if data.active_memory_id:
+            guide = self.get_session(actor_id, session_id)
+            if data.active_memory_id not in {
+                step.memory_id for step in guide.steps if step.memory_available
+            }:
+                raise ApplicationError(
+                    code="conversation_memory_unavailable",
+                    status_code=409,
+                    message="Ese recuerdo no pertenece a esta guía o ya no está disponible.",
+                )
+            active = self.memories.get_memory(actor_id, data.active_memory_id)
+            context.append("La actividad que están viendo ahora es: " + active.title)
         with self.session.begin():
             # Serializa turnos de la misma guía y evita duplicados al reintentar.
             self.repository.lock_generation(session_id)
             messages = self.repository.messages(session_id)
+            record = self.session.get(FamilySession, session_id)
+            if (
+                data.use_scene
+                and record
+                and record.scene_updated_at
+                and (datetime.now(UTC) - record.scene_updated_at).total_seconds() < 45
+            ):
+                context.append(
+                    "Observación visual reciente (puede ser imprecisa, no identifica personas): "
+                    + str(record.scene_context or {})
+                )
             previous = next(
                 (
                     item
@@ -164,7 +200,19 @@ class SessionsService:
             reply = generate_reply(
                 data,
                 context=context,
-                history=[{"role": item.role, "content": item.text} for item in messages],
+                history=[
+                    {
+                        "role": item.role,
+                        "content": item.text
+                        + (
+                            "\nDetalles observados en una captura anterior "
+                            "(no son la escena actual): " + str(item.observations)
+                            if item.observations
+                            else ""
+                        ),
+                    }
+                    for item in messages
+                ],
             )
             position = len(messages)
             text = redact_contacts(data.text.strip())
@@ -183,6 +231,58 @@ class SessionsService:
                 observations=reply.observations,
             )
             return SessionMessageResponse.model_validate(record)
+
+    def observe_scene(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SceneResponse:
+        guide = self.get_session(actor_id, session_id)
+        if not data.image or not data.image_consent:
+            raise ApplicationError(
+                code="conversation_image_consent_required",
+                status_code=422,
+                message="Activa el contexto visual para compartir capturas periódicas con Groq.",
+            )
+        with self.session.begin():
+            self.repository.lock_generation(session_id)
+            record = self.repository.get_session(
+                session_id, elder_profile_id=guide.elder_profile_id
+            )
+            if record is None:
+                raise ApplicationError(
+                    code="session_not_found", status_code=404, message="No encontramos esta guía."
+                )
+            now = datetime.now(UTC)
+            if record.scene_updated_at and (now - record.scene_updated_at).total_seconds() < 15:
+                return SceneResponse(
+                    observations=(record.scene_context or {}).get("observations", []),
+                    updated_at=record.scene_updated_at,
+                    cached=True,
+                )
+            reply = generate_reply(
+                data.model_copy(
+                    update={
+                        "cue": None,
+                        "text": (
+                            "Describe objetos, colores y entorno visibles de la captura. "
+                            "No identifiques ni infieras emociones."
+                        ),
+                    }
+                ),
+                context=[],
+                history=[],
+            )
+            record.scene_context = {"observations": reply.observations}
+            record.scene_updated_at = now
+            return SceneResponse(observations=reply.observations, updated_at=now)
+
+    def clear_scene(self, actor_id: UUID, session_id: UUID) -> None:
+        guide = self.get_session(actor_id, session_id)
+        with self.session.begin():
+            self.repository.lock_generation(session_id)
+            record = self.repository.get_session(
+                session_id, elder_profile_id=guide.elder_profile_id
+            )
+            if record:
+                record.scene_context = None
+                record.scene_updated_at = None
 
     def converse_about_memory(
         self, actor_id: UUID, memory_id: UUID, data: ConversationRequest
@@ -222,7 +322,15 @@ class SessionsService:
             ],
         )
 
-    def generate_session(self, actor_id: UUID) -> SessionDetail:
+    def generate_session(self, actor_id: UUID, memory_id: UUID | None = None) -> SessionDetail:
+        if memory_id:
+            chosen = self.memories.get_memory(actor_id, memory_id)
+            if not chosen.is_positive or chosen.is_sensitive or chosen.deletion_pending:
+                raise ApplicationError(
+                    code="no_eligible_memories",
+                    status_code=409,
+                    message="Elige un recuerdo positivo que no esté marcado como delicado.",
+                )
         profile_id = self._profile(actor_id)
         policy = BillingService(self.session).get_session_quota(actor_id)
         with self.session.begin():
@@ -231,7 +339,7 @@ class SessionsService:
             policy.require_capacity(
                 self.repository.count_since(profile_id, now - timedelta(days=policy.window_days))
             )
-            candidates = self.memories.select_session_memories(profile_id)
+            candidates = self.memories.select_session_memories(profile_id, memory_id)
             guide = build_session_guide(
                 profile_id,
                 [

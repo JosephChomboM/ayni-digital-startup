@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
-import { getMessages, sendMessage, imageForConversation } from "../api/sessions";
+import { getMessages, sendMessage, imageForConversation, observeScene, clearScene, transcribeAudio } from "../api/sessions";
 import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
 import { interpretReply, speakLocally } from "./sessionSignals";
@@ -13,6 +13,9 @@ export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué
 
 interface GuidedConversationProps {
   sessionId: string;
+  activeMemoryId?: string;
+  memoryOptions?: { id: string; title: string }[];
+  onSelectMemory?: (id: string) => void;
   photo?: Blob;
   withDevices: boolean;
   title: string;
@@ -26,8 +29,15 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  sessionId, photo, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
+  sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
+  const [liveScene, setLiveScene] = useState(withDevices);
+  const cameraCapture = useRef<(() => Promise<string>) | null>(null);
+  const [sceneNotice, setSceneNotice] = useState("");
+  const [sceneUpdated, setSceneUpdated] = useState("");
+  const sceneRequest = useRef<AbortController | null>(null);
+  const [cloudVoice, setCloudVoice] = useState(false);
+  const [reviewVoice, setReviewVoice] = useState(false);
   const [line, setLine] = useState(SESSION_GREETING);
   const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
   const nextMessage = useRef(0);
@@ -86,11 +96,17 @@ export function GuidedConversation({
     if (paused || request.current) return;
     const controller = new AbortController();
     request.current = controller;
-    const payload: ChatInput = retry ?? { text, request_id: crypto.randomUUID(), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
-    lastAttempt.current = payload;
     setPending(true);
     setAiError("");
+    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: liveScene && camera, ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
+      if (!retry?.image && !image && !cue && text.trim() && camera && liveScene) {
+        if (!cameraCapture.current) throw new Error("La cámara todavía no está lista. Espera a ver la imagen antes de enviar tu respuesta.");
+        image = await cameraCapture.current();
+        if (controller.signal.aborted) return;
+      }
+      const payload: ChatInput = { ...lastAttempt.current, ...(image ? { image, image_consent: true } : {}) };
+      lastAttempt.current = payload;
       const result = await sendMessage(sessionId, payload, controller.signal);
       if (controller.signal.aborted) return;
       setSuggestion(result.suggestion);
@@ -116,11 +132,30 @@ export function GuidedConversation({
   }
 
   const dictation = useSessionDictation(
-    (reply) => { if (!input.trim()) receive(reply); },
+    (reply) => {
+      if (input.trim()) return;
+      const intent = interpretReply(reply);
+      if (!reviewVoice || intent === "pause" || intent === "end") receive(reply);
+      else setInput(reply);
+    },
     mic && !paused && !pending && !speaking && !input.trim() && !aiError,
+    cloudVoice ? (recording, signal) => transcribeAudio(sessionId, recording, signal) : undefined,
   );
 
+  async function observe(image: string) {
+    if (sceneRequest.current || !liveScene || paused) return;
+    const controller = new AbortController();
+    sceneRequest.current = controller;
+    try {
+      const result = await observeScene(sessionId, image, controller.signal);
+      if (!controller.signal.aborted) { setObservations(result.observations); setSceneUpdated(result.updated_at); setSceneNotice(""); }
+    } catch (cause) {
+      if (!controller.signal.aborted) setSceneNotice(cause instanceof Error ? cause.message : "El contexto visual no está disponible.");
+    } finally { if (sceneRequest.current === controller) sceneRequest.current = null; }
+  }
+
   function pause(message: string) {
+    sceneRequest.current?.abort(); sceneRequest.current = null;
     cancelTurn();
     dictation.cancel();
     show(message);
@@ -147,7 +182,7 @@ export function GuidedConversation({
 
   function onCameraCue(cue: FaceCue) {
     // A glance away should never stop the session or switch off the preview.
-    if (cue === "away") return;
+    if (cue === "away" || liveScene) return;
     if (!canFollowExpression()) return;
     lastExpressionAt.current = performance.now();
     void follow("", undefined, cue);
@@ -193,6 +228,7 @@ export function GuidedConversation({
     void initialize(() => active);
     return () => {
       active = false;
+      sceneRequest.current?.abort();
       document.removeEventListener("visibilitychange", updateVisibility);
       request.current?.abort();
       request.current = null;
@@ -273,6 +309,12 @@ export function GuidedConversation({
 
     <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
       <aside className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#cddbdc] px-4 py-3 md:col-start-2 md:row-span-2 md:row-start-1 md:block md:border-b-0 md:border-l md:px-5 md:py-5" aria-label="Cámara y recuerdo">
+        {Boolean(memoryOptions?.length) && <label className="col-span-2 mb-3 block text-sm font-semibold">Recuerdo activo
+          <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} className="mt-1 w-full rounded border bg-white p-2 font-normal" onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
+            {!activeMemoryId && <option value="">Fotos de la sesión</option>}
+            {memoryOptions?.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}
+          </select>
+        </label>}
         <div className="min-w-0">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="font-bold text-[#264653]">Tu cámara</h3>
@@ -280,9 +322,22 @@ export function GuidedConversation({
               className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#264653] hover:bg-[#e8f5e9]" disabled={paused}
               onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
           </div>
-          {camera && !paused && visible ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)} /> :
+          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
+            live={liveScene} onObserveFrame={observe} canObserve={() => !pending && !speaking && !input.trim() && (dictation.state === "idle" || dictation.state === "listening")} /> :
             <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
         </div>
+        <label className="mt-3 flex min-h-11 items-start gap-2 text-sm">
+          <input type="checkbox" checked={liveScene} disabled={!camera || paused} onChange={(event) => {
+            const enabled = event.target.checked; setLiveScene(enabled);
+            if (!enabled) {
+              sceneRequest.current?.abort(); sceneRequest.current = null; setSceneUpdated("");
+              void clearScene(sessionId).catch(() => setSceneNotice("No se pudo limpiar el contexto anterior. No se usarán más capturas mientras esté desactivado."));
+            }
+          }} />Contexto visual en vivo
+        </label>
+        <p className="text-xs">Con esta opción, cada respuesta hablada o escrita comparte una captura actual con Groq. Puedes decir «mira acá» y contar lo que muestras. También se actualiza el contexto cada 15 segundos. No se guardan fotos ni video; solo la conversación y detalles observados. Puedes desactivarlo cuando quieras.</p>
+        {liveScene && sceneUpdated && <p className="mt-2 text-xs">Última observación: {new Date(sceneUpdated).toLocaleTimeString("es-PE")}</p>}
+        {sceneNotice && <p role="status" className="text-xs">{sceneNotice}</p>}
         <div className="my-3 flex flex-wrap gap-2">
           <button type="button" disabled={paused || pending} onClick={() => changeActivity()} className="min-h-11 rounded-lg border px-3 text-sm">Cambiar actividad</button>
           {photo && <button type="button" disabled={paused || pending} className="min-h-11 rounded-lg border px-3 text-sm" onClick={async () => {
@@ -350,6 +405,12 @@ export function GuidedConversation({
             }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
           <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending || Boolean(aiError)} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
         </div>
+        {dictation.state === "recording" && <Button type="button" variant="outline" onClick={dictation.finish}>Listo, ya hablé</Button>}
+        <details className="text-sm"><summary className="min-h-11 cursor-pointer py-2 font-semibold">Opciones de voz</summary>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={cloudVoice} onChange={(event) => { dictation.cancel(); setCloudVoice(event.target.checked); }} />Mejor precisión con Groq</label>
+          <p className="text-xs">Al activarlo, envías grabaciones breves a Groq para transcribirlas en español. El audio no se guarda en Ayni. Desactivado usa el modelo local.</p>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={reviewVoice} onChange={(event) => setReviewVoice(event.target.checked)} />Revisar el dictado antes de enviarlo</label>
+        </details>
         {(voiceNotice || (mic && dictation.error)) && <p role="status" className="text-sm text-[#435d60]">{(mic && dictation.error) || voiceNotice}</p>}
       </form>
     </div>

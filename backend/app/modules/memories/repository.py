@@ -155,6 +155,8 @@ class MemoriesRepository:
             memory.content_version += 1
             memory.entities.clear()
             memory.entities_status = EntitiesStatus.PENDING
+        if "url" in changes and changes["url"] != memory.url:
+            memory.song_context = None
         for name, value in changes.items():
             setattr(memory, name, value)
         self.session.flush()
@@ -289,11 +291,16 @@ class MemoriesRepository:
             Memory.deletion_pending.is_(False),
         ]
 
-    def select_session_memories(self, profile_id: UUID) -> list[Memory]:
+    def select_session_memories(
+        self, profile_id: UUID, memory_id: UUID | None = None
+    ) -> list[Memory]:
         return list(
             self.session.scalars(
                 select(Memory)
-                .where(*self._session_eligible(profile_id))
+                .where(
+                    *self._session_eligible(profile_id),
+                    *([Memory.id == memory_id] if memory_id else []),
+                )
                 .order_by(Memory.id)
                 .limit(3)
                 .with_for_update()

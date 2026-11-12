@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FaceLandmarker } from "@mediapipe/tasks-vision";
+import type { RefObject } from "react";
 import { createFaceCueTracker } from "./sessionSignals";
 import type { FaceCue, FaceObservation } from "./sessionSignals";
 import { imageForConversation } from "../api/sessions";
@@ -24,19 +25,49 @@ const statusText: Record<FaceObservation, string> = {
 };
 
 interface SessionCameraProps {
+  captureRef?: RefObject<(() => Promise<string>) | null>;
   onCue: (cue: FaceCue) => void;
   canFollowExpression: () => boolean;
   onAnalyzeFrame?: (image: string) => void;
   analyzing?: boolean;
+  live?: boolean;
+  canObserve?: () => boolean;
+  onObserveFrame?: (image: string) => Promise<void>;
 }
 
-export function SessionCamera({ onCue, canFollowExpression, onAnalyzeFrame, analyzing }: SessionCameraProps) {
+export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyzeFrame, analyzing, live, canObserve, onObserveFrame }: SessionCameraProps) {
   const preview = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!captureRef) return;
+    captureRef.current = async () => {
+      if (document.hidden || !preview.current || preview.current.readyState < 2 || !preview.current.srcObject) {
+        throw new Error("La cámara todavía no está lista. Espera a ver la imagen e inténtalo otra vez.");
+      }
+      return imageForConversation(preview.current);
+    };
+    return () => { captureRef.current = null; };
+  }, [captureRef]);
   const [status, setStatus] = useState("Esperando permiso de cámara…");
   const [ratio, setRatio] = useState("4 / 3");
   const [face, setFace] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const handleCue = useEffectEvent(onCue);
   const turnAvailable = useEffectEvent(canFollowExpression);
+  const observe = useEffectEvent(async () => {
+    if (!document.hidden && preview.current && preview.current.readyState >= 2 && canObserve?.()) {
+      await onObserveFrame?.(await imageForConversation(preview.current));
+    }
+  });
+  useEffect(() => {
+    if (!live) return;
+    let stopped = false;
+    let timer: number;
+    const tick = async () => {
+      try { await observe(); } catch { /* La conversación sigue aunque una captura falle. */ }
+      if (!stopped) timer = window.setTimeout(tick, 15_000);
+    };
+    timer = window.setTimeout(tick, 1500);
+    return () => { stopped = true; window.clearTimeout(timer); };
+  }, [live]);
 
   useEffect(() => {
     const video = preview.current;

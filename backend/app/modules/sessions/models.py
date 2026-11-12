@@ -33,6 +33,8 @@ class FamilySession(Base):
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     template_version: Mapped[str] = mapped_column(String(30))
     duration_minutes: Mapped[int] = mapped_column(Integer)
+    scene_context: Mapped[dict | None] = mapped_column(JSON)
+    scene_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     items: Mapped[list["SessionItem"]] = relationship(
         back_populates="session",
