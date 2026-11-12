@@ -58,7 +58,7 @@ export function GoogleSignInButton({ disabled = false, onCredential }: { disable
 
   return <div className="space-y-2">
     <div ref={container} aria-label="Acceso con Google" aria-disabled={disabled} className={disabled ? "pointer-events-none opacity-50" : "min-h-0"} />
-    {(disabled || state !== "ready") && <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>{state === "loading" && !disabled ? "Cargando Google…" : "Continuar con Google · Próximamente"}</button>}
+    {(disabled || state !== "ready") && <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>{disabled ? "Continuar con Google" : state === "loading" ? "Cargando Google…" : "Continuar con Google · Próximamente"}</button>}
     {state === "error" && <p className="text-xs text-slate-500">No pudimos cargar Google. Puedes usar tu correo y contraseña. <button type="button" disabled={disabled} onClick={() => setAttempt((value) => value + 1)} className="font-semibold underline">Volver a intentar Google</button></p>}
   </div>;
 }
