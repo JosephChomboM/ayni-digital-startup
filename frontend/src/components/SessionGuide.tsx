@@ -7,6 +7,8 @@ import { getLocalFamilyPhotos } from "../api/localMedia";
 import type { LocalFamilyPhoto } from "../api/localMedia";
 import { saveSessionFeedback } from "../api/sessionFeedback";
 import type { SessionExperience, SessionFeeling } from "../api/sessionFeedback";
+import { GuidedConversation } from "./GuidedConversation";
+import { speakLocally } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
@@ -51,6 +53,7 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   const [songId, setSongId] = useState("");
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [adaptivePause, setAdaptivePause] = useState<{ message: string; speak: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [step, setStep] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -93,7 +96,13 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
     return () => window.clearInterval(timer);
   }, [started, paused]);
 
-  const begin = () => { setStarted(true); setPaused(false); setElapsed(0); setStep(0); setReviewOpen(false); setSaved(false); };
+  useEffect(() => {
+    if (!paused || !adaptivePause?.speak) return;
+    speakLocally(adaptivePause.message);
+    return () => window.speechSynthesis?.cancel();
+  }, [paused, adaptivePause]);
+
+  const begin = () => { setStarted(true); setPaused(false); setAdaptivePause(null); setElapsed(0); setStep(0); setReviewOpen(false); setSaved(false); };
   const finish = () => { setStarted(false); setPaused(false); setReviewOpen(true); };
 
   const saveReview = () => {
@@ -153,17 +162,29 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
         {step === 2 && !selectedSong && <button onClick={onOpenMemories} className="inline-flex items-center gap-2 text-sm font-semibold text-[#e76f51]"><Music2 className="size-4" />Ir a Subir recuerdos</button>}
         <p className="text-base leading-relaxed text-slate-700">{steps[step].description}</p>
         <div className="py-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Una pregunta posible</p><p className="mt-1 text-lg font-medium text-[#264653]">{steps[step].prompt}</p></div>
+        {step === 1 && !paused && selectedAnecdote?.is_positive && !selectedAnecdote.is_sensitive && (
+          <GuidedConversation
+            key={selectedAnecdote.id}
+            memoryId={selectedAnecdote.id}
+            title={selectedAnecdote.title}
+            onPause={(message, speak) => {
+              setAdaptivePause({ message, speak });
+              setPaused(true);
+            }}
+            onNextActivity={() => setStep(2)}
+          />
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <div className="flex gap-2">
             <Button type="button" variant="outline" disabled={paused || step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>
             {step < steps.length - 1 && <Button type="button" variant="outline" disabled={paused} onClick={() => setStep((value) => value + 1)} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}
           </div>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setPaused((value) => !value)} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button>
+            <Button type="button" variant="outline" onClick={() => { setAdaptivePause(null); setPaused((value) => !value); }} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button>
             <Button type="button" variant="secondary" onClick={finish} className="w-auto"><Square className="mr-2 size-4" />Terminar</Button>
           </div>
         </div>
-        {paused && <p role="status" className="text-sm text-slate-500">La sesión está en pausa. No hay apuro para continuar.</p>}
+        {paused && <p role="status" className="text-sm text-slate-500">{adaptivePause?.message ?? "La sesión está en pausa. No hay apuro para continuar."}</p>}
         {elapsed >= DURATION_SECONDS && <p role="status" className="text-sm text-slate-600">Ya pasaron 15 minutos. Pueden cerrar la actividad o continuar si les resulta agradable.</p>}
       </section>}
 
