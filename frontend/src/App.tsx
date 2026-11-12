@@ -127,7 +127,7 @@ export function App() {
           <div className="flex flex-wrap gap-3"><button onClick={() => setView("profile")} className="min-h-12 rounded-lg bg-[#2c5f7c] px-5 font-semibold text-white">Ver persona y familia</button><button onClick={() => setView("billing")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Plan familiar</button><button onClick={() => setView("settings")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Configuración y privacidad</button><button onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold">Cerrar sesión</button></div>
         </section>}
 
-        {view === "settings" && currentUser && <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} />}
+        {view === "settings" && currentUser && <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} onUserUpdated={setCurrentUser} />}
         {view === "home" && (
           <HomePage
             onStartSession={() => setView("session")}

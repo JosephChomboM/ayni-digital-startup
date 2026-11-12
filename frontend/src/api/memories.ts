@@ -2,6 +2,7 @@ import { apiFetch, ApiError } from "./client";
 
 export type MemoryType = "anecdote" | "song";
 export interface Memory {
+  deletion_pending?: boolean;
   id: string;
   elder_profile_id: string;
   created_by: string;

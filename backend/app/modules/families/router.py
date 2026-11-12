@@ -5,10 +5,19 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.modules.families.google_schemas import (
+    GoogleChallengeResponse,
+    GoogleConfigResponse,
+    GoogleCredentialRequest,
+    GoogleLinkRequest,
+    GoogleRegisterRequest,
+    UserProfilePatchRequest,
+)
 from app.modules.families.schemas import (
     AuthenticationResponse,
     ConsentTextResponse,
     CurrentUserResponse,
+    DeleteAccountRequest,
     ElderProfileRequest,
     ElderProfileResponse,
     FamilyResponse,
@@ -21,7 +30,11 @@ from app.modules.families.schemas import (
     RegisterRequest,
     RegisterResponse,
 )
-from app.modules.families.service import FamiliesService, get_authenticated_user_id
+from app.modules.families.service import (
+    FamiliesService,
+    GoogleAuthService,
+    get_authenticated_user_id,
+)
 
 router = APIRouter(tags=["families"])
 
@@ -58,11 +71,58 @@ def login(data: LoginRequest, service: FamiliesServiceDep) -> AuthenticationResp
     return service.login(email=data.email, password=data.password)
 
 
+@router.get("/auth/google/config", response_model=GoogleConfigResponse)
+def google_config() -> GoogleConfigResponse:
+    return GoogleAuthService.config()
+
+
+@router.post("/auth/google/challenge", response_model=GoogleChallengeResponse, status_code=201)
+def google_challenge(db: Annotated[Session, Depends(get_db)]) -> GoogleChallengeResponse:
+    return GoogleAuthService(db).challenge()
+
+
+@router.post("/auth/google/login", response_model=AuthenticationResponse)
+def google_login(
+    data: GoogleCredentialRequest, db: Annotated[Session, Depends(get_db)]
+) -> AuthenticationResponse:
+    return GoogleAuthService(db).login(data)
+
+
+@router.post("/auth/google/register", response_model=RegisterResponse, status_code=201)
+def google_register(
+    data: GoogleRegisterRequest, db: Annotated[Session, Depends(get_db)]
+) -> RegisterResponse:
+    return GoogleAuthService(db).register(data)
+
+
+@router.post("/auth/google/link", status_code=204, response_class=Response)
+def google_link(
+    data: GoogleLinkRequest, actor: AuthenticatedUserId, db: Annotated[Session, Depends(get_db)]
+) -> Response:
+    GoogleAuthService(db).link(actor, data)
+    return Response(status_code=204)
+
+
+@router.patch("/users/me", response_model=CurrentUserResponse)
+def update_user_profile(
+    data: UserProfilePatchRequest, actor: AuthenticatedUserId, service: FamiliesServiceDep
+) -> CurrentUserResponse:
+    return service.update_user_profile(actor, data)
+
+
 @router.get("/users/me", response_model=CurrentUserResponse)
 def get_current_user(
     user_id: AuthenticatedUserId, service: FamiliesServiceDep
 ) -> CurrentUserResponse:
     return service.get_current_user(user_id)
+
+
+@router.delete("/users/me", status_code=204, response_class=Response)
+def delete_account(
+    data: DeleteAccountRequest, user_id: AuthenticatedUserId, service: FamiliesServiceDep
+) -> Response:
+    service.delete_account(user_id, data)
+    return Response(status_code=204)
 
 
 @router.get("/families/me", response_model=FamilyResponse)

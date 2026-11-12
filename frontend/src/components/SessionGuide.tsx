@@ -3,12 +3,10 @@ import { ArrowLeft, ArrowRight, Bot, Check, Play, RotateCcw } from "lucide-react
 import type { User } from "../api/auth";
 import { listMemories, getMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
-import { getLocalFamilyPhotos } from "../api/localMedia";
-import type { LocalFamilyPhoto } from "../api/localMedia";
-import { saveSessionFeedback } from "../api/sessionFeedback";
-import type { SessionExperience, SessionFeeling } from "../api/sessionFeedback";
-import { generateSession, getSession, listSessions } from "../api/sessions";
-import type { SavedSession, SessionSummary } from "../api/sessions";
+import { listPhotos } from "../api/photos";
+import type { MemoryPhoto } from "../api/photos";
+import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
+import type { Reaction, SavedSession, SessionSummary } from "../api/sessions";
 import { GuidedConversation } from "./GuidedConversation";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
@@ -19,6 +17,11 @@ interface SessionGuideProps {
   currentUser: User;
   onOpenMemories: () => void;
 }
+
+const reactions: Array<[Reaction, string]> = [
+  ["receptivo", "Receptivo"], ["emocionado", "Emocionado"],
+  ["indiferente", "Indiferente"], ["agitado", "Agitado"],
+];
 
 function playerUrl(value: string | null): string | null {
   if (!value) return null;
@@ -57,7 +60,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    listSessions(offset).then((page) => {
+    listSessions(10, offset).then((page) => {
       if (active) { setHistory(page.items); setTotal(page.total); setHistoryError(""); }
     }).catch((cause: unknown) => { if (active) setHistoryError(cause instanceof Error ? cause.message : "No pudimos cargar el historial."); })
       .finally(() => { if (active) setHistoryLoading(false); });
@@ -66,7 +69,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const refreshHistory = (next = offset) => { setHistoryLoading(true); setOffset(next); setRevision((value) => value + 1); };
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [photos, setPhotos] = useState<LocalFamilyPhoto[]>([]);
+  const [photos, setPhotos] = useState<MemoryPhoto[]>([]);
+  const [photoBlob, setPhotoBlob] = useState<Blob>();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [anecdoteId, setAnecdoteId] = useState("");
@@ -78,9 +82,9 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [activity, setActivity] = useState<SessionActivity>();
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
-  const [feeling, setFeeling] = useState<SessionFeeling | "">("");
-  const [experience, setExperience] = useState<SessionExperience | "">("");
-  const [note, setNote] = useState("");
+  const [reaction, setReaction] = useState<Reaction | null>(null);
+  const [reactionSaved, setReactionSaved] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [saved, setSaved] = useState(false);
 
   const songs = useMemo(() => memories.filter((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive), [memories]);
@@ -92,16 +96,16 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   useEffect(() => {
     let active = true;
     setLoading(true);
-    Promise.all([
-      getLocalFamilyPhotos(currentUser.family_id),
-      listMemories({ include_sensitive: false, limit: 50, offset: 0 }),
-    ]).then(([localPhotos, response]) => {
+    listMemories({ include_sensitive: false, limit: 50, offset: 0 }).then(async (response) => {
       if (!active) return;
-      setPhotos(localPhotos);
       setMemories(response.items);
+      const eligible = response.items.filter((memory) => memory.is_positive && !memory.is_sensitive);
+      const photoPages = await Promise.allSettled(eligible.map((memory) => listPhotos(memory.id)));
+      if (!active) return;
+      setPhotos(photoPages.flatMap((result) => result.status === "fulfilled" ? result.value : []));
       const firstAnecdote = response.items.find((memory) => memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive);
       if (firstAnecdote) setAnecdoteId(firstAnecdote.id);
-      const firstSong = response.items.find((memory) => memory.type === "song");
+      const firstSong = response.items.find((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive);
       if (firstSong) setSongId(firstSong.id);
       setLoadError("");
     }).catch((error: unknown) => {
@@ -109,6 +113,27 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [currentUser.family_id]);
+
+  useEffect(() => {
+    const currentPhoto = photos[photoIndex % Math.max(photos.length, 1)];
+    if (activity !== "photo" || !currentPhoto) { setPhotoBlob(undefined); return; }
+    const controller = new AbortController();
+    fetch(currentPhoto.url, { signal: controller.signal })
+      .then((response) => { if (!response.ok) throw new Error("No se pudo cargar la foto."); return response.blob(); })
+      .then((blob) => { if (!controller.signal.aborted) setPhotoBlob(blob); })
+      .catch(() => { if (!controller.signal.aborted) setPhotoBlob(undefined); });
+    return () => controller.abort();
+  }, [activity, photoIndex, photos]);
+
+  useEffect(() => {
+    if (!started || !memories.length) return;
+    const refresh = () => {
+      Promise.allSettled(memories.map((memory) => listPhotos(memory.id)))
+        .then((pages) => setPhotos(pages.flatMap((page) => page.status === "fulfilled" ? page.value : [])));
+    };
+    const timer = window.setInterval(refresh, 4 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [started, memories]);
 
   useEffect(() => {
     if (!started || paused) return;
@@ -138,10 +163,14 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       const ids = [...new Set(saved.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
       const results = await Promise.allSettled(ids.map(getMemory));
       const allowed = results.flatMap((result) => result.status === "fulfilled" && result.value.is_positive && !result.value.is_sensitive && result.value.elder_profile_id === saved.elder_profile_id ? [result.value] : []);
+      const photoResults = await Promise.allSettled(allowed.map((memory) => listPhotos(memory.id)));
+      const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+      const previousReaction = await getRecordedReaction(saved.id);
       setMemories(allowed);
+      setPhotos(sessionPhotos);
       setAnecdoteId(allowed.find((item) => item.type === "anecdote")?.id ?? "");
       setSongId(allowed.find((item) => item.type === "song")?.id ?? "");
-      setActivity(allowed[0]?.type ?? (photos.length ? "photo" : undefined));
+      setActivity(allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
       setWithDevices(devices);
       setPhotoIndex(0);
       setStarted(true);
@@ -149,7 +178,9 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       setElapsed(0);
       setReviewOpen(false);
       setSaved(false);
-      setFeeling(""); setExperience(""); setNote("");
+      setReaction(previousReaction?.reaction ?? null);
+      setReactionSaved(Boolean(previousReaction));
+      setReviewError("");
     } catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos abrir la guía."); }
     finally { setBusy(false); }
   }
@@ -158,6 +189,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     setStarted(false);
     setPaused(false);
     setReviewVoice(speak);
+    setSaved(reactionSaved);
     setReviewOpen(true);
   }
 
@@ -179,14 +211,17 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     return "Podemos pensar en otro día bonito. ¿Qué te gustaría compartir?";
   }
 
-  const saveReview = () => {
-    if (!feeling || !experience) return;
-    saveSessionFeedback({
-      id: crypto.randomUUID(), family_id: currentUser.family_id, user_id: currentUser.id,
-      user_name: currentUser.name, feeling, experience, note: note.trim(),
-      duration_seconds: elapsed, created_at: new Date().toISOString(),
-    });
-    setSaved(true);
+  const saveReview = async () => {
+    if (!guide || !reaction || reactionSaved || busy) return;
+    setBusy(true);
+    setReviewError("");
+    try {
+      await recordReaction(guide.id, reaction);
+      setReactionSaved(true);
+      setSaved(true);
+    } catch (cause) {
+      setReviewError(cause instanceof Error ? cause.message : "No pudimos guardar la reacción.");
+    } finally { setBusy(false); }
   };
 
   const activityTitle = activity === "anecdote" ? selectedAnecdote?.title :
@@ -237,7 +272,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {started && guide && <GuidedConversation
         key={guide.id}
         sessionId={guide.id}
-        photo={activity === "photo" ? photos[photoIndex % photos.length]?.blob : undefined}
+        photo={activity === "photo" ? photoBlob : undefined}
         withDevices={withDevices}
         title={activityTitle ?? "Recuerdo familiar"}
         elapsed={formatTime(elapsed)}
@@ -251,31 +286,23 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {started && <Button variant="outline" onClick={() => { setStarted(false); refreshHistory(); }}>Volver al historial</Button>}
 
       {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
-        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo les fue?</h2><p className="mt-1 text-sm text-slate-600">Este registro es una nota familiar sobre la actividad, no un diagnóstico.</p></div>
-        <fieldset className="space-y-2"><legend className="text-sm font-medium text-[#264653]">¿Cómo se sintió tu familiar?</legend><div className="flex flex-wrap gap-2">{([["content", "A gusto"], ["calm", "Tranquilo/a"], ["tired", "Cansado/a"], ["no_answer", "Prefirió no decir"]] as const).map(([value, label]) => <Choice key={value} selected={feeling === value} onClick={() => setFeeling(value)}>{label}</Choice>)}</div></fieldset>
-        <fieldset className="space-y-2"><legend className="text-sm font-medium text-[#264653]">¿Cómo resultó la actividad?</legend><div className="flex flex-wrap gap-2">{([["comfortable", "Cómoda"], ["mixed", "Con pausas"], ["paused", "Preferimos parar"]] as const).map(([value, label]) => <Choice key={value} selected={experience === value} onClick={() => setExperience(value)}>{label}</Choice>)}</div></fieldset>
-        <label htmlFor="session-note" className="block text-sm font-medium text-[#264653]">Nota para la familia (opcional)</label><textarea id="session-note" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} placeholder="¿Qué tema le interesó? ¿Qué prefieren hacer la próxima vez?" className="min-h-24 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-[#264653] focus:outline-none focus:ring-2 focus:ring-[#2c5f7c]" />
-        <div className="flex flex-wrap gap-3"><Button disabled={!feeling || !experience} onClick={saveReview} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />Guardar reseña</Button><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir</Button></div>
+        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
+        <fieldset className="space-y-2" disabled={busy || reactionSaved}><legend className="text-sm font-medium text-[#264653]">Elige una reacción</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
+        {reviewError && <p role="alert" className="text-sm text-red-700">{reviewError}</p>}
+        <div className="flex flex-wrap gap-3"><Button disabled={!reaction || busy || reactionSaved} onClick={() => void saveReview()} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando reacción…" : reactionSaved ? "Reacción ya guardada" : "Guardar reacción"}</Button><Button variant="outline" disabled={busy} onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir por ahora</Button></div>
       </section>}
 
-      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reseña guardada en este navegador</h2><p className="text-sm text-slate-600">Gracias por registrar cómo fue este momento para su familia.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver a la guía</Button></div>}
+      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
     </CardContent>
   </Card>;
 }
 
-function PhotoCarousel({ photos, index, onChange, large = false }: { photos: LocalFamilyPhoto[]; index: number; onChange: (index: number) => void; large?: boolean }) {
+function PhotoCarousel({ photos, index, onChange, large = false }: { photos: MemoryPhoto[]; index: number; onChange: (index: number) => void; large?: boolean }) {
   const photo = photos[index % photos.length];
-  const [src, setSrc] = useState("");
-  useEffect(() => {
-    if (!photo) return;
-    const url = URL.createObjectURL(photo.blob);
-    setSrc(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
   if (!photo) return null;
   return <figure className={`mt-3 ${large ? "max-w-2xl" : "max-w-sm"}`}>
-    {src && <img src={src} alt={photo.name} className={`w-full rounded-lg object-cover ${large ? "max-h-[420px]" : "aspect-video"}`} />}
-    <figcaption className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-600"><span className="truncate">{photo.name}</span><span>{index + 1} / {photos.length}</span></figcaption>
+    <img src={photo.url} alt="Foto familiar" className={`w-full rounded-lg object-cover ${large ? "max-h-[420px]" : "aspect-video"}`} />
+    <figcaption className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-600"><span className="truncate">Foto familiar</span><span>{index + 1} / {photos.length}</span></figcaption>
     {photos.length > 1 && <div className="mt-2 flex gap-2"><button type="button" onClick={() => onChange((index - 1 + photos.length) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Foto anterior"><ArrowLeft className="size-4" /></button><button type="button" onClick={() => onChange((index + 1) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Siguiente foto"><ArrowRight className="size-4" /></button></div>}
   </figure>;
 }

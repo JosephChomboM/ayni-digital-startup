@@ -7,6 +7,7 @@ import { BillingPanel } from "../components/BillingPanel";
 import { ProfilePage } from "./ProfilePage";
 import { listMemories, memoryErrorMessage } from "../api/memories";
 import type { Memory } from "../api/memories";
+import { AccountControls } from "../components/AccountControls";
 
 export type AccountSection = "overview" | "family" | "personal" | "plan" | "memories";
 
@@ -14,6 +15,7 @@ interface AccountPageProps {
   currentUser: User;
   initialSection: AccountSection;
   onSectionChange: (section: AccountSection) => void;
+  onUserUpdated?: (user: User) => void;
 }
 
 const sections = [
@@ -23,7 +25,7 @@ const sections = [
   { id: "memories", label: "Recuerdos subidos", detail: "Anécdotas y canciones que compartiste", icon: LibraryBig },
 ] as const;
 
-export function AccountPage({ currentUser, initialSection, onSectionChange }: AccountPageProps) {
+export function AccountPage({ currentUser, initialSection, onSectionChange, onUserUpdated }: AccountPageProps) {
   const [family, setFamily] = useState<Family | null>(null);
   const [familyLoading, setFamilyLoading] = useState(true);
 
@@ -83,6 +85,7 @@ export function AccountPage({ currentUser, initialSection, onSectionChange }: Ac
             <div><dt className="text-xs font-semibold text-slate-500">Cuenta creada</dt><dd className="mt-1 text-base text-[#264653]">{new Date(currentUser.created_at).toLocaleDateString("es-PE", { year: "numeric", month: "long", day: "numeric" })}</dd></div>
           </dl>
           <p className="border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-500">Para proteger tu cuenta, los datos personales se muestran aquí tal como están registrados.</p>
+          <AccountControls user={currentUser} onUpdated={onUserUpdated} />
         </div>}
 
         {initialSection === "plan" && <BillingPanel embedded />}

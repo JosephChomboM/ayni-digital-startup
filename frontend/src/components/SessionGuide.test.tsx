@@ -2,14 +2,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionGuide } from "./SessionGuide";
 import { listMemories, getMemory } from "../api/memories";
-import { getLocalFamilyPhotos } from "../api/localMedia";
-import { getFamilySessionFeedback } from "../api/sessionFeedback";
-import { generateSession, getSession, listSessions, getMessages, sendMessage, imageForConversation } from "../api/sessions";
+import { listPhotos } from "../api/photos";
+import { generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false }));
 vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn() }));
-vi.mock("../api/localMedia", () => ({ getLocalFamilyPhotos: vi.fn() }));
-vi.mock("../api/sessions", () => ({ generateSession: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn() }));
+vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
+vi.mock("../api/sessions", () => ({ generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ onCue, onAnalyzeFrame }: { onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></> }));
 const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
@@ -21,15 +20,18 @@ const memory = {
 };
 const guide = { id:"guide", elder_profile_id:"profile", created_at:"2026-11-12T02:00:00Z", duration_minutes:15, steps:[{ instruction:"Conversen a su ritmo", memory_id:"memory", memory_available:true }] };
 const answer = { id:"reply", role:"assistant" as const, text:"Me contaste que caminabas por el parque. ¿Qué te gustaba mirar allí?", suggestion:"continue" as const, observations:[] };
+const photo = { id:"photo", memory_id:"memory", created_by:"u", content_type:"image/jpeg", size_bytes:12, width:1, height:1, created_at:"", url:"https://photos.example.test/signed", url_expires_at:"2026-11-12T03:00:00Z" };
 beforeEach(() => {
  URL.createObjectURL=vi.fn(()=>"blob:test"); URL.revokeObjectURL=vi.fn();
  vi.mocked(listMemories).mockResolvedValue({items:[memory],total:1,limit:50,offset:0});
  vi.mocked(getMemory).mockResolvedValue(memory);
- vi.mocked(getLocalFamilyPhotos).mockResolvedValue([]);
+ vi.mocked(listPhotos).mockResolvedValue([]);
  vi.mocked(generateSession).mockResolvedValue(guide);
  vi.mocked(getSession).mockResolvedValue(guide);
- vi.mocked(listSessions).mockResolvedValue({items:[guide],total:1,limit:10});
+ vi.mocked(listSessions).mockResolvedValue({items:[guide],total:1,limit:10,offset:0});
  vi.mocked(getMessages).mockResolvedValue([]);
+ vi.mocked(getRecordedReaction).mockResolvedValue(null);
+ vi.mocked(recordReaction).mockResolvedValue({ id:"response", session_id:"guide", elder_profile_id:"profile", created_by:"u", reaction:"receptivo", occurred_at:"", created_at:"" });
  vi.mocked(sendMessage).mockImplementation(async (_id, body) => ({...answer, text:body.text ? answer.text : "Hola, ¿qué disfrutaban de sus paseos?"}));
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); localStorage.clear(); });
@@ -75,13 +77,13 @@ it("pausa desde un comando transcrito sin esperar al proveedor",async()=>{
  expect(speech.enabled).toBe(false);
  expect(sendMessage).toHaveBeenCalledTimes(previous);
 });
-it("no activa dispositivos en modo texto y conserva la reseña local",async()=>{
+it("saves a reaction through the API instead of storing review data in the browser",async()=>{
  await begin(); expect(speech.enabled).toBe(false);
- expect(screen.getByRole("button",{name:"Activar cámara"})).toBeInTheDocument();
  fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
- fireEvent.click(screen.getByRole("button",{name:"A gusto"}));fireEvent.click(screen.getByRole("button",{name:"Cómoda"}));
- fireEvent.click(screen.getByRole("button",{name:"Guardar reseña"}));
- expect(getFamilySessionFeedback("f")).toHaveLength(1);
+ fireEvent.click(screen.getByRole("button",{name:"Receptivo"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
+ await screen.findByRole("heading",{name:"Reacción guardada en tu familia"});
+ expect(recordReaction).toHaveBeenCalledWith("guide","receptivo");
 });
 it("una captura explícita se envía con consentimiento y muestra detalles detectados",async()=>{
  await begin("Empezar con Ayni");
@@ -107,7 +109,8 @@ it("aborta una respuesta en curso al pausar e impide que reaparezca",async()=>{
  expect(signal.aborted).toBe(true);
 });
 it("permite analizar una foto familiar solo mediante una acción explícita",async()=>{
- vi.mocked(getLocalFamilyPhotos).mockResolvedValue([{id:"photo",name:"Foto familiar",blob:new Blob(["image"],{type:"image/jpeg"}),family_id:"f",created_at:""}] as Awaited<ReturnType<typeof getLocalFamilyPhotos>>);
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["image"],{type:"image/jpeg"}) }));
  vi.mocked(imageForConversation).mockResolvedValue("data:image/jpeg;base64,photo");
  await begin();
  fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
@@ -117,4 +120,14 @@ it("permite analizar una foto familiar solo mediante una acción explícita",asy
  fireEvent.click(screen.getByRole("button",{name:"Analizar foto con IA"}));
  await waitFor(()=>expect(sendMessage).toHaveBeenCalledTimes(previous+1));
  expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({image:"data:image/jpeg;base64,photo",image_consent:true}),expect.any(AbortSignal));
+});
+
+it("keeps the review open and shows the server error if a reaction cannot be saved",async()=>{
+ await begin();
+ vi.mocked(recordReaction).mockRejectedValue(new Error("No pudimos guardar la reacción."));
+ fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
+ fireEvent.click(screen.getByRole("button",{name:"Emocionado"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
+ expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar la reacción.");
+ expect(screen.queryByRole("heading",{name:"Reacción guardada en tu familia"})).not.toBeInTheDocument();
 });

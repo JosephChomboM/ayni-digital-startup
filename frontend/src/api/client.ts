@@ -28,14 +28,13 @@ export async function apiFetch<T>(
 
   const token = localStorage.getItem("ayni_token");
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const headers = new Headers(options.headers);
+  if (options.body instanceof FormData) {
+    headers.delete("Content-Type");
+  } else if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   let response: Response;
   try {

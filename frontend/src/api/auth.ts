@@ -4,6 +4,9 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string | null;
+  city?: string | null;
+  district?: string | null;
   family_id: string;
   role: "cuidador_principal" | "familiar";
   created_at: string;
