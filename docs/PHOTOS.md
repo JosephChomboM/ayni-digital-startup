@@ -150,3 +150,20 @@ cascada en la base; una operación SQL directa no puede retirar archivos de Supa
 
 Referencias: [buckets privados](https://supabase.com/docs/guides/storage/buckets/fundamentals),
 [API de Storage](https://supabase.github.io/storage/).
+
+
+## Borrado pendiente y reintento (AYNI-45)
+
+DELETE /memories/{id} confirma primero `deletion_pending=true` en PostgreSQL,
+antes de retirar archivos. Si falla Storage o se interrumpe el proceso, la marca
+permanece. No se declara éxito ni se vuelve a presentar como intacto el recuerdo.
+GET /memories incluye este indicador para que la web permita reintentar DELETE
+con el mismo ID. Mientras está pendiente, leer su detalle/fotos o modificarlo
+responde 409 `memory_deletion_pending`, con mensaje en español.
+
+Repetir DELETE verifica de nuevo familia y autor/cuidador, y repite la retirada
+idempotente de todos los objetos, incluidos los ya ausentes; después borra las filas.
+No hay borrado lógico definitivo: la marca es una intención temporal y la eliminación
+final sigue siendo física. No se agregan colas ni reintentos automáticos. Las fotos
+pendientes siguen contando para la cuota hasta completar la eliminación.
+El frontend debe distinguir esta marca y ofrecer reintentar, sin habilitar edición.
