@@ -105,12 +105,13 @@ export function GuidedConversation({
 
   async function follow(text: string, image?: string, cue?: "smile" | "brow", retry?: ChatInput) {
     if (paused || request.current) return;
+    let lookAtCamera = false;
     const controller = new AbortController();
     request.current = controller;
     setPending(true);
     setAiError("");
     setRecovering(false);
-    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, ...(localPrompt.current ? { previous_prompt: localPrompt.current.slice(0, 300) } : {}), ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
+    lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, available: activities, camera_on: camera && liveScene && !paused, ...(localPrompt.current ? { previous_prompt: localPrompt.current.slice(0, 300) } : {}), ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
       if (!retry?.image && !image && !cue && requestsVisualContext(text)) {
         if (camera && liveScene && cameraCapture.current) {
@@ -138,6 +139,12 @@ export function GuidedConversation({
       setObservations(image ? result.observations : []);
       show(result.text, false);
       localPrompt.current = null;
+      // Ayni decide qué hacer según lo que la persona pidió, dicho con sus propias palabras.
+      const shows: Partial<Record<NonNullable<typeof result.action>, SessionActivity>> = { show_photo: "photo", play_song: "song", tell_story: "anecdote" };
+      const activity = result.action ? shows[result.action] : undefined;
+      if (activity && activities.includes(activity)) onNextActivity(activity);
+      else if (result.action === "pause") { dictation.cancel(); onPause(result.text); }
+      else if (result.action === "look_camera" && !image) lookAtCamera = true;
     } catch (cause) {
       if (controller.signal.aborted) return;
       if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && cause.status !== 429) {
@@ -158,6 +165,12 @@ export function GuidedConversation({
       }
     } finally {
       if (request.current === controller) { request.current = null; setPending(false); }
+    }
+    if (lookAtCamera && camera && cameraCapture.current) {
+      let frame: string | undefined;
+      try { frame = await cameraCapture.current(); }
+      catch { /* Sin imagen, Ayni ya dijo que iba a mirar; la persona puede repetir «mira acá». */ }
+      if (frame && !controller.signal.aborted) await follow("Mira por la cámara lo que te estoy mostrando.", frame);
     }
   }
 

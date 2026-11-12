@@ -254,7 +254,9 @@ class SessionsService:
                 suggestion=reply.suggestion,
                 observations=reply.observations,
             )
-            return SessionMessageResponse.model_validate(record)
+            response = SessionMessageResponse.model_validate(record)
+            response.action = reply.action
+            return response
 
     def observe_scene(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SceneResponse:
         guide = self.get_session(actor_id, session_id)

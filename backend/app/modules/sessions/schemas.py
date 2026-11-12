@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
 
+from app.modules.sessions.assistant import Action
+
 
 class GuideMemory(BaseModel):
     """Internal candidate from the memories public service, never client ownership data."""
@@ -90,6 +92,8 @@ class SessionMessageResponse(BaseModel):
     suggestion: Literal["continue", "slow_down", "pause", "change_activity"]
     observations: list[str]
     created_at: UTCDateTime
+    # Acción que Ayni pide hacer en pantalla en este turno; no se guarda en el historial.
+    action: Action = "none"
 
 
 class SceneResponse(BaseModel):
