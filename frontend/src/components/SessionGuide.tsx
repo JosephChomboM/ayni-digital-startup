@@ -1,5 +1,7 @@
+import { AyniCompanion } from "./AyniCompanion";
+import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Check, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Play, RotateCcw } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -12,7 +14,7 @@ import { GuidedConversation } from "./GuidedConversation";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 
 interface SessionGuideProps {
   currentUser: User;
@@ -236,18 +238,15 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     <PhotoCarousel photos={photos} index={photoIndex} onChange={setPhotoIndex} />
   ) : activity === "song" && selectedSong && !paused ? <MusicPlayer memory={selectedSong} /> : null;
 
-  return <Card className="border-0 bg-white shadow-none">
-    {!started && <CardHeader className="px-0 pb-5">
-      <CardTitle className="text-2xl font-bold text-[#264653]">Guía de sesión</CardTitle>
-      <CardDescription className="max-w-2xl text-base text-slate-600">Conversen a su ritmo con la ayuda de Ayni.</CardDescription>
-    </CardHeader>}
-    <CardContent className="space-y-6 px-0">
+  return <Card className="session-page border-0 shadow-none">
+    {!started && <PageIntro eyebrow="UN MOMENTO PARA CONECTAR" title="Guía de sesión">Conversen a su ritmo con la ayuda de Ayni.</PageIntro>}
+    <CardContent className={`session-content space-y-6 px-0 ${!started && !reviewOpen ? "session-preparation" : ""}`}>
       {loadError && <p role="alert" className="text-sm text-red-700">{loadError}</p>}
-      {!started && !reviewOpen && <section aria-labelledby="prepare-session" className="max-w-2xl rounded-xl border border-slate-200 bg-[#f5faf8] p-5 sm:p-7">
+      {!started && !reviewOpen && <section aria-labelledby="prepare-session" className="session-setup">
         <div className="flex items-start gap-4">
-          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-[#193745] text-[#f4d784]"><Bot aria-hidden="true" className="size-6" /></div>
+          <AyniCompanion className="setup-companion" decorative/>
           <div>
-            <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
+            <h2 id="prepare-session" className="text-xl font-bold text-[#223e38]">Un momento con Ayni</h2>
             <p className="mt-1 text-base text-slate-700">Te haré una pregunta y esperaré tu respuesta. Puedes hablar o escribir a tu ritmo.</p>
           </div>
         </div>
@@ -275,7 +274,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
           <p className="text-sm text-slate-600">Al empezar con Ayni, tu navegador pedirá permiso para la cámara y el micrófono. El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
         </div>}
       </section>}
-      {!started && !reviewOpen && <section className="space-y-3" aria-labelledby="saved-guides">
+      {!started && !reviewOpen && <section className="session-history space-y-3" aria-labelledby="saved-guides">
         <h2 id="saved-guides" className="text-lg font-semibold">Mis guías y conversaciones</h2>
         {historyLoading ? <p role="status">Cargando historial…</p> : historyError ? <div role="alert"><p>{historyError}</p><Button variant="outline" onClick={() => refreshHistory()}>Reintentar historial</Button></div> : <>
           {total === 0 && <p className="text-sm">Tu primera guía y conversación aparecerán aquí.</p>}
@@ -311,13 +310,13 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {started && <Button variant="outline" onClick={() => { setStarted(false); refreshHistory(); }}>Volver al historial</Button>}
 
       {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
-        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
-        <fieldset className="space-y-2" disabled={busy || reactionSaved}><legend className="text-sm font-medium text-[#264653]">Elige una reacción</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
+        <div><p className="text-sm font-semibold text-[#b94c35]">Al terminar</p><h2 className="text-xl font-semibold text-[#235c50]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
+        <fieldset className="space-y-2" disabled={busy || reactionSaved}><legend className="text-sm font-medium text-[#223e38]">Elige una reacción</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
         {reviewError && <p role="alert" className="text-sm text-red-700">{reviewError}</p>}
         <div className="flex flex-wrap gap-3"><Button disabled={!reaction || busy || reactionSaved} onClick={() => void saveReview()} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando reacción…" : reactionSaved ? "Reacción ya guardada" : "Guardar reacción"}</Button><Button variant="outline" disabled={busy} onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir por ahora</Button></div>
       </section>}
 
-      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
+      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#235c50]" /><h2 className="text-xl font-semibold text-[#235c50]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
     </CardContent>
   </Card>;
 }
@@ -328,19 +327,19 @@ function PhotoCarousel({ photos, index, onChange, large = false }: { photos: Mem
   return <figure className={`mt-3 ${large ? "max-w-2xl" : "max-w-sm"}`}>
     <img src={photo.url} alt="Foto familiar" className={`w-full rounded-lg object-cover ${large ? "max-h-[420px]" : "aspect-video"}`} />
     <figcaption className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-600"><span className="truncate">Foto familiar</span><span>{index + 1} / {photos.length}</span></figcaption>
-    {photos.length > 1 && <div className="mt-2 flex gap-2"><button type="button" onClick={() => onChange((index - 1 + photos.length) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Foto anterior"><ArrowLeft className="size-4" /></button><button type="button" onClick={() => onChange((index + 1) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#2c5f7c]" aria-label="Siguiente foto"><ArrowRight className="size-4" /></button></div>}
+    {photos.length > 1 && <div className="mt-2 flex gap-2"><button type="button" onClick={() => onChange((index - 1 + photos.length) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#235c50]" aria-label="Foto anterior"><ArrowLeft className="size-4" /></button><button type="button" onClick={() => onChange((index + 1) % photos.length)} className="rounded-full border border-slate-300 p-2 text-[#235c50]" aria-label="Siguiente foto"><ArrowRight className="size-4" /></button></div>}
   </figure>;
 }
 
 function MusicPlayer({ memory }: { memory: Memory }) {
   const src = playerUrl(memory.url);
   return <div className="mt-3 space-y-2">
-    <p className="text-sm font-medium text-[#264653]">{memory.title}</p>
+    <p className="text-sm font-medium text-[#223e38]">{memory.title}</p>
     <SongContext key={memory.id} memoryId={memory.id} />
-    {src ? <iframe title={`Reproducir ${memory.title}`} src={src} className="aspect-video w-full max-w-xl rounded-lg border-0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[#2c5f7c] underline">Abrir canción en otra pestaña</a>}
+    {src ? <iframe title={`Reproducir ${memory.title}`} src={src} className="aspect-video w-full max-w-xl rounded-lg border-0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[#235c50] underline">Abrir canción en otra pestaña</a>}
   </div>;
 }
 
 function Choice({ children, selected, onClick }: { children: string; selected: boolean; onClick: () => void }) {
-  return <button type="button" aria-pressed={selected} onClick={onClick} className={`rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-[#2c5f7c] bg-[#2c5f7c] text-white" : "border-slate-300 text-slate-700 hover:border-[#2c5f7c]"}`}>{children}</button>;
+  return <button type="button" aria-pressed={selected} onClick={onClick} className={`rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-[#235c50] bg-[#235c50] text-white" : "border-slate-300 text-slate-700 hover:border-[#235c50]"}`}>{children}</button>;
 }

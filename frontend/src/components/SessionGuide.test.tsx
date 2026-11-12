@@ -42,6 +42,18 @@ async function begin(mode="Empezar sin cámara ni micrófono") {
  fireEvent.click(await screen.findByRole("button",{name:mode}));
  await screen.findByText("Hola, ¿qué disfrutaban de sus paseos?");
 }
+it("el acompañante refleja la respuesta pendiente y la pausa sin fingir que habla", async () => {
+ await begin();
+ expect(screen.getByRole("img", { name:"Ayni está contigo" })).toBeInTheDocument();
+ vi.mocked(sendMessage).mockImplementation(() => new Promise(() => {}));
+ fireEvent.change(screen.getByRole("textbox", {name:"Tu respuesta"}), {target:{value:"Me gusta cantar"}});
+ fireEvent.click(screen.getByRole("button", {name:"Enviar"}));
+ expect(screen.getByRole("img", {name:"Ayni está preparando su respuesta"})).toBeInTheDocument();
+ expect(screen.queryByRole("img", {name:"Ayni está hablando"})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button", {name:"Pausar"}));
+ expect(screen.getByRole("img", {name:"Ayni está en pausa"})).toBeInTheDocument();
+ expect(vi.mocked(sendMessage).mock.calls.at(-1)![2].aborted).toBe(true);
+});
 it("adjunta la cámara actual a lo que digo sin pulsar el botón de imagen", async () => {
  await begin("Empezar con Ayni");
  act(() => speech.receive?.("Mira acá, ¿de qué color es lo que te muestro?"));

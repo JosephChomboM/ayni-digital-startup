@@ -1,4 +1,4 @@
-﻿import * as React from "react"
+import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -11,12 +11,12 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-[#2c5f7c] text-white hover:bg-[#2c5f7c]/80",
+          "border-transparent bg-[#235c50] text-white hover:bg-[#235c50]/80",
         secondary:
           "border-transparent bg-[#b94c35] text-white hover:bg-[#9e3f2c]",
         destructive:
           "border-transparent bg-red-600 text-white hover:bg-red-600/80",
-        outline: "text-[#264653] border-gray-300",
+        outline: "text-[#223e38] border-gray-300",
       },
     },
     defaultVariants: {
