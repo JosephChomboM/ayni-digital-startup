@@ -1,11 +1,9 @@
 import { useId } from "react";
 
-export type CompanionState = "idle" | "listening" | "thinking" | "speaking" | "paused";
+import { companionLabels } from "./companionLabels";
+import type { CompanionState } from "./companionLabels";
 
-const labels: Record<CompanionState, string> = {
-  idle: "Ayni está contigo", listening: "Ayni está escuchando", thinking: "Ayni está preparando su respuesta",
-  speaking: "Ayni está hablando", paused: "Ayni está en pausa",
-};
+export type { CompanionState };
 
 /** El movimiento refleja el estado de la conversación; no interpreta emociones. */
 export function AyniCompanion({ state = "idle", className = "", decorative = false }: {
@@ -13,7 +11,7 @@ export function AyniCompanion({ state = "idle", className = "", decorative = fal
 }) {
   const id = useId();
   return <div className={`ayni-robot ${className}`} data-state={state} role={decorative ? undefined : "img"}
-    aria-label={decorative ? undefined : labels[state]} aria-hidden={decorative || undefined}>
+    aria-label={decorative ? undefined : companionLabels[state]} aria-hidden={decorative || undefined}>
     <svg viewBox="0 0 260 250" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-shell`} x1="70" y1="45" x2="185" y2="202" gradientUnits="userSpaceOnUse">
