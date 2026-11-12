@@ -31,7 +31,20 @@ export function interpretReply(transcript: string): SpokenChoice {
 }
 
 export type FaceObservation = "absent" | "multiple" | "present" | "smiling" | "brow";
-export type FaceCue = "smile" | "brow" | "away";
+export type FaceCue = "smile" | "brow" | "away" | "hand";
+
+/** Gesto visible de la cara. Describe la expresión, no lo que la persona siente. */
+export type Expression = "smile" | "surprise" | "brow" | "sad" | "calm";
+
+export function readExpression(score: (name: string) => number): Expression {
+  const both = (name: string) => (score(name + "Left") + score(name + "Right")) / 2;
+  if (both("mouthSmile") >= 0.45) return "smile";
+  if (score("jawOpen") >= 0.35 && score("browInnerUp") >= 0.35) return "surprise";
+  if (both("browDown") >= 0.5) return "brow";
+  if (both("mouthFrown") >= 0.25 || (score("browInnerUp") >= 0.45 && both("mouthSmile") < 0.1)) return "sad";
+  return "calm";
+}
+
 
 export function createFaceCueTracker() {
   let previous: FaceObservation | undefined;

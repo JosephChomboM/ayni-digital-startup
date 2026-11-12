@@ -44,6 +44,8 @@ export function GuidedConversation({
   // Lo que Ayni dijo localmente (cambio de actividad, pausa) y que el servidor aún no conoce.
   const localPrompt = useRef<string | null>(null);
   const lastAwayAt = useRef(-Infinity);
+  const lastHandAt = useRef(-Infinity);
+  const [bodyTracking, setBodyTracking] = useState(true);
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
   const [failedTurns, setFailedTurns] = useState(0);
@@ -223,6 +225,14 @@ export function GuidedConversation({
   }
 
   function onCameraCue(cue: FaceCue) {
+    if (cue === "hand") {
+      // Una mano en alto suele pedir turno: Ayni lo nota sin llamar a la IA.
+      const now = performance.now();
+      if (paused || request.current || input.trim() || now - lastHandAt.current < 45_000 || now - lastTurnAt.current < 4000) return;
+      lastHandAt.current = now;
+      show("¡Veo tu mano en alto! ¿Quieres contarme o mostrarme algo?");
+      return;
+    }
     if (cue === "away") {
       // Salir del cuadro nunca detiene la sesión: Ayni solo avisa que sigue ahí, sin insistir.
       const now = performance.now();
@@ -367,7 +377,18 @@ export function GuidedConversation({
       </div>
     </header>
 
-    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} extra={<>
+    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} camera={<div className="camera-dock">
+      <div className="camera-head">
+        <h3>Tu cámara</h3>
+        <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
+          className="tool-icon" disabled={paused}
+          onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
+      </div>
+      {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
+        live={false} bodyTracking={bodyTracking} /> :
+        <p className="tool-hint">{paused ? "Cámara en pausa." : "Enciéndela para que Ayni vea tus gestos y lo que le muestres."}</p>}
+      {camera && !paused && <label className="camera-toggle"><input type="checkbox" checked={bodyTracking} onChange={(event) => setBodyTracking(event.target.checked)} />Puntos de manos y cuerpo</label>}
+    </div>} extra={<>
       {scene?.kind === "photo" && photo && <button type="button" className="prop-action" disabled={paused || pending} onClick={async () => {
         try { await follow("Exploremos juntos esta foto familiar.", await imageForConversation(photo)); }
         catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
@@ -404,18 +425,6 @@ export function GuidedConversation({
               onClick={() => changeActivity(kind)}><Icon aria-hidden="true" />{label}</button>)}
         </div>}
 
-        <div className="camera-dock">
-          <div className="camera-head">
-            <h3>Tu cámara</h3>
-            <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
-              className="tool-icon" disabled={paused}
-              onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
-          </div>
-          {camera && !paused && visible ? <SessionCamera captureRef={cameraCapture} onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)}
-            live={false} /> :
-            <p className="tool-hint">{paused ? "Cámara en pausa." : "Cámara apagada. Enciéndela para que Ayni note si sonríes o te alejas y pueda mirar lo que le muestres."}</p>}
-          <p className="tool-hint">Di «mira acá» o «¿puedes ver mi cámara?» para compartir una captura actual con Groq. En los demás mensajes no se envían capturas. El video no sale de este dispositivo y no se guardan fotos ni video.</p>
-        </div>
         <form onSubmit={submit} className="reply-dock">
           <div role="status" className="reply-status">
             <AudioLines aria-hidden="true" className={`size-4 ${speaking || dictation.state === "recording" ? "motion-safe:animate-pulse" : ""}`} />{status}
@@ -464,6 +473,11 @@ export function GuidedConversation({
             </p>)}
             {pending && <p className="transcript-pending">Ayni está respondiendo…</p>}
           </div>
+        </div>
+
+        <div className="tool-block">
+          <h4>Sobre la cámara</h4>
+          <p className="tool-hint">Los puntos y el gesto («Sonriendo», «Gesto triste»…) se calculan en este dispositivo: describen la expresión de la cara, no lo que la persona siente, y no se guardan ni se envían. Di «mira acá» o «¿puedes ver mi cámara?» para compartir una captura con Groq; en los demás mensajes no se envían capturas.</p>
         </div>
 
         <div className="tool-block">

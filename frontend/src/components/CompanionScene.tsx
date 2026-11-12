@@ -40,13 +40,15 @@ function playerUrl(value: string | null): string | null {
  * La sala donde Ayni conversa: entra caminando, saluda, y cuando cambia la actividad
  * camina hacia un lado para entregar la foto, sacar la radio o desplegar la historia.
  */
-export function CompanionScene({ state, scene, line, pending, paused, extra }: {
+export function CompanionScene({ state, scene, line, pending, paused, extra, camera }: {
   state: CompanionState;
   scene?: StageScene;
   line: string;
   pending: boolean;
   paused: boolean;
   extra?: ReactNode;
+  /** La cámara de la persona, como un espejo en la pared de la sala. */
+  camera?: ReactNode;
 }) {
   const kind = scene?.kind ?? "none";
   const [reduced] = useState(prefersReducedMotion);
@@ -74,10 +76,9 @@ export function CompanionScene({ state, scene, line, pending, paused, extra }: {
   const pose: BuddyPose = gesture ?? (paused ? "none" : kind === "song" ? "music" : kind === "photo" ? "present" : kind === "anecdote" ? "story" : "none");
   const words = line.split(/(\s+)/);
 
-  return <div className="buddy-stage" data-scene={kind} data-arrived={arrived || undefined} data-paused={paused || undefined}>
+  return <div className="buddy-stage" data-scene={kind} data-camera={camera ? true : undefined} data-arrived={arrived || undefined} data-paused={paused || undefined}>
     <div className="stage-room" aria-hidden="true">
       <span className="room-window"/>
-      <span className="room-frame"/>
       <svg className="room-plant" viewBox="0 0 80 120"><path d="M40 78C38 52 22 40 8 38c4 18 16 30 32 40Zm0 0c2-30 14-48 32-54-2 24-14 42-32 54Zm0 0c-1-24-4-44-10-62 12 10 16 34 10 62Z" fill="#7fa58d"/><path d="M22 76h36l-5 40H27Z" fill="#c98a62"/></svg>
       <span className="room-rug"/>
     </div>
@@ -99,6 +100,8 @@ export function CompanionScene({ state, scene, line, pending, paused, extra }: {
       </article>}
       {extra}
     </div>}
+
+    {camera && <div className="stage-camera">{camera}</div>}
 
     <div className="buddy-walker">
       <AyniBuddy state={state} pose={pose} />
