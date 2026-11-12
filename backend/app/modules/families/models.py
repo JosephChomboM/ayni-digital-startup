@@ -71,6 +71,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254))
     name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    city: Mapped[str | None] = mapped_column(String(100))
+    district: Mapped[str | None] = mapped_column(String(100))
     deletion_pending: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
@@ -89,6 +92,26 @@ class User(Base):
     consent: Mapped["UserConsent | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
+
+
+class GoogleIdentity(Base):
+    __tablename__ = "google_identities"
+    __table_args__ = (
+        UniqueConstraint("subject", name="uq_google_identities_subject"),
+        CheckConstraint("btrim(subject) <> ''", name="ck_google_identity_subject"),
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    subject: Mapped[str] = mapped_column(String(255))
+
+
+class GoogleAuthChallenge(Base):
+    __tablename__ = "google_auth_challenges"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    nonce_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ElderProfile(Base):

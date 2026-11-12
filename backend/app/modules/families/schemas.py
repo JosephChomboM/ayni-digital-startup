@@ -131,6 +131,9 @@ class UserResponse(ResponseSchema):
     id: UUID
     email: NormalizedEmail
     name: str
+    phone: str | None = None
+    city: str | None = None
+    district: str | None = None
     family_id: UUID
     role: UserRole
     created_at: UTCDateTime
