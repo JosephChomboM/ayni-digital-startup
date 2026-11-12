@@ -63,6 +63,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [photoBlob, setPhotoBlob] = useState<Blob>();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoSourceIds, setPhotoSourceIds] = useState<string[]>([]);
   const [anecdoteId, setAnecdoteId] = useState("");
   const [songId, setSongId] = useState("");
   const [withDevices, setWithDevices] = useState(false);
@@ -116,14 +117,15 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   }, [activity, photoIndex, photos]);
 
   useEffect(() => {
-    if (!started || !memories.length) return;
+    if (!started || !photoSourceIds.length) return;
     const refresh = () => {
-      Promise.allSettled(memories.map((memory) => listPhotos(memory.id)))
+      // Las URLs firmadas caducan: se renuevan para los mismos recuerdos que aportaron fotos.
+      Promise.allSettled(photoSourceIds.map((memoryId) => listPhotos(memoryId)))
         .then((pages) => setPhotos(pages.flatMap((page) => page.status === "fulfilled" ? page.value : [])));
     };
     const timer = window.setInterval(refresh, 4 * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [started, memories]);
+  }, [started, photoSourceIds]);
 
   useEffect(() => {
     if (!started || paused) return;
@@ -153,11 +155,17 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       const ids = [...new Set(saved.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
       const results = await Promise.allSettled(ids.map(getMemory));
       const allowed = results.flatMap((result) => result.status === "fulfilled" && result.value.is_positive && !result.value.is_sensitive && result.value.elder_profile_id === saved.elder_profile_id ? [result.value] : []);
-      const photoResults = await Promise.allSettled(allowed.map((memory) => listPhotos(memory.id)));
+      // Las fotos vienen de todos los recuerdos positivos y no sensibles de la familia, no solo de la guía.
+      const family = await listMemories({ include_sensitive: false, limit: 50, offset: 0 }).then((page) => page.items).catch(() => allowed);
+      const photoSources = [...new Map([...allowed, ...family]
+        .filter((memory) => memory.is_positive && !memory.is_sensitive && memory.elder_profile_id === saved.elder_profile_id)
+        .map((memory) => [memory.id, memory])).values()];
+      const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
       const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       const previousReaction = await getRecordedReaction(saved.id);
       setMemories(allowed);
       setPhotos(sessionPhotos);
+      setPhotoSourceIds(photoSources.map((memory) => memory.id));
       setAnecdoteId(allowed.find((item) => item.type === "anecdote")?.id ?? "");
       setSongId(allowed.find((item) => item.type === "song")?.id ?? "");
       setActivity(allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
@@ -268,7 +276,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       {started && guide && <GuidedConversation
         key={guide.id}
         sessionId={guide.id}
-        activeMemoryId={activity === "song" ? selectedSong?.id : activity === "anecdote" ? selectedAnecdote?.id : undefined}
+        activeMemoryId={activity === "song" ? selectedSong?.id : activity === "anecdote" ? selectedAnecdote?.id :
+          activity === "photo" ? photos[photoIndex % Math.max(photos.length, 1)]?.memory_id : undefined}
         memoryOptions={memories.map((item) => ({ id: item.id, title: item.title }))}
         onSelectMemory={(id) => {
           const item = memories.find((value) => value.id === id);
