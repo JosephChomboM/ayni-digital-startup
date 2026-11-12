@@ -351,3 +351,40 @@ def test_chat_can_talk_about_a_family_photo_memory_outside_the_guide(
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["code"] == "conversation_memory_unavailable"
     assert len(assistant_provider) == calls
+
+
+def test_look_uses_the_family_interests_and_guide_titles_only(
+    client, caregiver_account, memory_profile_id, other_caregiver_account, monkeypatch
+):
+    from app.modules.sessions.look import LookSpec
+
+    received = []
+
+    def fake(interests, titles, variant=0):
+        received.append((interests, titles, variant))
+        return LookSpec(
+            hat="chef",
+            body="apron",
+            glasses=False,
+            hat_color="#fffefa",
+            outfit_color="#fffefa",
+            accent_color="#b94c35",
+            wall=["#f8efe2", "#f8efe2"],
+            decor=[{"icon": "cooking-pot", "place": "wall"}],
+            description="Ayni se puso su gorro de cocinero.",
+        )
+
+    monkeypatch.setattr(sessions_service, "generate_look", fake)
+    guide = generate(client, caregiver_account, seed(caregiver_account)).json()
+    path = f"/sessions/{guide['id']}/look"
+    response = client.get(path + "?variant=2", headers=auth(caregiver_account))
+    assert response.status_code == 200
+    assert response.json()["hat"] == "chef"
+    assert received[-1][1] == ["Paseo"] and received[-1][2] == 2
+    assert client.get(path).status_code == 401
+    assert client.get(path + "?variant=99", headers=auth(caregiver_account)).status_code == 422
+    with Session(engine) as session:
+        FamiliesService(session).save_elder_profile(
+            other_caregiver_account.user_id, name="Otro perfil", birth_decade=1950, interests=[]
+        )
+    assert client.get(path, headers=auth(other_caregiver_account)).status_code == 404

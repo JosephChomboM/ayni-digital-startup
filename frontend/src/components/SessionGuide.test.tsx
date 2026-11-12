@@ -4,13 +4,13 @@ import { SessionGuide } from "./SessionGuide";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import { getElderProfile } from "../api/families";
-import { clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
+import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
 vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
 vi.mock("../api/families", () => ({ getElderProfile: vi.fn() }));
-vi.mock("../api/sessions", () => ({ clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
+vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ captureRef, onCue, onAnalyzeFrame }: { captureRef?: { current: (() => Promise<string>) | null }; onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => { if (captureRef) captureRef.current = speech.capture; return <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></>; } }));
 const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
@@ -30,6 +30,7 @@ beforeEach(() => {
  vi.mocked(listMemories).mockResolvedValue({items:[memory],total:1,limit:50,offset:0});
  vi.mocked(getMemory).mockResolvedValue(memory);
  vi.mocked(listPhotos).mockResolvedValue([]);
+ vi.mocked(getLook).mockRejectedValue(new Error("sin IA"));
  vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:[], created_at:"", updated_at:"" });
  vi.mocked(generateSession).mockResolvedValue(guide);
  vi.mocked(getSession).mockResolvedValue(guide);
@@ -305,8 +306,18 @@ it("carga también los recuerdos que quedan fuera de la primera página", async 
  expect(listMemories).toHaveBeenCalledWith(expect.objectContaining({offset:1}));
 });
 
-it("viste a Ayni y ambienta la sala con los gustos del perfil",async()=>{
+it("si la IA no responde, viste a Ayni con un look por palabras clave de los gustos",async()=>{
  vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:["cocina criolla","boleros"], created_at:"", updated_at:"" });
  await begin();
- expect(screen.getByText(/Ayni lleva gorro y mandil de cocina/)).toBeInTheDocument();
+ expect(screen.getAllByText(/Ayni lleva gorro y mandil de cocina/).length).toBeGreaterThan(0);
+});
+const aiLook = { hat:"beret" as const, body:"scarf" as const, glasses:false, hat_color:"#b94c35", outfit_color:"#edce84", accent_color:"#235c50", wall:["#f7f0e1","#f3ead8"] as [string,string], decor:[{icon:"palette",place:"wall" as const}], description:"Ayni se puso una boina de pintor" };
+it("usa el look que diseña la IA y pide otro distinto con el botón",async()=>{
+ vi.mocked(getLook).mockResolvedValueOnce(aiLook).mockResolvedValueOnce({...aiLook, hat:"straw", description:"Ayni se puso un sombrero de paja"});
+ await begin();
+ expect(getLook).toHaveBeenLastCalledWith("guide", 0);
+ expect(screen.getAllByText(/Ayni se puso una boina de pintor/).length).toBeGreaterThan(0);
+ fireEvent.click(screen.getByRole("button",{name:"Otro look para Ayni"}));
+ expect((await screen.findAllByText(/Ayni se puso un sombrero de paja/)).length).toBeGreaterThan(0);
+ expect(getLook).toHaveBeenLastCalledWith("guide", 1);
 });
