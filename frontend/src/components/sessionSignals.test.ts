@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createFaceCueTracker, interpretReply, requestsVisualContext, spanishVoices } from "./sessionSignals";
+import { createFaceCueTracker, interpretReply, requestsVisualContext, latinAmericanVoices } from "./sessionSignals";
 
 it.each([
   ["Mira acá, este es mi álbum", true], ["¿Qué ves aquí?", true],
@@ -12,14 +12,14 @@ it.each([
   expect(requestsVisualContext(text)).toBe(expected);
 });
 
-it("prioriza acentos locales y evita que una voz de personaje gane por calidad", () => {
+it("elige solo voces locales de Latinoamérica y prioriza Perú", () => {
   const voice = (name: string, lang: string, localService = true) => ({ name, lang, localService } as SpeechSynthesisVoice);
   const voices = [voice("Española", "es-ES"), voice("Peruana", "es-PE"),
     voice("Paulina", "es-MX"), voice("Natural mexicana", "es-MX"),
     voice("Natural remota", "es-PE", false), voice("English", "en-US"),
     voice("Natural de Estados Unidos", "es-US"), voice("Eddy (Premium)", "es-MX")];
-  expect(spanishVoices(voices).map(v => v.name))
-    .toEqual(["Peruana", "Natural mexicana", "Paulina", "Española", "Natural de Estados Unidos", "Eddy (Premium)"]);
+  expect(latinAmericanVoices(voices).map(v => v.name))
+    .toEqual(["Peruana", "Natural mexicana", "Paulina", "Eddy (Premium)"]);
 });
 
 describe("spoken session preferences", () => {
