@@ -17,9 +17,9 @@ const wasmAssets = {
 const statusText: Record<FaceObservation, string> = {
   absent: "Colócate frente a la cámara.",
   multiple: "Deja un solo rostro en cuadro para usar las señales.",
-  present: "Rostro en cuadro.",
-  smiling: "Sonrisa en cuadro.",
-  brow: "Gesto de ceño en cuadro.",
+  present: "Seguimiento activo.",
+  smiling: "Seguimiento activo.",
+  brow: "Seguimiento activo.",
 };
 
 interface SessionCameraProps {
@@ -62,7 +62,7 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
     function cameraEnded() {
       stop();
       setFace(null);
-      setStatus("La cámara se desconectó. Pueden seguir con los botones.");
+      setStatus("La cámara se desconectó. Puedes seguir conversando sin video.");
     }
 
     function stopAnalysis() {
@@ -179,7 +179,7 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
   return <div className="space-y-2">
     <div className="relative overflow-hidden rounded-xl bg-[#17232d]" style={{ aspectRatio: ratio }}>
       <video ref={preview} muted playsInline aria-label="Vista de la cámara" className="absolute inset-0 size-full object-contain [transform:scaleX(-1)]" />
-      {face && <div aria-hidden="true" className="pointer-events-none absolute rounded-xl border-2 border-[#d1edaa] motion-safe:transition-[left,top,width,height] motion-safe:duration-150"
+      {face && <div aria-hidden="true" className="pointer-events-none absolute rounded-lg border-2 border-[#d1edaa] motion-safe:transition-[left,top,width,height] motion-safe:duration-150"
         style={{ left: `${face.x}%`, top: `${face.y}%`, width: `${face.width}%`, height: `${face.height}%` }} />}
     </div>
     <p role="status" className="text-sm text-slate-600">{status}</p>
