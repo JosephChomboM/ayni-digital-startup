@@ -51,7 +51,7 @@ export async function apiFetch<T>(
     );
   }
 
-  if (response.status === 401) {
+  if (response.status === 401 && token) {
     localStorage.removeItem("ayni_token");
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }

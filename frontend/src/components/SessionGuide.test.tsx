@@ -250,3 +250,35 @@ it("si Ayni decide mirar, toma una captura y vuelve a responder con ella",async(
  expect(speech.capture).toHaveBeenCalledOnce();
  expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({ image:"data:image/jpeg;base64,current", image_consent:true }),expect.any(AbortSignal));
 });
+it("envía la foto guardada activa al preguntar por ella sin necesitar la cámara", async () => {
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["photo"],{type:"image/jpeg"})}));
+ vi.mocked(imageForConversation).mockResolvedValue("data:image/jpeg;base64,saved");
+ await begin();
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
+ await screen.findByRole("button",{name:"Analizar foto con IA"});
+ fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"¿Qué ves en esta foto?"}});
+ fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({image:"data:image/jpeg;base64,saved",image_consent:true}),expect.any(AbortSignal));
+ expect(speech.capture).not.toHaveBeenCalled();
+ vi.unstubAllGlobals();
+});
+it("prioriza la cámara explícita sobre una foto activa", async () => {
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["photo"],{type:"image/jpeg"})}));
+ await begin("Empezar con Ayni");
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
+ await screen.findByRole("button",{name:"Analizar foto con IA"});
+ act(()=>speech.receive?.("Mira mi cámara, ¿qué ves acá?"));
+ await screen.findByText(answer.text);
+ expect(speech.capture).toHaveBeenCalledOnce();
+ expect(imageForConversation).not.toHaveBeenCalled();
+ vi.unstubAllGlobals();
+});
+it("no usa la cámara cuando se pide una foto que no está abierta", async () => {
+ await begin("Empezar con Ayni");
+ act(()=>speech.receive?.("Mira la foto del recuerdo"));
+ await screen.findByText(/Abre la foto del recuerdo/);
+ expect(speech.capture).not.toHaveBeenCalled();
+});

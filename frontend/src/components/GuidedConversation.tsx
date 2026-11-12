@@ -10,7 +10,7 @@ import { CompanionScene } from "./CompanionScene";
 import type { StageScene } from "./CompanionScene";
 import { SessionCamera } from "./SessionCamera";
 import { SongContext } from "./SongContext";
-import { interpretReply, requestsVisualContext, speakLocally } from "./sessionSignals";
+import { interpretReply, requestsVisualContext, visualSource, speakLocally } from "./sessionSignals";
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
 import { Button } from "./ui/button";
@@ -115,8 +115,13 @@ export function GuidedConversation({
     setRecovering(false);
     lastAttempt.current = retry ?? { text, request_id: crypto.randomUUID(), use_scene: false, available: activities, camera_on: camera && liveScene && !paused, ...(localPrompt.current ? { previous_prompt: localPrompt.current.slice(0, 300) } : {}), ...(activeMemoryId ? { active_memory_id: activeMemoryId } : {}), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
     try {
+      const source = visualSource(text);
+      if (!retry?.image && !image && !cue && requestsVisualContext(text) && photo && source !== "camera") {
+        image = await imageForConversation(photo);
+        if (controller.signal.aborted) return;
+      }
       if (!retry?.image && !image && !cue && requestsVisualContext(text)) {
-        if (camera && liveScene && cameraCapture.current) {
+        if (source !== "memory" && camera && liveScene && cameraCapture.current) {
           try { image = await cameraCapture.current(); }
           catch { /* The camera may still be starting or may have lost access. */ }
           if (controller.signal.aborted) return;
@@ -125,7 +130,9 @@ export function GuidedConversation({
           lastAttempt.current = null;
           setObservations([]);
           setSuggestion("continue");
-          show(camera && liveScene
+          show(source === "memory"
+            ? "Abre la foto del recuerdo que quieres comentar y vuelve a preguntarme. No usaré la cámara para esta petición."
+            : camera && liveScene
             ? "La cámara todavía no me muestra la imagen. ¿Puedes enseñármela otra vez?"
             : "Si quieres que mire algo, enciende la cámara o usa Analizar foto con IA.");
           return;
