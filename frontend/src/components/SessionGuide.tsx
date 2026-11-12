@@ -3,7 +3,7 @@ import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Play, RotateCcw } from "lucide-react";
 import type { User } from "../api/auth";
-import { listMemories, getMemory } from "../api/memories";
+import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
@@ -87,7 +87,17 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   useEffect(() => {
     let active = true;
     setLoading(true);
-    listMemories({ include_sensitive: false, limit: 50, offset: 0 }).then(async (response) => {
+    (async () => {
+      const items: Memory[] = [];
+      let total = 0;
+      do {
+        const page = await listMemories({ include_sensitive: true, limit: 50, offset: items.length });
+        if (!active) return { items };
+        items.push(...page.items); total = page.total;
+        if (!page.items.length) break;
+      } while (items.length < total);
+      return { items };
+    })().then(async (response) => {
       if (!active) return;
       setMemories(response.items);
       const eligible = response.items.filter((memory) => memory.is_positive && !memory.is_sensitive);
@@ -168,7 +178,9 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       setPhotoSourceIds(photoSources.map((memory) => memory.id));
       setAnecdoteId(allowed.find((item) => item.type === "anecdote")?.id ?? "");
       setSongId(allowed.find((item) => item.type === "song")?.id ?? "");
-      setActivity(allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
+      const chosenPhoto = memoryChoice ? sessionPhotos.findIndex((photo) => photo.memory_id === memoryChoice) : -1;
+      if (chosenPhoto >= 0) { setPhotoIndex(chosenPhoto); setActivity("photo"); }
+      else setActivity(allowed.find((item) => item.id === memoryChoice)?.type ?? allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
       setWithDevices(devices);
       setPhotoIndex(0);
       setStarted(true);
@@ -242,9 +254,19 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
           <label className="block text-sm font-semibold">¿Con qué recuerdo quieres empezar?
             <select aria-label="Recuerdo para la sesión" className="mt-2 w-full rounded border bg-white p-3 font-normal" value={memoryChoice} onChange={(event) => setMemoryChoice(event.target.value)}>
               <option value="">Dejar que Ayni prepare una selección</option>
-              {memories.filter((item) => item.is_positive && !item.is_sensitive).map((item) => <option key={item.id} value={item.id}>{item.title} · {item.type === "song" ? "Canción" : "Anécdota"}</option>)}
+              {memories.map((item) => <option key={item.id} value={item.id} disabled={item.is_sensitive || item.deletion_pending}>{item.title} · {item.is_sensitive ? "Tema delicado: no disponible" : item.deletion_pending ? "Eliminándose" : !item.is_positive ? "Confirma que es un recuerdo bonito" : item.type === "song" ? "Canción" : "Anécdota"}</option>)}
             </select>
           </label>
+          {memories.some((item) => item.id === memoryChoice && !item.is_positive && !item.is_sensitive) && <div className="rounded-xl border bg-amber-50 p-4 space-y-3">
+            <p>Este recuerdo todavía no está marcado como bonito. Para usarlo en una sesión, confirma que es un recuerdo positivo para tu familiar.</p>
+            <Button disabled={busy} onClick={async () => {
+              setBusy(true); setLoadError("");
+              try { const updated = await updateMemory(memoryChoice, { is_positive: true }); setMemories((items) => items.map((item) => item.id === updated.id ? updated : item)); }
+              catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos confirmar el recuerdo."); }
+              finally { setBusy(false); }
+            }}>Confirmar que es un recuerdo bonito</Button>
+          </div>}
+          <p className="text-sm text-slate-600">Las sesiones usan recuerdos bonitos y sin temas delicados. Las imágenes acompañan al recuerdo donde las guardaste.</p>
           <Button variant="outline" disabled={recommending || busy} onClick={async () => {
             setRecommending(true); setLoadError("");
             try { const result = await recommendMemory(); setRecommendation(result); setMemoryChoice(result.memory_id); }
@@ -256,8 +278,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
           <button type="button" onClick={onOpenMemories} className="min-h-11 text-sm font-semibold underline">Agregar o revisar mis recuerdos</button>
           <p className="text-sm text-slate-600">Groq recibe sus respuestas y los recuerdos necesarios para conversar. Los mensajes y detalles observados se guardan en el historial familiar. Al empezar con Ayni y permitir la cámara, se comparte una captura solo cuando pides mirar algo, por ejemplo «mira acá». Puedes desactivar «Contexto visual en vivo». No se guardan fotos ni video de la cámara.</p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" disabled={busy} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
+            <Button type="button" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+            <Button type="button" variant="ghost" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
           </div>
           <p className="text-sm text-slate-600">Al empezar con Ayni, tu navegador pedirá permiso para la cámara y el micrófono. El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
         </div>}
