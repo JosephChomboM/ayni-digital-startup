@@ -2,6 +2,9 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { SessionCamera } from "./SessionCamera";
 import { FaceLandmarker } from "@mediapipe/tasks-vision";
+import { imageForConversation } from "../api/sessions";
+
+vi.mock("../api/sessions", () => ({ imageForConversation: vi.fn().mockResolvedValue("data:image/jpeg;base64,frame") }));
 
 const detector = vi.hoisted(() => ({
   detectForVideo: vi.fn(),
@@ -19,6 +22,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   detector.close.mockClear();
+});
+
+it("envía capturas solo con permiso, espera entre ellas y se detiene al desactivar", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const track = Object.assign(new EventTarget(), { stop: vi.fn() });
+  vi.stubGlobal("navigator", Object.create(navigator, { mediaDevices: { value: {
+    getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track], getVideoTracks: () => [track] }),
+  } } }));
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(2);
+  detector.detectForVideo.mockReturnValue({ faceLandmarks: [], faceBlendshapes: [] });
+  const onObserveFrame = vi.fn().mockResolvedValue(undefined);
+  const canObserve = vi.fn().mockReturnValue(false);
+  const props = { onCue: vi.fn(), canFollowExpression: () => false, canObserve, onObserveFrame };
+  const { rerender } = render(<SessionCamera {...props} live />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+  expect(onObserveFrame).not.toHaveBeenCalled();
+  canObserve.mockReturnValue(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+  expect(imageForConversation).toHaveBeenCalled();
+  expect(onObserveFrame).toHaveBeenCalledOnce();
+  rerender(<SessionCamera {...props} live={false} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+  expect(onObserveFrame).toHaveBeenCalledOnce();
 });
 
 it("opens the live preview before loading the model and keeps it open if the model fails", async () => {

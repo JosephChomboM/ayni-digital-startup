@@ -36,6 +36,8 @@ export interface ChatInput {
   image?: string;
   image_consent?: boolean;
   cue?: "smile" | "brow";
+  use_scene?: boolean;
+  active_memory_id?: string;
 }
 
 export type Reaction = "receptivo" | "emocionado" | "indiferente" | "agitado";
@@ -51,13 +53,29 @@ export interface SessionResponse {
 
 const route = (id: string) => `/sessions/${encodeURIComponent(id)}`;
 
-export const generateSession = () => apiFetch<SavedSession>("/sessions/generate", { method: "POST", body: "{}" });
+export const generateSession = (memoryId?: string) => apiFetch<SavedSession>("/sessions/generate", { method: "POST", body: JSON.stringify(memoryId ? { memory_id: memoryId } : {}) });
 export const getSession = (id: string) => apiFetch<SavedSession>(route(id));
 export const listSessions = (limit = 20, offset = 0) =>
   apiFetch<SessionPage>(`/sessions?limit=${limit}&offset=${offset}`);
 export const getMessages = (id: string) => apiFetch<SavedMessage[]>(`${route(id)}/messages`);
 export const sendMessage = (id: string, input: ChatInput, signal: AbortSignal) =>
   apiFetch<SavedMessage>(`${route(id)}/chat`, { method: "POST", body: JSON.stringify(input), signal });
+
+export interface Recommendation { memory_id: string; title: string; source: "ai" | "history"; reason: string; previous_sessions: number; positive_reactions: number }
+export const recommendMemory = () => apiFetch<Recommendation>("/sessions/recommendation");
+export interface Scene { observations: string[]; updated_at: string; cached: boolean }
+export const observeScene = (id: string, image: string, signal: AbortSignal) => apiFetch<Scene>(`${route(id)}/scene`, { method: "POST", body: JSON.stringify({ image, image_consent: true }), signal });
+export const clearScene = (id: string) => apiFetch<void>(`${route(id)}/scene`, { method: "DELETE" });
+export async function transcribeAudio(id: string, recording: Blob, signal?: AbortSignal): Promise<string> {
+  const encoded = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = () => reject(new Error("No pudimos leer la grabación."));
+    reader.readAsDataURL(recording);
+  });
+  const result = await apiFetch<{ text: string }>(`${route(id)}/transcribe`, { method: "POST", body: JSON.stringify({ audio: encoded, content_type: recording.type.split(";")[0], consent: true }), signal });
+  return result.text;
+}
 
 export function recordReaction(id: string, reaction: Reaction): Promise<SessionResponse> {
   return apiFetch(`${route(id)}/response`, { method: "POST", body: JSON.stringify({ reaction }) });

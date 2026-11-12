@@ -44,6 +44,52 @@ class MemoriesError(ApplicationError):
 
 
 class MemoriesService:
+    def get_song_context(
+        self, actor_id: UUID, memory_id: UUID, lookup: bool = False, search: str | None = None
+    ) -> dict:
+        from app.modules.memories.song_metadata import search_song
+
+        profile_id, _ = self._context(actor_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id)
+            if memory.type != MemoryType.SONG:
+                raise MemoriesError(
+                    code="song_required", status_code=422, message="Elige una canción."
+                )
+            if memory.song_context:
+                return dict(memory.song_context)
+            url, title = memory.url, memory.title
+        return (
+            (search_song(url, title, search) if search else search_song(url, title))
+            if lookup
+            else {"status": "unavailable", "candidates": []}
+        )
+
+    def confirm_song_context(self, actor_id: UUID, memory_id: UUID, recording_id: UUID) -> dict:
+        from app.modules.memories.song_metadata import recording_context
+
+        profile_id, is_caregiver = self._context(actor_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id)
+            self._require_editor(memory, actor_id, is_caregiver)
+            if memory.type != MemoryType.SONG:
+                raise MemoriesError(
+                    code="song_required", status_code=422, message="Elige una canción."
+                )
+            url = memory.url
+        context = recording_context(recording_id)
+        with self.session.begin():
+            memory = self._require_memory(memory_id, profile_id, for_update=True)
+            self._require_editor(memory, actor_id, is_caregiver)
+            if memory.url != url:
+                raise MemoriesError(
+                    code="song_changed",
+                    status_code=409,
+                    message="La canción cambió. Consulta sus datos de nuevo.",
+                )
+            memory.song_context = dict(context)
+        return dict(context)
+
     """Use a dedicated session and own the transaction for every operation."""
 
     def __init__(self, session: Session, *, photo_storage: PhotoStorage | None = None) -> None:
@@ -337,7 +383,9 @@ class MemoriesService:
             self._remove_photo_objects([photo])
             self.repository.delete_photo(photo)
 
-    def select_session_memories(self, elder_profile_id: UUID) -> list[SessionMemoryCandidate]:
+    def select_session_memories(
+        self, elder_profile_id: UUID, memory_id: UUID | None = None
+    ) -> list[SessionMemoryCandidate]:
         """Trusted module interface; caller derives the profile and owns the transaction.
 
         Locks eligible rows until the caller persists the generated session.
@@ -355,7 +403,7 @@ class MemoriesService:
                 is_sensitive=memory.is_sensitive,
                 deletion_pending=memory.deletion_pending,
             )
-            for memory in self.repository.select_session_memories(elder_profile_id)
+            for memory in self.repository.select_session_memories(elder_profile_id, memory_id)
         ]
 
     def available_session_memory_ids(

@@ -42,6 +42,7 @@ UTCDateTime = Annotated[AwareDatetime, AfterValidator(lambda value: value.astime
 
 class GenerateSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    memory_id: UUID | None = None
 
 
 class SessionListRequest(BaseModel):
@@ -89,3 +90,9 @@ class SessionMessageResponse(BaseModel):
     suggestion: Literal["continue", "slow_down", "pause", "change_activity"]
     observations: list[str]
     created_at: UTCDateTime
+
+
+class SceneResponse(BaseModel):
+    observations: list[str]
+    updated_at: UTCDateTime
+    cached: bool = False

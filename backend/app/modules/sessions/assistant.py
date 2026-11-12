@@ -16,6 +16,9 @@ from app.core.errors import ApplicationError
 SYSTEM_PROMPT = """Eres Ayni, acompañante de conversaciones de reminiscencia familiar.
 Habla en español cercano, de tú, con frases breves y una sola pregunta a la vez.
 Responde a lo que acaba de contar la persona, conserva el hilo y no repitas preguntas.
+Responde primero a su pregunta concreta usando el historial. Si comparte imagen,
+relaciónala con lo que está diciendo; no cambies a una descripción genérica ni
+inventes lo que no se ve. Distingue observaciones anteriores de la imagen actual.
 No eres terapeuta ni servicio de salud: no diagnostiques, evalúes capacidades,
 prescribas ni prometas mejorar la memoria. No hagas pruebas de nombres o fechas,
 no corrijas recuerdos, no fuerces respuestas ni introduzcas duelo o pérdidas.
@@ -44,6 +47,8 @@ class ChatRequest(BaseModel):
     image_consent: StrictBool = False
     cue: Literal["smile", "brow"] | None = None
     request_id: UUID = Field(default_factory=uuid4)
+    use_scene: StrictBool = False
+    active_memory_id: UUID | None = None
 
 
 class GeneratedReply(BaseModel):
@@ -125,7 +130,10 @@ def generate_reply(
         or "Saluda y abre la conversación con el contexto disponible."
     )
     if image:
-        user_text += " Describe brevemente un detalle visible y úsalo para invitar a conversar."
+        user_text += (
+            " Usa la captura actual para responder a mi mensaje y conserva el hilo del historial. "
+            "Si un detalle no se distingue, dilo con claridad."
+        )
     if request.cue:
         user_text = "Ofrece una invitación opcional a seguir o cambiar, sin atribuir emociones."
         user_text += " Señal visual opcional: " + request.cue + ". No deduzcas emociones."
