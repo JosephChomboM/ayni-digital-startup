@@ -29,7 +29,9 @@ interface SessionCameraProps {
 
 export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps) {
   const preview = useRef<HTMLVideoElement>(null);
-  const [status, setStatus] = useState("Preparando la cámara…");
+  const [status, setStatus] = useState("Esperando permiso de cámara…");
+  const [ratio, setRatio] = useState("4 / 3");
+  const [face, setFace] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const handleCue = useEffectEvent(onCue);
   const turnAvailable = useEffectEvent(canFollowExpression);
 
@@ -59,7 +61,16 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
 
     function cameraEnded() {
       stop();
+      setFace(null);
       setStatus("La cámara se desconectó. Pueden seguir con los botones.");
+    }
+
+    function stopAnalysis() {
+      window.clearTimeout(timer);
+      detector?.close();
+      detector = undefined;
+      setFace(null);
+      setStatus("Vista en vivo. El seguimiento no pudo iniciar.");
     }
 
     function sample() {
@@ -81,14 +92,21 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
               observation = "brow";
             }
           }
+          const points = result.faceLandmarks.length === 1 ? result.faceLandmarks[0] : [];
+          if (points.length) {
+            const left = Math.max(0, Math.min(...points.map((point) => point.x)) - 0.025);
+            const right = Math.min(1, Math.max(...points.map((point) => point.x)) + 0.025);
+            const top = Math.max(0, Math.min(...points.map((point) => point.y)) - 0.025);
+            const bottom = Math.min(1, Math.max(...points.map((point) => point.y)) + 0.025);
+            setFace({ x: (1 - right) * 100, y: top * 100, width: (right - left) * 100, height: (bottom - top) * 100 });
+          } else setFace(null);
           setStatus(statusText[observation]);
           const cue = trackCue(observation, now, turnAvailable());
           if (cue) handleCue(cue);
         }
         if (!stopped) timer = window.setTimeout(sample, 150);
       } catch {
-        stop();
-        setStatus("El análisis de cámara se detuvo. Pueden seguir con los botones.");
+        stopAnalysis();
       }
     }
 
@@ -97,6 +115,30 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error("camera unavailable");
         }
+        const captured = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } },
+        });
+        if (stopped || !video) {
+          captured.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = captured;
+        stream.getVideoTracks().forEach((track) => track.addEventListener("ended", cameraEnded, { once: true }));
+        video.srcObject = stream;
+        await video.play();
+      } catch (error) {
+        if (stopped) return;
+        stop();
+        setStatus(error instanceof DOMException && error.name === "NotAllowedError"
+          ? "La cámara está bloqueada. Permite el acceso desde el icono del navegador y vuelve a activarla."
+          : "No pudimos abrir la cámara. Comprueba que esté conectada y libre.");
+        return;
+      }
+      if (stopped || !video) return;
+      if (video.videoWidth && video.videoHeight) setRatio(`${video.videoWidth} / ${video.videoHeight}`);
+      setStatus("Vista en vivo. Preparando el seguimiento…");
+      try {
         const vision = await import("@mediapipe/tasks-vision");
         if (stopped) return;
         const simd = await vision.FilesetResolver.isSimdSupported();
@@ -112,29 +154,16 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
           return;
         }
         detector = model;
-        const captured = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } },
-        });
-        if (stopped || !video) {
-          captured.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        stream = captured;
-        stream.getVideoTracks().forEach((track) => track.addEventListener("ended", cameraEnded, { once: true }));
-        video.srcObject = stream;
-        await video.play();
-        if (!stopped) sample();
+        sample();
       } catch {
-        if (stopped) return;
-        stop();
-        setStatus("No pudimos activar la cámara. Revisen el permiso o continúen con los botones.");
+        if (!stopped) stopAnalysis();
       }
     }
 
     function onVisibilityChange() {
       if (document.hidden && !stopped) {
         stop();
+        setFace(null);
         setStatus("La cámara se apagó al salir de esta pestaña. Pueden volver a activarla.");
       }
     }
@@ -148,7 +177,11 @@ export function SessionCamera({ onCue, canFollowExpression }: SessionCameraProps
   }, []);
 
   return <div className="space-y-2">
-    <video ref={preview} muted playsInline aria-label="Vista de la cámara" className="aspect-[4/3] w-full max-w-56 rounded-lg bg-slate-100 object-cover [transform:scaleX(-1)]" />
+    <div className="relative overflow-hidden rounded-xl bg-[#17232d]" style={{ aspectRatio: ratio }}>
+      <video ref={preview} muted playsInline aria-label="Vista de la cámara" className="absolute inset-0 size-full object-contain [transform:scaleX(-1)]" />
+      {face && <div aria-hidden="true" className="pointer-events-none absolute rounded-xl border-2 border-[#d1edaa] motion-safe:transition-[left,top,width,height] motion-safe:duration-150"
+        style={{ left: `${face.x}%`, top: `${face.y}%`, width: `${face.width}%`, height: `${face.height}%` }} />}
+    </div>
     <p role="status" className="text-sm text-slate-600">{status}</p>
   </div>;
 }

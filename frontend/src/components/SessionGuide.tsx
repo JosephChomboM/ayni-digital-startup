@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Clock3, ImagePlus, Music2, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, Play, RotateCcw } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -9,16 +9,14 @@ import { saveSessionFeedback } from "../api/sessionFeedback";
 import type { SessionExperience, SessionFeeling } from "../api/sessionFeedback";
 import { GuidedConversation } from "./GuidedConversation";
 import { speakLocally } from "./sessionSignals";
+import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Progress } from "./ui/progress";
 
 interface SessionGuideProps {
   currentUser: User;
   onOpenMemories: () => void;
 }
-
-const DURATION_SECONDS = 15 * 60;
 
 function playerUrl(value: string | null): string | null {
   if (!value) return null;
@@ -48,23 +46,22 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   const [photos, setPhotos] = useState<LocalFamilyPhoto[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
   const [anecdoteId, setAnecdoteId] = useState("");
   const [songId, setSongId] = useState("");
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [adaptivePause, setAdaptivePause] = useState<{ message: string; speak: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [step, setStep] = useState(0);
+  const [activity, setActivity] = useState<SessionActivity>();
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewVoice, setReviewVoice] = useState(false);
   const [feeling, setFeeling] = useState<SessionFeeling | "">("");
   const [experience, setExperience] = useState<SessionExperience | "">("");
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
 
   const songs = useMemo(() => memories.filter((memory) => memory.type === "song"), [memories]);
-  const anecdotes = useMemo(() => memories.filter((memory) => memory.type === "anecdote"), [memories]);
-  const sessionPhotos = useMemo(() => photos.filter((photo) => selectedPhotoIds.includes(photo.id)), [photos, selectedPhotoIds]);
+  const anecdotes = useMemo(() => memories.filter((memory) =>
+    memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive), [memories]);
   const selectedSong = songs.find((memory) => memory.id === songId) ?? songs[0];
   const selectedAnecdote = anecdotes.find((memory) => memory.id === anecdoteId) ?? anecdotes[0];
 
@@ -77,9 +74,8 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
     ]).then(([localPhotos, response]) => {
       if (!active) return;
       setPhotos(localPhotos);
-      setSelectedPhotoIds(localPhotos.map((photo) => photo.id));
       setMemories(response.items);
-      const firstAnecdote = response.items.find((memory) => memory.type === "anecdote");
+      const firstAnecdote = response.items.find((memory) => memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive);
       if (firstAnecdote) setAnecdoteId(firstAnecdote.id);
       const firstSong = response.items.find((memory) => memory.type === "song");
       if (firstSong) setSongId(firstSong.id);
@@ -97,13 +93,53 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
   }, [started, paused]);
 
   useEffect(() => {
-    if (!paused || !adaptivePause?.speak) return;
-    speakLocally(adaptivePause.message);
+    if (!reviewOpen || !reviewVoice) return;
+    speakLocally("Gracias por compartir este momento conmigo. Si quieren, pueden contar cómo les fue.");
     return () => window.speechSynthesis?.cancel();
-  }, [paused, adaptivePause]);
+  }, [reviewOpen, reviewVoice]);
 
-  const begin = () => { setStarted(true); setPaused(false); setAdaptivePause(null); setElapsed(0); setStep(0); setReviewOpen(false); setSaved(false); };
-  const finish = () => { setStarted(false); setPaused(false); setReviewOpen(true); };
+  const availableActivities: SessionActivity[] = [];
+  if (selectedAnecdote) availableActivities.push("anecdote");
+  if (photos.length) availableActivities.push("photo");
+  if (selectedSong) availableActivities.push("song");
+
+  function begin() {
+    setActivity(availableActivities[0]);
+    setPhotoIndex(0);
+    setStarted(true);
+    setPaused(false);
+    setElapsed(0);
+    setReviewOpen(false);
+    setSaved(false);
+    setFeeling("");
+    setExperience("");
+    setNote("");
+  }
+
+  function finish(speak: boolean) {
+    setStarted(false);
+    setPaused(false);
+    setReviewVoice(speak);
+    setReviewOpen(true);
+  }
+
+  function nextActivity(preferred?: SessionActivity): string {
+    if (preferred && !availableActivities.includes(preferred)) {
+      return "Ese recuerdo todavía no está disponible aquí. ¿Quieres que sigamos con lo que tenemos?";
+    }
+    const index = activity ? availableActivities.indexOf(activity) : -1;
+    const next = preferred ?? (availableActivities.length
+      ? availableActivities[(index + 1) % availableActivities.length]
+      : undefined);
+    setActivity(next);
+    if (next === "photo") {
+      if (activity === "photo") setPhotoIndex((value) => (value + 1) % photos.length);
+      return "Miremos una foto juntos. ¿Qué detalle te llama la atención?";
+    }
+    if (next === "song") return "Pasemos a la canción. Puedes ponerla cuando quieras. ¿En qué momento solías escucharla?";
+    if (next === "anecdote") return "Hablemos de la anécdota. ¿Qué parte te gustaría contar?";
+    return "Podemos pensar en otro día bonito. ¿Qué te gustaría compartir?";
+  }
 
   const saveReview = () => {
     if (!feeling || !experience) return;
@@ -115,78 +151,59 @@ export function SessionGuide({ currentUser, onOpenMemories }: SessionGuideProps)
     setSaved(true);
   };
 
-  const steps = [
-    { title: "Miren una imagen", description: "Muestra una imagen a la vez. Deja que la persona la observe y decida qué le gustaría contar.", prompt: "¿Qué detalle te llama la atención?" },
-    { title: "Conversen sin apuro", description: selectedAnecdote ? `Pueden partir de “${selectedAnecdote.title}”. No hace falta recordar todo ni responder de una forma determinada.` : "Usa una pregunta sencilla. Si no quiere responder, pueden escuchar o pasar a otra actividad.", prompt: "¿Qué te gustaría contar de ese momento?" },
-    { title: "Escuchen una canción", description: selectedSong ? `Reproduzcan “${selectedSong.title}” y conversen si la música invita a hacerlo.` : "Todavía no hay canciones guardadas. Pueden saltar este paso o agregar un enlace en Subir recuerdos.", prompt: "¿Qué te hace sentir escucharla?" },
-    { title: "Cierren a su ritmo", description: "Agradece el momento compartido. Si hay cansancio o incomodidad, terminen antes; no es necesario completar todos los pasos.", prompt: "¿Prefieres seguir conversando o descansar?" },
-  ];
+  const activityTitle = activity === "anecdote" ? selectedAnecdote?.title :
+    activity === "photo" ? "Foto familiar" : selectedSong?.title;
+  const activityContent = activity === "anecdote" ? (
+    <p className="mt-2 break-words text-sm leading-relaxed text-slate-700">{selectedAnecdote?.text}</p>
+  ) : activity === "photo" && photos.length ? (
+    <PhotoCarousel photos={photos} index={photoIndex} onChange={setPhotoIndex} />
+  ) : activity === "song" && selectedSong && !paused ? <MusicPlayer memory={selectedSong} /> : null;
 
-  return <Card className="overflow-hidden border-0 bg-white shadow-none">
-    <CardHeader className="px-0 pb-5">
-      <p className="text-sm font-semibold text-[#e76f51]">Un momento en familia</p>
-      <CardTitle className="text-2xl font-semibold text-[#2c5f7c]">Guía de sesión</CardTitle>
-      <CardDescription className="max-w-2xl text-sm leading-relaxed text-slate-600">Las fotos y las reseñas se guardan solo en este navegador y no se sincronizan. Una conversación breve que se adapta a sus recuerdos. Pueden saltar preguntas, cambiar de tema o detenerse cuando quieran.</CardDescription>
-    </CardHeader>
+  return <Card className="border-0 bg-white shadow-none">
+    {!started && <CardHeader className="px-0 pb-5">
+      <CardTitle className="text-2xl font-bold text-[#264653]">Guía de sesión</CardTitle>
+      <CardDescription className="max-w-2xl text-base text-slate-600">Conversen a su ritmo con la ayuda de Ayni.</CardDescription>
+    </CardHeader>}
     <CardContent className="space-y-6 px-0">
-      {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm text-red-700"><span>{loadError}</span><button onClick={() => window.location.reload()} className="font-semibold underline">Volver a cargar</button></div>}
-
-      {!started && !reviewOpen && <>
-        <section className="space-y-4" aria-labelledby="prepare-session">
-          <div><h2 id="prepare-session" className="text-lg font-semibold text-[#264653]">Preparen el momento</h2><p className="mt-1 text-sm text-slate-600">Duración sugerida: hasta 15 minutos. Tengan a mano las imágenes o canciones que la familia guardó.</p></div>
-          {loading ? <p role="status" className="text-sm text-slate-500">Buscando recuerdos…</p> : <div className="grid gap-5 sm:grid-cols-2">
-            <div><div className="flex items-center justify-between gap-2"><h3 className="font-medium text-[#2c5f7c]">Imágenes disponibles</h3><span className="text-xs text-slate-500">{photos.length}</span></div>
-              {photos.length ? <PhotoCarousel photos={photos} index={photoIndex} onChange={setPhotoIndex} /> : <div className="py-4"><p className="text-sm text-slate-500">Aún no hay fotos guardadas aquí.</p><button onClick={onOpenMemories} className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#e76f51]"><ImagePlus className="size-4" />Agregar fotos</button></div>}
-              {photos.length > 1 && <fieldset className="mt-3 space-y-2"><legend className="text-xs font-semibold text-slate-600">Elige las fotos para esta sesión</legend><div className="max-h-32 space-y-1 overflow-y-auto">{photos.map((photo) => <label key={photo.id} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={selectedPhotoIds.includes(photo.id)} onChange={(event) => { setSelectedPhotoIds((value) => event.target.checked ? [...value, photo.id] : value.filter((id) => id !== photo.id)); setPhotoIndex(0); }} />{photo.name}</label>)}</div></fieldset>}
-            </div>
-            <div><div className="flex items-center justify-between gap-2"><h3 className="font-medium text-[#2c5f7c]">Canción para escuchar</h3><Music2 className="size-4 text-[#e76f51]" /></div>
-              {songs.length ? <><label htmlFor="session-song" className="sr-only">Elegir canción</label><select id="session-song" value={selectedSong?.id ?? ""} onChange={(event) => setSongId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-[#264653]">{songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}</select>{selectedSong && <MusicPlayer memory={selectedSong} />}</> : <div className="py-4"><p className="text-sm text-slate-500">Todavía no hay canciones disponibles.</p><button onClick={onOpenMemories} className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#e76f51]"><Music2 className="size-4" />Agregar una canción</button></div>}
-            </div>
-          </div>}
-          {anecdotes.length > 0 && <label className="block max-w-xl text-sm font-medium text-[#264653]">Anécdota para conversar<select value={selectedAnecdote?.id ?? ""} onChange={(event) => setAnecdoteId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal">{anecdotes.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}
-          {anecdotes.length > 0 && <p className="text-sm text-slate-600">También hay {anecdotes.length} {anecdotes.length === 1 ? "anécdota familiar guardada" : "anécdotas familiares guardadas"} que pueden usar como tema.</p>}
-          <p className="text-xs leading-relaxed text-slate-500">La guía es una ayuda para conversar, no una evaluación clínica. Si una imagen o tema incomoda, ciérrenlo y elijan otra cosa.</p>
-          <Button onClick={begin} disabled={loading} variant="secondary" className="w-auto px-5">Comenzar cuando estén listos</Button>
-        </section>
-      </>}
-
-      {started && <section className="space-y-5" aria-live="polite">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div><p className="text-sm font-semibold text-[#e76f51]">Paso {step + 1} de {steps.length}</p><h2 className="text-xl font-semibold text-[#2c5f7c]">{steps[step].title}</h2></div>
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-600"><Clock3 className="size-4 text-[#2c5f7c]" />{formatTime(elapsed)} / 15:00</div>
-        </div>
-        <Progress value={Math.min(100, elapsed / DURATION_SECONDS * 100)} className="h-1.5" />
-        {step === 0 && sessionPhotos.length > 0 && <PhotoCarousel photos={sessionPhotos} index={photoIndex % sessionPhotos.length} onChange={setPhotoIndex} large />}
-        {step === 0 && sessionPhotos.length === 0 && <p className="py-4 text-sm text-slate-600">No eligieron imágenes para este momento. Pueden continuar con una anécdota o cambiar la selección.</p>}
-        {step === 2 && selectedSong && <MusicPlayer memory={selectedSong} />}
-        {step === 2 && !selectedSong && <button onClick={onOpenMemories} className="inline-flex items-center gap-2 text-sm font-semibold text-[#e76f51]"><Music2 className="size-4" />Ir a Subir recuerdos</button>}
-        <p className="text-base leading-relaxed text-slate-700">{steps[step].description}</p>
-        <div className="py-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Una pregunta posible</p><p className="mt-1 text-lg font-medium text-[#264653]">{steps[step].prompt}</p></div>
-        {step === 1 && !paused && selectedAnecdote?.is_positive && !selectedAnecdote.is_sensitive && (
-          <GuidedConversation
-            key={selectedAnecdote.id}
-            memoryId={selectedAnecdote.id}
-            title={selectedAnecdote.title}
-            onPause={(message, speak) => {
-              setAdaptivePause({ message, speak });
-              setPaused(true);
-            }}
-            onNextActivity={() => setStep(2)}
-          />
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" disabled={paused || step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))} className="w-auto"><ArrowLeft className="mr-2 size-4" />Anterior</Button>
-            {step < steps.length - 1 && <Button type="button" variant="outline" disabled={paused} onClick={() => setStep((value) => value + 1)} className="w-auto">Siguiente<ArrowRight className="ml-2 size-4" /></Button>}
-          </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => { setAdaptivePause(null); setPaused((value) => !value); }} className="w-auto">{paused ? <><Play className="mr-2 size-4" />Continuar</> : <><Pause className="mr-2 size-4" />Pausar</>}</Button>
-            <Button type="button" variant="secondary" onClick={finish} className="w-auto"><Square className="mr-2 size-4" />Terminar</Button>
+      {loadError && <p role="alert" className="text-sm text-red-700">{loadError} Puedes empezar una conversación general.</p>}
+      {!started && !reviewOpen && <section aria-labelledby="prepare-session" className="max-w-2xl rounded-xl border border-slate-200 bg-[#f5faf8] p-5 sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-[#193745] text-[#f4d784]"><Bot aria-hidden="true" className="size-6" /></div>
+          <div>
+            <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
+            <p className="mt-1 text-base text-slate-700">Te daré la bienvenida y te haré una pregunta. Puedes responder hablando o escribiendo.</p>
           </div>
         </div>
-        {paused && <p role="status" className="text-sm text-slate-500">{adaptivePause?.message ?? "La sesión está en pausa. No hay apuro para continuar."}</p>}
-        {elapsed >= DURATION_SECONDS && <p role="status" className="text-sm text-slate-600">Ya pasaron 15 minutos. Pueden cerrar la actividad o continuar si les resulta agradable.</p>}
+        {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="mt-5 space-y-4">
+          {anecdotes.length > 0 ? <label className="block text-sm font-semibold text-[#264653]">
+            Anécdota para conversar
+            <select value={selectedAnecdote?.id ?? ""} onChange={(event) => setAnecdoteId(event.target.value)}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-normal">
+              {anecdotes.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </select>
+          </label> : <p className="text-sm text-slate-700">Puedes empezar con una pregunta general o <button type="button" onClick={onOpenMemories}
+            className="font-semibold underline underline-offset-4">agregar una anécdota bonita</button>.</p>}
+          {songs.length > 1 && <label className="block text-sm font-semibold text-[#264653]">
+            Canción para más adelante
+            <select value={selectedSong?.id ?? ""} onChange={(event) => setSongId(event.target.value)}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-normal">
+              {songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
+            </select>
+          </label>}
+          <Button type="button" onClick={begin} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+        </div>}
       </section>}
+      {started && <GuidedConversation
+        memoryId={activity === "anecdote" ? selectedAnecdote?.id : undefined}
+        title={activityTitle ?? "Recuerdo familiar"}
+        elapsed={formatTime(elapsed)}
+        paused={paused}
+        activity={activityContent}
+        onPause={() => setPaused(true)}
+        onResume={() => setPaused(false)}
+        onNextActivity={nextActivity}
+        onFinish={finish}
+      />}
 
       {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
         <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo les fue?</h2><p className="mt-1 text-sm text-slate-600">Este registro es una nota familiar sobre la actividad, no un diagnóstico.</p></div>
