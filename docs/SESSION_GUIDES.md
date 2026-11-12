@@ -114,9 +114,11 @@ La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
 
 El detector de voz cierra el turno tras una pausa sostenida o al llegar a 30
 segundos desde que empiezas a hablar. Si el dictado no entiende la frase, te
-pide repetirla y vuelve a escuchar. En **Opciones de voz** puedes elegir la
-voz en español, revisar el texto antes de enviarlo o activar **Mejor precisión
-con Groq**. Esta última opción comparte grabaciones breves con Whisper Large
+pide repetirla y vuelve a escuchar. Ayni elige automáticamente una voz local
+en español latinoamericano, con prioridad para Perú. Si el dispositivo no
+ofrece una voz compatible, las respuestas se muestran por escrito. En
+**Opciones de dictado** puedes revisar el texto antes de enviarlo o activar
+**Mejor precisión con Groq**. Esta última opción comparte grabaciones breves con Whisper Large
 V3. Si el servicio falla, la misma grabación se transcribe en el navegador.
 La cámara y el micrófono requieren HTTPS o localhost.
 
