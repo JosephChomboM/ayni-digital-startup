@@ -1,8 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AudioLines, Bot, Camera, Mic, MicOff, Pause, Play, Send, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
-import { nextConversationTurn } from "../api/conversation";
-import type { ConversationTopic } from "../api/conversation";
+import { getMessages, sendMessage, imageForConversation } from "../api/sessions";
+import type { ChatInput } from "../api/sessions";
 import { SessionCamera } from "./SessionCamera";
 import { interpretReply, speakLocally } from "./sessionSignals";
 import type { FaceCue, SessionActivity } from "./sessionSignals";
@@ -11,23 +11,9 @@ import { Button } from "./ui/button";
 
 export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
-const localQuestions: Record<ConversationTopic, readonly string[]> = {
-  start: [SESSION_GREETING],
-  place: ["¿Qué detalle de ese lugar te viene a la mente?", "¿Cómo era estar allí?"],
-  activity: ["¿Qué era lo que más disfrutabas de ese momento?", "¿Qué te gustaría contar de lo que hicieron?"],
-  detail: ["Te escucho. ¿Qué más te gustaría compartir?", "¿Hay otro detalle que quieras contar?"],
-  ease: ["Está bien. ¿Quieres escuchar otra pregunta o prefieres cambiar de actividad?", "Podemos ir más despacio. ¿Qué te gustaría hacer ahora?"],
-};
-
-const acknowledgments: Partial<Record<ConversationTopic, string>> = {
-  place: "Gracias por contármelo.",
-  activity: "Gracias por compartir ese momento.",
-  detail: "Te escucho.",
-  ease: "No hay apuro. Vamos a tu ritmo.",
-};
-
 interface GuidedConversationProps {
-  memoryId?: string;
+  sessionId: string;
+  photo?: Blob;
   withDevices: boolean;
   title: string;
   elapsed: string;
@@ -40,7 +26,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  memoryId, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
+  sessionId, photo, withDevices, title, elapsed, paused, activity, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   const [line, setLine] = useState(SESSION_GREETING);
   const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
@@ -60,8 +46,11 @@ export function GuidedConversation({
   const [visible, setVisible] = useState(!document.hidden);
   const [voiceNotice, setVoiceNotice] = useState("");
   const request = useRef<AbortController | null>(null);
-  const recent = useRef<string[]>([]);
-  const turnCount = useRef(0);
+  const [aiError, setAiError] = useState("");
+  const [suggestion, setSuggestion] = useState("continue");
+  const [observations, setObservations] = useState<string[]>([]);
+  const lastAttempt = useRef<ChatInput | null>(null);
+  const greetingId = useRef(crypto.randomUUID());
   const lastTurnAt = useRef(0);
   const lastExpressionAt = useRef(-Infinity);
   const waitingForVoice = useRef<string | null>(null);
@@ -93,31 +82,25 @@ export function GuidedConversation({
     setPending(false);
   }
 
-  async function follow(topic: ConversationTopic, introduction = "") {
+  async function follow(text: string, image?: string, cue?: "smile" | "brow", retry?: ChatInput) {
     if (paused || request.current) return;
-    const options = localQuestions[topic];
-    let question = options[turnCount.current % options.length];
     const controller = new AbortController();
     request.current = controller;
+    const payload: ChatInput = retry ?? { text, request_id: crypto.randomUUID(), ...(image ? { image, image_consent: true } : {}), ...(cue ? { cue } : {}) };
+    lastAttempt.current = payload;
     setPending(true);
+    setAiError("");
     try {
-      if (memoryId) {
-        const result = await nextConversationTurn(memoryId, topic, recent.current, controller.signal);
-        if (controller.signal.aborted) return;
-        recent.current = [...recent.current, result.question_id].slice(-4);
-        question = result.question;
-      }
-    } catch {
+      const result = await sendMessage(sessionId, payload, controller.signal);
       if (controller.signal.aborted) return;
+      setSuggestion(result.suggestion);
+      setObservations(result.observations);
+      show(result.text);
+    } catch (cause) {
+      if (!controller.signal.aborted) setAiError(cause instanceof Error ? cause.message : "La IA no pudo responder. Puedes reintentar.");
     } finally {
-      if (request.current === controller) {
-        request.current = null;
-        setPending(false);
-      }
+      if (request.current === controller) { request.current = null; setPending(false); }
     }
-    if (controller.signal.aborted) return;
-    turnCount.current += 1;
-    show([introduction, question].filter(Boolean).join(" "));
   }
 
   function receive(raw: string) {
@@ -129,12 +112,12 @@ export function GuidedConversation({
     else if (intent === "pause") pause("Claro, hagamos una pausa. Pulsa Continuar cuando te apetezca.");
     else if (intent === "next") changeActivity();
     else if (intent === "photo" || intent === "song" || intent === "anecdote") changeActivity(intent);
-    else void follow(intent, acknowledgments[intent]);
+    else void follow(reply);
   }
 
   const dictation = useSessionDictation(
     (reply) => { if (!input.trim()) receive(reply); },
-    mic && !paused && !pending && !speaking && !input.trim(),
+    mic && !paused && !pending && !speaking && !input.trim() && !aiError,
   );
 
   function pause(message: string) {
@@ -158,7 +141,7 @@ export function GuidedConversation({
 
   function canFollowExpression() {
     const now = performance.now();
-    return !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
+    return !aiError && !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
       now - lastTurnAt.current >= 5000 && now - lastExpressionAt.current >= 25_000;
   }
 
@@ -167,15 +150,27 @@ export function GuidedConversation({
     if (cue === "away") return;
     if (!canFollowExpression()) return;
     lastExpressionAt.current = performance.now();
-    if (cue === "brow") show("Podemos seguir, cambiar de actividad o hacer una pausa. ¿Qué prefieres?");
-    else void follow("detail", "Si quieres, podemos quedarnos un poquito más con este recuerdo.");
+    void follow("", undefined, cue);
   }
 
-  const greet = useEffectEvent(() => {
+  async function loadConversation(isActive: () => boolean) {
     heading.current?.focus();
-    if (!nextMessage.current) show(SESSION_GREETING);
-    else speak(SESSION_GREETING);
-  });
+    try {
+      const saved = await getMessages(sessionId);
+      if (!isActive()) return;
+      if (saved.length) {
+        setMessages(saved.map((item, index) => ({ id: index, from: item.role === "assistant" ? "ayni" : "you", text: item.text })));
+        nextMessage.current = saved.length;
+        const last = saved.filter((item) => item.role === "assistant").at(-1);
+        if (last) { setLine(last.text); setSuggestion(last.suggestion); setObservations(last.observations); }
+      } else {
+        await follow("", undefined, undefined, { text: "", request_id: greetingId.current });
+      }
+    } catch (cause) {
+      if (isActive()) setAiError(cause instanceof Error ? cause.message : "No pudimos recuperar la conversación.");
+    }
+  }
+  const initialize = useEffectEvent(loadConversation);
 
   useEffect(() => {
     function onVoicesChanged() {
@@ -194,10 +189,13 @@ export function GuidedConversation({
     }
     document.addEventListener("visibilitychange", updateVisibility);
     window.speechSynthesis?.addEventListener("voiceschanged", onVoicesChanged);
-    greet();
+    let active = true;
+    void initialize(() => active);
     return () => {
+      active = false;
       document.removeEventListener("visibilitychange", updateVisibility);
       request.current?.abort();
+      request.current = null;
       waitingForVoice.current = null;
       window.speechSynthesis?.removeEventListener("voiceschanged", onVoicesChanged);
       window.speechSynthesis?.cancel();
@@ -206,7 +204,7 @@ export function GuidedConversation({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!input.trim() || paused || pending) return;
+    if (!input.trim() || paused || pending || aiError) return;
     dictation.cancel();
     receive(input);
     setInput("");
@@ -282,9 +280,18 @@ export function GuidedConversation({
               className="grid size-11 shrink-0 place-items-center rounded-md border border-[#cddbdc] bg-white text-[#264653] hover:bg-[#e8f5e9]" disabled={paused}
               onClick={() => setCamera(!camera)}>{camera ? <VideoOff className="size-5" /> : <Camera className="size-5" />}</button>
           </div>
-          {camera && !paused && visible ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} /> :
+          {camera && !paused && visible ? <SessionCamera onCue={onCameraCue} canFollowExpression={canFollowExpression} analyzing={pending} onAnalyzeFrame={(image) => void follow("Conversemos sobre un detalle visible de esta captura.", image)} /> :
             <p className="text-sm leading-snug text-[#435d60]">{paused ? "Cámara en pausa." : "Cámara apagada."}</p>}
         </div>
+        <div className="my-3 flex flex-wrap gap-2">
+          <button type="button" disabled={paused || pending} onClick={() => changeActivity()} className="min-h-11 rounded-lg border px-3 text-sm">Cambiar actividad</button>
+          {photo && <button type="button" disabled={paused || pending} className="min-h-11 rounded-lg border px-3 text-sm" onClick={async () => {
+            try { await follow("Exploremos juntos esta foto familiar.", await imageForConversation(photo)); }
+            catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
+          }}>Analizar foto con IA</button>}
+        </div>
+        {photo && <p className="text-xs">Al analizar, compartes esta foto con Groq para conversar sobre sus detalles visibles.</p>}
+        {observations.length > 0 && <div className="my-3 text-sm"><strong>Detalles que observó Ayni:</strong><ul className="list-inside list-disc">{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
         {activity && <details key={title} className="min-w-0 md:mt-3 md:border-t md:border-[#cddbdc] md:pt-3" open>
           <summary className="cursor-pointer break-words font-semibold text-[#264653]">{title}</summary>
           {activity}
@@ -302,6 +309,20 @@ export function GuidedConversation({
             <p className="mt-1 whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg">{text}</p>
           </div>
         </div>)}
+        {aiError && <div role="alert" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+          <p>{aiError}</p>
+          <button type="button" disabled={pending || paused} className="min-h-11 font-semibold underline" onClick={() => {
+            const attempt = lastAttempt.current;
+            if (attempt) void follow(attempt.text, attempt.image, attempt.cue, attempt);
+            else void loadConversation(() => true);
+          }}>Reintentar con IA</button>
+          <button type="button" disabled={paused} className="ml-3 min-h-11 font-semibold" onClick={() => { setAiError(""); lastAttempt.current = null; }}>Seguir con otra pregunta</button>
+        </div>}
+        {!aiError && suggestion !== "continue" && <div className="rounded-lg bg-sky-50 p-3 text-sm">
+          <p>{suggestion === "pause" ? "Ayni propone hacer una pausa. Tú decides." : suggestion === "slow_down" ? "Pueden ir más despacio, escuchar o cambiar de tema." : "Si quieren, pueden cambiar de actividad."}</p>
+          <button type="button" className="min-h-11 font-semibold underline" onClick={() => pause("La sesión está en pausa. Continúen cuando quieran.")}>Hacer una pausa</button>
+          <button type="button" className="ml-3 min-h-11 font-semibold underline" onClick={() => changeActivity()}>Cambiar actividad</button>
+        </div>}
         {pending && <p className="text-sm text-[#435d60]">Ayni está preparando una pregunta…</p>}
       </div>
 
@@ -327,7 +348,7 @@ export function GuidedConversation({
               if (dictation.error) { dictation.retry(); setMic(true); }
               else setMic(!mic);
             }}>{mic && !dictation.error ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
-          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
+          <Button type="submit" aria-label="Enviar" disabled={!input.trim() || paused || pending || Boolean(aiError)} className="size-11 shrink-0 p-0"><Send className="size-5" /></Button>
         </div>
         {(voiceNotice || (mic && dictation.error)) && <p role="status" className="text-sm text-[#435d60]">{(mic && dictation.error) || voiceNotice}</p>}
       </form>

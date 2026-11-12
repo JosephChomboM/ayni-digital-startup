@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -67,3 +68,24 @@ class SessionItem(Base):
         ForeignKey("memories.id", ondelete="SET NULL"), index=True
     )
     session: Mapped[FamilySession] = relationship(back_populates="items")
+
+
+class SessionMessage(Base):
+    __tablename__ = "session_messages"
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_session_messages_role"),
+        UniqueConstraint("session_id", "position", name="uq_session_messages_position"),
+        UniqueConstraint("session_id", "request_id", "role", name="uq_session_messages_request"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("sessions.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(10))
+    text: Mapped[str] = mapped_column(Text)
+    request_id: Mapped[UUID]
+    suggestion: Mapped[str] = mapped_column(String(20), default="continue")
+    observations: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
