@@ -15,14 +15,14 @@ it("loads public Google configuration and a nonce without storing credentials", 
   expect(fetchMock.mock.calls[1][1]?.method).toBe("POST"); expect(localStorage.length).toBe(0);
 });
 
-it("exchanges Google proof for an Ayni token and verifies the session with users/me", async () => {
+it("guarda la sesión emitida por el backend sin depender de una segunda consulta", async () => {
   const token = crypto.randomUUID();
   fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ user, access_token: token, token_type: "bearer", expires_in: 1800 })))
     .mockResolvedValueOnce(new Response(JSON.stringify({ user, consent: { text_version: "1.0", accepted_at: user.created_at } })));
   expect((await loginWithGoogle(proof)).user).toEqual(user);
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["https://api.example.test/auth/google/login", "https://api.example.test/users/me"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["https://api.example.test/auth/google/login"]);
   expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual(proof);
-  expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Authorization")).toBe(`Bearer ${token}`);
+  expect(fetchMock).toHaveBeenCalledOnce();
   expect(localStorage.getItem("ayni_token")).toBe(token);
 });
 
