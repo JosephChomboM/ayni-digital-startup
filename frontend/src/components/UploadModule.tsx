@@ -9,31 +9,9 @@ import { getMe } from "../api/auth"
 import type { User } from "../api/auth"
 import { createMemory, deleteMemory, getMemory, listMemories, memoryErrorMessage, updateMemory } from "../api/memories"
 import type { Memory, MemoryInput, MemoryType } from "../api/memories"
-import { deleteLocalFamilyPhoto, getLocalFamilyPhotos, saveLocalFamilyPhoto } from "../api/localMedia"
-import type { LocalFamilyPhoto } from "../api/localMedia"
+import { uploadPhoto, listPhotos, deletePhoto } from "../api/photos"
+import type { MemoryPhoto } from "../api/photos"
 import { ProfilePage } from "../pages/ProfilePage"
-
-async function rasterizePhoto(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file)
-  try {
-    if (bitmap.width * bitmap.height > 40_000_000) {
-      throw new Error("La foto tiene demasiados píxeles.")
-    }
-    const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height))
-    const canvas = document.createElement("canvas")
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
-    const context = canvas.getContext("2d")
-    if (!context) throw new Error("No se pudo procesar la foto.")
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    const png = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("No se pudo convertir la foto.")), "image/png")
-    })
-    return new File([png], file.name.replace(/\.[^.]+$/, ".png"), { type: "image/png", lastModified: file.lastModified })
-  } finally {
-    bitmap.close()
-  }
-}
 
 function SpotifyIcon({ className = "size-4" }: { className?: string }) {
   return (
@@ -57,7 +35,6 @@ export function UploadModule() {
   const [success, setSuccess] = useState<string | null>(null)
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [photos, setPhotos] = useState<LocalFamilyPhoto[]>([])
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [successDialog, setSuccessDialog] = useState(false)
@@ -67,8 +44,6 @@ export function UploadModule() {
     getMe().then(async ({ user }) => {
       if (!active) return
       setCurrentUser(user)
-      const localPhotos = await getLocalFamilyPhotos(user.family_id)
-      if (active) setPhotos(localPhotos)
     }).catch(() => { if (active) setCurrentUser(null) })
     return () => { active = false }
   }, [])
@@ -92,29 +67,27 @@ export function UploadModule() {
       ? { ...fields, type: "anecdote", text: anecdote }
       : { ...fields, type: "song", url: song }
     setPending(true)
-    const savedPhotoIds: string[] = []
     try {
-      if (pendingPhotos.length && currentUser) {
-        for (const file of pendingPhotos) {
-          const photoId = crypto.randomUUID()
-          await saveLocalFamilyPhoto({ id: photoId, family_id: currentUser.family_id, created_by: currentUser.id, creator_name: currentUser.name, name: file.name, mime_type: file.type, blob: file, created_at: new Date().toISOString() })
-          savedPhotoIds.push(photoId)
-        }
-      }
+      let saved: Memory
       if (editing) {
         const { type, ...changes } = data
         if (type !== editing.type) throw new Error("No puedes cambiar el tipo de recuerdo.")
-        await updateMemory(editing.id, changes)
+        saved = await updateMemory(editing.id, changes)
       } else {
-        await createMemory(data)
+        saved = await createMemory(data)
       }
-      if (currentUser) setPhotos(await getLocalFamilyPhotos(currentUser.family_id))
+      // Preserve the ID and remaining files if a later upload fails.
+      setEditing(saved)
+      for (const file of pendingPhotos) {
+        await uploadPhoto(saved.id, file)
+        setPendingPhotos((files) => files.slice(1))
+      }
       setSuccess(editing ? "Cambios guardados." : "Recuerdo guardado.")
       resetForm()
       setRevision((value) => value + 1)
       setSuccessDialog(true)
     } catch (err) {
-      if (currentUser) await Promise.all(savedPhotoIds.map((id) => deleteLocalFamilyPhoto(id, currentUser.family_id, currentUser.id)))
+      setRevision((value) => value + 1)
       setError(memoryErrorMessage(err))
     }
     finally { setPending(false) }
@@ -124,6 +97,7 @@ export function UploadModule() {
     setPending(true); setError(null); setSuccess(null)
     try {
       const memory = await getMemory(id)
+      setPendingPhotos([])
       setMemoryMode(memory.type)
       setEditing(memory); setTitle(memory.title); setAnecdote(memory.text ?? ""); setSong(memory.url ?? "")
       setPositive(memory.is_positive); setSensitive(memory.is_sensitive)
@@ -138,7 +112,10 @@ export function UploadModule() {
       if (editing?.id === id) resetForm()
       setSuccess("Recuerdo eliminado.")
       setRevision((value) => value + 1)
-    } catch (err) { setError(memoryErrorMessage(err)) }
+    } catch (err) {
+      setRevision((value) => value + 1)
+      setError(memoryErrorMessage(err))
+    }
     finally { setPending(false) }
   }
 
@@ -153,30 +130,22 @@ export function UploadModule() {
     if (!files?.length || !currentUser) return
     setPhotoError(null)
     const selected = Array.from(files)
-    if (photos.length + pendingPhotos.length + selected.length > 12) {
-      setPhotoError("Puedes agregar hasta 12 fotos.")
-      return
-    }
     const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024)
     if (invalid) {
       setPhotoError("Usa fotos JPG, PNG o WebP de hasta 8 MB cada una.")
       return
     }
-    setPending(true)
-    try {
-      const safePhotos = await Promise.all(selected.map(rasterizePhoto))
-      setPendingPhotos((current) => [...current, ...safePhotos])
-    } catch {
-      setPhotoError("No se pudo procesar una de las fotos. Elige una imagen JPG, PNG o WebP válida.")
-    } finally {
-      setPending(false)
-    }
+    setPendingPhotos((current) => [...current, ...selected])
   }
 
-  const handleDeletePhoto = async (photo: LocalFamilyPhoto) => {
-    if (!currentUser) return
-    await deleteLocalFamilyPhoto(photo.id, currentUser.family_id, currentUser.id)
-    setPhotos(await getLocalFamilyPhotos(currentUser.family_id))
+  const handleDeletePhoto = async (photo: MemoryPhoto) => {
+    setPending(true); setError(null); setSuccess(null)
+    try {
+      await deletePhoto(photo)
+      setRevision((value) => value + 1)
+      setSuccess("Foto eliminada.")
+    } catch (err) { setError(memoryErrorMessage(err)) }
+    finally { setPending(false) }
   }
 
   const handleShareWhatsApp = () => {
@@ -227,10 +196,11 @@ export function UploadModule() {
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={pending || !currentUser} onChange={(event) => { handlePhotoFiles(event.target.files); event.currentTarget.value = "" }} className="sr-only" />
             </label>
           </div>
+          <p className="text-xs text-slate-500">Si guardaste fotos antes en este navegador, vuelve a seleccionarlas para compartirlas.</p>
           {photoError && <p role="alert" className="text-sm text-red-700">{photoError}</p>}
           {pendingPhotos.length > 0 && <p className="text-sm font-medium text-[#2c5f7c]">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada" : "fotos seleccionadas"}; se guardarán junto con el recuerdo.</p>}
           {pendingPhotos.length > 0 && <StagedPhotoGrid files={pendingPhotos} onRemove={(index) => setPendingPhotos((items) => items.filter((_, itemIndex) => itemIndex !== index))} />}
-          {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos seleccionadas se guardan solo en este navegador al guardar el recuerdo. No se sincronizan con otros dispositivos.</p>}
+          {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos se guardarán de forma privada y podrás verlas desde otros dispositivos de tu familia.</p>}
         </section>
 
         <div className="space-y-4 border-t border-slate-200 pt-5">
@@ -324,30 +294,28 @@ export function UploadModule() {
         </div>
       </CardContent>
     </Card>
-    <Contributions revision={revision} busy={pending} photos={photos} currentUserId={currentUser?.id ?? ""} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />
+    <Contributions revision={revision} busy={pending} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />
     {successDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="memory-saved-title" className="w-full max-w-sm rounded-xl bg-white p-7 text-center shadow-xl"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="size-7" aria-hidden="true" /></div><h2 id="memory-saved-title" className="mt-4 text-xl font-semibold text-[#2c5f7c]">¡Se guardó correctamente!</h2><p className="mt-2 text-sm text-slate-600">{success}</p><Button autoFocus onClick={() => setSuccessDialog(false)} className="mt-5 w-full bg-[#2c5f7c] hover:bg-[#224a61]">OK</Button></section></div>}
     </div>
   )
 }
 
-function PhotoGrid({ photos, currentUserId, onDelete }: {
-  photos: LocalFamilyPhoto[];
-  currentUserId: string;
-  onDelete: (photo: LocalFamilyPhoto) => void;
+function PhotoGrid({ photos, canManage, busy, onDelete, onRefresh }: {
+  photos: MemoryPhoto[];
+  canManage: boolean;
+  busy: boolean;
+  onDelete?: (photo: MemoryPhoto) => void;
+  onRefresh: () => void;
 }) {
-  const [sources, setSources] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const urls = photos.map((photo) => [photo.id, URL.createObjectURL(photo.blob)] as const);
-    setSources(Object.fromEntries(urls));
-    return () => urls.forEach(([, url]) => URL.revokeObjectURL(url));
-  }, [photos]);
-
   return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
     {photos.map((photo) => <figure key={photo.id} className="group relative overflow-hidden rounded-lg">
-      {sources[photo.id] && <img src={sources[photo.id]} alt="Foto familiar guardada" className="aspect-square w-full object-cover" />}
+      <img key={photo.url} src={photo.url} alt="Foto familiar guardada" onError={(event) => {
+        event.currentTarget.hidden = true
+      }} className="aspect-square w-full object-cover" />
       <figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600">
         <span className="truncate">Foto familiar</span>
-        {photo.created_by === currentUserId && <button type="button" onClick={() => onDelete(photo)} aria-label="Eliminar foto familiar" className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button>}
+        <button type="button" disabled={busy} onClick={onRefresh} aria-label="Actualizar enlace de foto" className="underline">Actualizar</button>
+        {canManage && <button type="button" disabled={busy} onClick={() => onDelete?.(photo)} aria-label="Eliminar foto familiar" className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button>}
       </figcaption>
     </figure>)}
   </div>;
@@ -363,13 +331,13 @@ function StagedPhotoGrid({ files, onRemove }: { files: File[]; onRemove: (index:
   return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{files.map((_, index) => <figure key={index} className="overflow-hidden rounded-lg">{sources[index] && <img src={sources[index]} alt={`Vista previa de foto ${index + 1}`} className="aspect-square w-full object-cover" />}<figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600"><span className="truncate">Foto seleccionada {index + 1}</span><button type="button" onClick={() => onRemove(index)} aria-label={`Quitar foto ${index + 1}`} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button></figcaption></figure>)}</div>
 }
 
-export function Contributions({ revision = 0, busy = false, photos = [], currentUserId = "", onDeletePhoto, onEdit, onDelete }: {
+export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdit, onDelete }: {
   revision?: number; busy?: boolean;
-  photos?: LocalFamilyPhoto[]; currentUserId?: string;
-  onDeletePhoto?: (photo: LocalFamilyPhoto) => void;
+  onDeletePhoto?: (photo: MemoryPhoto) => void;
   onEdit?: (id: string) => void; onDelete?: (id: string) => void;
 }) {
   const [items, setItems] = useState<Memory[]>([])
+  const [photos, setPhotos] = useState<Record<string, MemoryPhoto[]>>({})
   const [user, setUser] = useState<User | null>(null)
   const [includeSensitive, setIncludeSensitive] = useState(false)
   const [page, setPage] = useState(0)
@@ -387,13 +355,20 @@ export function Contributions({ revision = 0, busy = false, photos = [], current
     let active = true
     setLoading(true); setItems([]); setError(null)
     Promise.all([listMemories({ q: query || undefined, include_sensitive: includeSensitive, limit: 100, offset: page * 100 }), getMe()])
-      .then(([data, account]) => {
+      .then(async ([data, account]) => {
+        const photos = await Promise.all(data.items.map(async (memory) =>
+          [memory.id, memory.deletion_pending ? [] : await listPhotos(memory.id)] as const))
         if (!active) return
-        setItems(data.items); setTotal(data.total); setUser(account.user); setError(null)
+        setItems(data.items); setPhotos(Object.fromEntries(photos)); setTotal(data.total); setUser(account.user); setError(null)
       }).catch((err: unknown) => { if (active) setError(memoryErrorMessage(err)) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [revision, includeSensitive, page, attempt, query])
+  useEffect(() => {
+    // Signed links last five minutes; renew while the gallery is mounted.
+    const timer = window.setInterval(() => setAttempt((value) => value + 1), 240_000)
+    return () => window.clearInterval(timer)
+  }, [])
   const visibleItems = useMemo(() => items.filter((memory) => {
     const date = new Date(memory.created_at)
     const now = new Date()
@@ -414,7 +389,7 @@ export function Contributions({ revision = 0, busy = false, photos = [], current
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {photos.length > 0 && <section className="space-y-3" aria-labelledby="saved-family-photos"><h3 id="saved-family-photos" className="text-sm font-semibold text-[#264653]">Fotos guardadas</h3><PhotoGrid photos={photos} currentUserId={currentUserId} onDelete={(photo) => onDeletePhoto?.(photo)} /></section>}
+
         <form className="flex flex-col gap-2" onSubmit={(event) => {
           event.preventDefault(); setPage(0); setQuery(searchText.trim())
         }}>
@@ -449,6 +424,10 @@ export function Contributions({ revision = 0, busy = false, photos = [], current
         {!loading && !error && visibleItems.map((memory) => (
           <div key={memory.id} className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
             <p className="text-xs font-bold text-[#264653]">{memory.title}</p>
+            {memory.deletion_pending && <p role="status" className="text-xs text-amber-800">Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.</p>}
+            <PhotoGrid photos={photos[memory.id] ?? []} busy={busy}
+              canManage={!!user && (user.role === "cuidador_principal" || user.id === memory.created_by)}
+              onDelete={onDeletePhoto} onRefresh={() => setAttempt((value) => value + 1)} />
             {memory.type === "anecdote"
               ? <p className="text-[11px] text-gray-500 whitespace-pre-wrap wrap-break-word">{memory.text}</p>
               : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2c5f7c] underline">Abrir canción</a>}
@@ -458,7 +437,7 @@ export function Contributions({ revision = 0, busy = false, photos = [], current
             </div>
             {user && (user.role === "cuidador_principal" || user.id === memory.created_by) && (
               <div className="flex gap-2">
-                {onEdit && <Button size="sm" variant="outline" disabled={busy} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}>Editar</Button>}
+                {onEdit && <Button size="sm" variant="outline" disabled={busy || memory.deletion_pending} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}>Editar</Button>}
                 {onDelete && <Button size="sm" variant="outline" disabled={busy} onClick={() => onDelete(memory.id)} aria-label={`Eliminar ${memory.title}`}>Eliminar</Button>}
               </div>
             )}
