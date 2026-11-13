@@ -7,6 +7,8 @@ import type { MemoryPhoto } from "../api/photos";
 import { AyniBuddy } from "./AyniBuddy";
 import type { BuddyPose } from "./AyniBuddy";
 import type { CompanionState } from "./AyniCompanion";
+import type { LookSpec } from "../api/sessions";
+import { ROOM_ICONS } from "./roomIcons";
 
 /** Lo que Ayni tiene "en las manos" durante la sesión. */
 export type StageScene =
@@ -40,13 +42,17 @@ function playerUrl(value: string | null): string | null {
  * La sala donde Ayni conversa: entra caminando, saluda, y cuando cambia la actividad
  * camina hacia un lado para entregar la foto, sacar la radio o desplegar la historia.
  */
-export function CompanionScene({ state, scene, line, pending, paused, extra }: {
+export function CompanionScene({ state, scene, line, pending, paused, extra, camera, look }: {
   state: CompanionState;
   scene?: StageScene;
   line: string;
   pending: boolean;
   paused: boolean;
   extra?: ReactNode;
+  /** La cámara de la persona, como un espejo en la pared de la sala. */
+  camera?: ReactNode;
+  /** Ropa de Ayni, paredes y objetos de la sala diseñados según los gustos del perfil. */
+  look?: LookSpec | null;
 }) {
   const kind = scene?.kind ?? "none";
   const [reduced] = useState(prefersReducedMotion);
@@ -74,14 +80,17 @@ export function CompanionScene({ state, scene, line, pending, paused, extra }: {
   const pose: BuddyPose = gesture ?? (paused ? "none" : kind === "song" ? "music" : kind === "photo" ? "present" : kind === "anecdote" ? "story" : "none");
   const words = line.split(/(\s+)/);
 
-  return <div className="buddy-stage" data-scene={kind} data-arrived={arrived || undefined} data-paused={paused || undefined}>
+  return <div className="buddy-stage" data-scene={kind} data-camera={camera ? true : undefined} data-look={look ? true : undefined}
+    style={look ? { "--wall-a": look.wall[0], "--wall-b": look.wall[1] } as CSSProperties : undefined} data-arrived={arrived || undefined} data-paused={paused || undefined}>
     <div className="stage-room" aria-hidden="true">
       <span className="room-window"/>
-      <span className="room-frame"/>
       <svg className="room-plant" viewBox="0 0 80 120"><path d="M40 78C38 52 22 40 8 38c4 18 16 30 32 40Zm0 0c2-30 14-48 32-54-2 24-14 42-32 54Zm0 0c-1-24-4-44-10-62 12 10 16 34 10 62Z" fill="#7fa58d"/><path d="M22 76h36l-5 40H27Z" fill="#c98a62"/></svg>
       <span className="room-rug"/>
+      {look?.decor.map((item, index) => <RoomDecor key={item.icon + look.description} icon={item.icon} color={look.accent_color}
+        slot={`${item.place}${look.decor.slice(0, index).filter((other) => other.place === item.place).length ? "2" : ""}`} />)}
     </div>
 
+    {look?.description && <p className="sr-only">{look.description}.</p>}
     <div className="stage-speech" data-pending={pending || undefined}>
       <p key={line} className="speech-line">
         {words.map((word, index) => /^\s+$/.test(word) ? word :
@@ -100,8 +109,10 @@ export function CompanionScene({ state, scene, line, pending, paused, extra }: {
       {extra}
     </div>}
 
+    {camera && <div className="stage-camera">{camera}</div>}
+
     <div className="buddy-walker">
-      <AyniBuddy state={state} pose={pose} />
+      <AyniBuddy state={state} pose={pose} look={look} />
     </div>
   </div>;
 }
@@ -154,4 +165,15 @@ function RadioPlayer({ memory, paused }: { memory: Memory; paused: boolean }) {
     </div>
     {!paused && <span className="radio-notes" aria-hidden="true"><Music2/><Music2/><Music2/></span>}
   </div>;
+}
+
+/** Objeto de la sala elegido por la IA: un cuadro en la pared o algo sobre una mesita. */
+function RoomDecor({ icon, color, slot }: { icon: string; color: string; slot: string }) {
+  const Icon = ROOM_ICONS[icon];
+  if (!Icon) return null;
+  const ink = /^#(?:f|e)/i.test(color) ? "#235c50" : color;
+  return <span className={`room-decor decor-${slot}`}>
+    {slot.startsWith("wall") ? <span className="decor-frame"><Icon style={{ color: ink }} strokeWidth={1.6} /></span> :
+      <span className="decor-stand"><Icon style={{ color: ink }} strokeWidth={1.6} /><i/></span>}
+  </span>;
 }

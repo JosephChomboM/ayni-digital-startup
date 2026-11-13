@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { companionLabels } from "./companionLabels";
 import type { CompanionState } from "./companionLabels";
+import type { LookSpec } from "../api/sessions";
 
 /**
  * Pose física de Ayni en la sala. Solo describe lo que hace el personaje
@@ -9,9 +10,10 @@ import type { CompanionState } from "./companionLabels";
 export type BuddyPose = "none" | "walk" | "wave" | "present" | "music" | "story";
 
 /** Ayni de cuerpo entero: camina, saluda, gesticula y abre su compartimento de música. */
-export function AyniBuddy({ state, pose }: { state: CompanionState; pose: BuddyPose }) {
+export function AyniBuddy({ state, pose, look = null }: { state: CompanionState; pose: BuddyPose; look?: LookSpec | null }) {
   const id = useId();
-  return <div className="ayni-buddy" data-state={state} data-pose={pose} role="img" aria-label={companionLabels[state]}>
+  return <div className="ayni-buddy" data-state={state} data-pose={pose}
+    data-hat={look && look.hat !== "none" && look.hat !== "headphones" ? true : undefined} role="img" aria-label={companionLabels[state]}>
     <svg viewBox="0 0 200 300" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-shell`} x1="40" y1="40" x2="160" y2="250" gradientUnits="userSpaceOnUse">
@@ -20,6 +22,7 @@ export function AyniBuddy({ state, pose }: { state: CompanionState; pose: BuddyP
         <linearGradient id={`${id}-face`} x1="44" y1="58" x2="156" y2="126" gradientUnits="userSpaceOnUse">
           <stop stopColor="#294c43"/><stop offset="1" stopColor="#122e28"/>
         </linearGradient>
+        <clipPath id={`${id}-torso`}><rect x="56" y="148" width="88" height="86" rx="32"/></clipPath>
         <radialGradient id={`${id}-glow`} cx="100" cy="193" r="22" gradientUnits="userSpaceOnUse">
           <stop stopColor="#fbe6a8"/><stop offset="1" stopColor="#e7a76f"/>
         </radialGradient>
@@ -46,6 +49,7 @@ export function AyniBuddy({ state, pose }: { state: CompanionState; pose: BuddyP
             <rect x="78" y="176" width="44" height="36" rx="12" fill="#e6f1e8" stroke="#98bdab" strokeWidth="2"/>
             <path d="M94 190C91 184 84 189 88 193L100 202L112 193C116 189 109 184 106 190L100 195Z" fill="#c56748"/>
           </g>
+          {look && <BodyOutfit key={look.description} look={look} clip={`url(#${id}-torso)`} />}
         </g>
 
         <g className="buddy-head">
@@ -76,6 +80,7 @@ export function AyniBuddy({ state, pose }: { state: CompanionState; pose: BuddyP
           <g className="buddy-sleep" fill="#467967" fontFamily="Georgia, serif" fontWeight="700">
             <text x="168" y="40" fontSize="16">z</text><text x="182" y="22" fontSize="21">z</text>
           </g>
+          {look && <HeadOutfit key={look.description} look={look} />}
         </g>
 
         {/* Los brazos van al final para poder cruzar delante de la cabeza al escuchar o pensar. */}
@@ -97,4 +102,111 @@ export function AyniBuddy({ state, pose }: { state: CompanionState; pose: BuddyP
       </g>
     </svg>
   </div>;
+}
+
+/** Lo que Ayni lleva en la cabeza; se mueve con la cabeza. Los colores vienen del diseño. */
+function HeadOutfit({ look }: { look: LookSpec }) {
+  const { hat_color: hat, accent_color: accent } = look;
+  const glasses = look.glasses && <g fill="#ffffff14" stroke={accent === "#fffefa" ? "#c98a62" : accent} strokeWidth="4">
+    <circle cx="75" cy="89" r="18"/><circle cx="125" cy="89" r="18"/>
+    <path d="M93 87Q100 81 107 87" fill="none"/><path d="M57 85L44 80M143 85L156 80" fill="none"/>
+  </g>;
+  const hats: Record<LookSpec["hat"], React.ReactNode> = {
+    none: null,
+    fedora: <>
+      <path d="M50 46Q52 8 100 10Q148 8 150 46Z" fill={hat}/>
+      <rect x="51" y="32" width="98" height="9" fill={accent}/>
+      <ellipse cx="100" cy="46" rx="78" ry="10" fill={hat} filter="brightness(.8)"/>
+      <ellipse cx="100" cy="46" rx="78" ry="10" fill="#00000026"/>
+    </>,
+    straw: <>
+      <ellipse cx="100" cy="46" rx="90" ry="13" fill={hat} stroke="#00000026" strokeWidth="2"/>
+      <path d="M58 46Q60 12 100 12Q140 12 142 46Z" fill={hat} stroke="#00000026" strokeWidth="2"/>
+      <rect x="59" y="34" width="82" height="7" fill={look.outfit_color}/>
+      <g fill={accent}><circle cx="128" cy="30" r="5"/><circle cx="136" cy="33" r="5"/><circle cx="133" cy="41" r="5"/><circle cx="123" cy="40" r="5"/><circle cx="121" cy="32" r="5"/></g>
+      <circle cx="129" cy="36" r="4" fill="#edab3c"/>
+    </>,
+    chef: <g fill={hat} stroke="#00000022" strokeWidth="2">
+      <circle cx="70" cy="22" r="18"/><circle cx="130" cy="22" r="18"/><circle cx="100" cy="12" r="22"/>
+      <rect x="60" y="24" width="80" height="24" rx="8"/>
+    </g>,
+    beret: <>
+      <ellipse cx="94" cy="40" rx="66" ry="17" fill={hat} transform="rotate(-8 94 40)"/>
+      <path d="M40 50Q94 30 152 38" stroke="#00000033" strokeWidth="3" fill="none"/>
+      <circle cx="98" cy="22" r="6" fill={accent}/>
+    </>,
+    bucket: <>
+      <path d="M50 48L62 16Q100 4 138 16L150 48Z" fill={hat}/>
+      <path d="M58 30Q100 22 142 30" stroke={accent} strokeWidth="3" fill="none"/>
+      <ellipse cx="100" cy="48" rx="72" ry="10" fill={hat}/><ellipse cx="100" cy="48" rx="72" ry="10" fill="#0000001f"/>
+    </>,
+    cap: <>
+      <path d="M44 50Q46 10 100 10Q154 10 156 50Z" fill={hat}/>
+      <path d="M100 10V50" stroke="#00000022" strokeWidth="2"/>
+      <path d="M120 46Q168 40 184 52Q160 58 120 54Z" fill={hat}/><path d="M120 46Q168 40 184 52Q160 58 120 54Z" fill="#0000001f"/>
+      <circle cx="100" cy="11" r="5" fill={accent}/>
+    </>,
+    beanie: <>
+      <path d="M40 54Q40 6 100 6Q160 6 160 54Z" fill={hat}/>
+      <rect x="38" y="42" width="124" height="16" rx="7" fill={accent}/>
+      <path d="M60 18V40M80 10V40M100 8V40M120 10V40M140 18V40" stroke="#0000001a" strokeWidth="3"/>
+      <circle cx="100" cy="4" r="9" fill={accent}/>
+    </>,
+    headphones: <>
+      <path d="M30 92Q30 20 100 20Q170 20 170 92" stroke={hat} strokeWidth="9" fill="none"/>
+      <rect x="10" y="70" width="26" height="46" rx="12" fill={hat}/><rect x="164" y="70" width="26" height="46" rx="12" fill={hat}/>
+      <rect x="16" y="80" width="14" height="26" rx="6" fill={accent}/><rect x="170" y="80" width="14" height="26" rx="6" fill={accent}/>
+    </>,
+    flower_crown: <>
+      <path d="M38 48Q100 26 162 48" stroke="#7fa58d" strokeWidth="5" fill="none"/>
+      {[46, 66, 86, 106, 126, 146].map((x, index) => <g key={x}>
+        <circle cx={x} cy={44 - Math.sin((x - 38) / 124 * Math.PI) * 10} r="9" fill={index % 2 ? accent : hat}/>
+        <circle cx={x} cy={44 - Math.sin((x - 38) / 124 * Math.PI) * 10} r="3.5" fill="#edab3c"/>
+      </g>)}
+    </>,
+  };
+  return <g className="buddy-wear">{hats[look.hat]}{glasses}</g>;
+}
+
+/** Lo que Ayni lleva en el cuerpo; se mueve con el torso. */
+function BodyOutfit({ look, clip }: { look: LookSpec; clip: string }) {
+  const { outfit_color: main, accent_color: accent } = look;
+  const bodies: Record<LookSpec["body"], React.ReactNode> = {
+    none: null,
+    bowtie: <>
+      <path d="M82 146L100 155L82 164Z M118 146L100 155L118 164Z" fill={main}/>
+      <circle cx="100" cy="155" r="5" fill={accent}/>
+    </>,
+    tie: <>
+      <path d="M93 146H107L104 156H96Z" fill={accent}/>
+      <path d="M96 156H104L110 196L100 208L90 196Z" fill={main}/>
+    </>,
+    apron: <>
+      <path d="M84 150L72 168M116 150L128 168" stroke={main} strokeWidth="4"/>
+      <path d="M68 166H132V222Q132 230 124 230H76Q68 230 68 222Z" fill={main} stroke="#00000018" strokeWidth="2"/>
+      <path d="M68 212H132" stroke={accent} strokeWidth="4"/>
+      <rect x="86" y="186" width="28" height="18" rx="4" fill="#0000000f"/>
+    </>,
+    sash: <g clipPath={clip}><path d="M52 168L74 148L150 214L128 236Z" fill={main}/></g>,
+    scarf: <>
+      <rect x="66" y="140" width="68" height="18" rx="9" fill={main}/>
+      <path d="M78 141V157M92 141V157M106 141V157M120 141V157" stroke={accent} strokeWidth="3"/>
+      <rect x="112" y="150" width="15" height="44" rx="6" fill={main}/>
+      <path d="M112 166H127M112 180H127" stroke={accent} strokeWidth="3"/>
+    </>,
+    bandana: <>
+      <path d="M64 146H136L100 184Z" fill={main}/>
+      <g fill={accent}><circle cx="86" cy="154" r="2.5"/><circle cx="100" cy="162" r="2.5"/><circle cx="114" cy="154" r="2.5"/><circle cx="100" cy="174" r="2"/></g>
+    </>,
+    cardigan: <>
+      <path d="M56 170Q60 150 84 148L100 196L116 148Q140 150 144 170V206Q144 234 112 234H88Q56 234 56 206Z" fill={main} opacity=".92" clipPath={clip}/>
+      <g fill={accent}><circle cx="100" cy="206" r="3"/><circle cx="100" cy="220" r="3"/></g>
+    </>,
+    stripes: <g clipPath={clip}><path d="M50 176H150M50 194H150M50 212H150" stroke={main} strokeWidth="7"/></g>,
+    necklace: <>
+      <path d="M72 148Q100 178 128 148" stroke={main} strokeWidth="3" fill="none"/>
+      {[80, 90, 100, 110, 120].map((x) => <circle key={x} cx={x} cy={154 + (x === 100 ? 9 : x === 90 || x === 110 ? 6 : 1)} r="4" fill={x === 100 ? accent : main}/>)}
+    </>,
+  };
+  return <g className="buddy-wear">{bodies[look.body]}</g>;
 }

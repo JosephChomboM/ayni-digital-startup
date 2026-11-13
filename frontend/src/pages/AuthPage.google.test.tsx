@@ -3,14 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AuthPage } from "./AuthPage";
 import { ApiError } from "../api/client";
 import { getConsent, login, register } from "../api/auth";
-import { loginWithGoogle, registerWithGoogle, updateMyProfile } from "../api/account";
+import { loginWithGoogle, registerWithGoogle, updateMyProfile, linkGoogle } from "../api/account";
 import type { GoogleProof } from "../api/account";
 
 const proof = { credential: "synthetic-credential", challenge_id: "synthetic-challenge" };
 const password = crypto.randomUUID();
 vi.mock("../components/GoogleSignInButton", () => ({ GoogleSignInButton: ({ disabled, onCredential }: { disabled: boolean; onCredential: (proof: GoogleProof) => void }) => <button type="button" disabled={disabled} onClick={() => onCredential({ credential: "synthetic-credential", challenge_id: "synthetic-challenge" })}>Continuar con Google</button> }));
 vi.mock("../api/auth", () => ({ getConsent: vi.fn(), login: vi.fn(), register: vi.fn() }));
-vi.mock("../api/account", () => ({ loginWithGoogle: vi.fn(), registerWithGoogle: vi.fn(), updateMyProfile: vi.fn() }));
+vi.mock("../api/account", () => ({ loginWithGoogle: vi.fn(), registerWithGoogle: vi.fn(), updateMyProfile: vi.fn(), linkGoogle: vi.fn() }));
 const user = { id: "u", family_id: "f", role: "cuidador_principal" as const, name: "Persona Prueba", email: "verified@example.com", created_at: "2026-11-11T12:00:00Z" };
 const session = { user, access_token: crypto.randomUUID(), token_type: "bearer" as const, expires_in: 1800 };
 
@@ -61,7 +61,7 @@ it("does not automatically link an existing password account by email", async ()
   vi.mocked(loginWithGoogle).mockRejectedValue(new ApiError("Inicia sesión y vincula Google desde tu cuenta.", "google_link_required", 409));
   const onSuccess = vi.fn(); render(<AuthPage initialMode="login" onBack={vi.fn()} onSuccess={onSuccess} />);
   fireEvent.click(screen.getByRole("button", { name: "Continuar con Google" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("vincula Google");
+  expect(await screen.findByRole("status")).toHaveTextContent("Google te reconoció");
   expect(onSuccess).not.toHaveBeenCalled(); expect(registerWithGoogle).not.toHaveBeenCalled();
 });
 
@@ -73,4 +73,28 @@ it("reports a profile save failure after registration without claiming that cont
   expect(onSuccess).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Continuar y completar mis datos después" }));
   expect(onSuccess).toHaveBeenCalledWith(user); expect(registerWithGoogle).toHaveBeenCalledOnce();
+});
+
+it("vincula una cuenta existente solo después de comprobar su contraseña", async () => {
+ vi.mocked(loginWithGoogle).mockRejectedValue(new ApiError("Vincula Google", "google_link_required",409));
+ vi.mocked(linkGoogle).mockResolvedValue(undefined);
+ const onSuccess=vi.fn(); render(<AuthPage initialMode="login" onBack={vi.fn()} onSuccess={onSuccess}/>);
+ fireEvent.click(screen.getByRole("button",{name:"Continuar con Google"}));
+ await screen.findByText(/Google te reconoció/);
+ expect(linkGoogle).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText("Correo Electrónico"),{target:{value:user.email}});
+ fireEvent.change(screen.getByLabelText("Contraseña"),{target:{value:password}});
+ fireEvent.submit(screen.getByLabelText("Contraseña").closest("form")!);
+ await waitFor(()=>expect(onSuccess).toHaveBeenCalledWith(user));
+ expect(linkGoogle).toHaveBeenCalledWith(proof,password);
+ expect(registerWithGoogle).not.toHaveBeenCalled();
+});
+it("conserva los datos y permite verificar Google de nuevo si vence el registro", async () => {
+ vi.mocked(registerWithGoogle).mockRejectedValue(new ApiError("Verificación vencida","invalid_google_challenge",401));
+ render(<AuthPage initialMode="login" onBack={vi.fn()} onSuccess={vi.fn()}/>);
+ await fillGoogleRegistration();
+ fireEvent.submit(screen.getByLabelText("Contraseña").closest("form")!);
+ expect(await screen.findByText(/La verificación de Google venció/)).toBeInTheDocument();
+ expect(screen.getByLabelText("Nombre")).toHaveValue("Persona");
+ expect(screen.getByLabelText("Nombre del grupo familiar")).toHaveValue("Familia Prueba");
 });

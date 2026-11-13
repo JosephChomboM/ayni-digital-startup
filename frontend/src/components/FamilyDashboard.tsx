@@ -92,7 +92,7 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
           <p className="mt-2 max-w-2xl text-slate-600">Anécdotas y canciones de tu familia, junto con fotos y reseñas guardadas solo en este navegador. Las fotos y reseñas no se sincronizan entre dispositivos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onOpenMemories}>Subir recuerdos</Button>
+          <Button variant="outline" onClick={onOpenMemories}>Recuerdos</Button>
           <Button onClick={onOpenSession} className="bg-[#b94c35] hover:bg-[#d95f43]">Abrir guía <ArrowRight className="ml-2 size-4" /></Button>
         </div>
       </header>

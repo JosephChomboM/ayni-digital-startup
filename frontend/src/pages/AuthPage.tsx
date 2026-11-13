@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { getConsent, login, register } from "../api/auth";
 import type { ConsentText, RegisterPayload, User as UserType } from "../api/auth";
 import { ApiError } from "../api/client";
-import { loginWithGoogle, registerWithGoogle, updateMyProfile } from "../api/account";
+import { loginWithGoogle, registerWithGoogle, updateMyProfile, linkGoogle } from "../api/account";
 import type { GoogleProof } from "../api/account";
 import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
@@ -25,6 +25,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [googleLinkProof, setGoogleLinkProof] = useState<GoogleProof | null>(null);
+  const feedback = React.useRef<HTMLDivElement>(null);
   const [googleProof, setGoogleProof] = useState<GoogleProof | null>(null);
   const [profilePendingUser, setProfilePendingUser] = useState<UserType | null>(null);
 
@@ -73,8 +75,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     return () => { active = false; };
   }, [mode, consentAttempt]);
 
+  React.useEffect(() => {
+    if (!error && !notice && !googleLinkProof) return;
+    feedback.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    feedback.current?.focus();
+  }, [error, notice, googleLinkProof]);
+
   const handleGoogle = async (proof: GoogleProof) => {
-    setLoading(true); setError(null); setProfilePendingUser(null);
+    setLoading(true); setError(null); setProfilePendingUser(null); setGoogleLinkProof(null);
     try {
       const response = await loginWithGoogle(proof);
       onSuccess(response.user);
@@ -82,6 +90,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       if (reason instanceof ApiError && reason.code === "google_account_not_registered") {
         setGoogleProof(proof); setMode("register"); reloadConsent();
         setNotice("Completa tus datos, elige una contraseña de Ayni y acepta el consentimiento para crear tu cuenta con Google.");
+      } else if (reason instanceof ApiError && reason.code === "google_link_required") {
+        setGoogleProof(null); setGoogleLinkProof(proof); setMode("login");
+        setNotice("Google te reconoció. Tu cuenta de Ayni todavía usa contraseña. Ingresa tu correo y contraseña de Ayni una sola vez para vincular Google y entrar.");
       } else {
         setGoogleProof(null);
         setError(reason instanceof Error ? reason.message : "No pudimos continuar con Google.");
@@ -142,6 +153,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
       const response = await login({ email: loginEmail, password });
 
+      if (googleLinkProof) {
+        await linkGoogle(googleLinkProof, password);
+        setGoogleLinkProof(null);
+      }
       setPassword("");
       if (registered) {
         try {
@@ -156,6 +171,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
       onSuccess(response.user);
     } catch (err) {
+      if (err instanceof ApiError && ["invalid_google_challenge", "invalid_google_credential"].includes(err.code)) {
+        setGoogleProof(null); setGoogleLinkProof(null);
+        setNotice("La verificación de Google venció. Pulsa Continuar con Google otra vez; conservamos los datos que escribiste.");
+      }
       if (err instanceof ApiError && err.code === "consent_version_invalid") {
         reloadConsent();
       }
@@ -211,7 +230,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <div className="flex gap-6 border-b border-gray-200">
               <button
                 type="button"
-                onClick={() => { setGoogleProof(null); reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
+                onClick={() => { setGoogleLinkProof(null); setGoogleProof(null); reloadConsent(); setMode("register"); setError(null); setNotice(null); }}
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "register"
@@ -223,7 +242,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => { setGoogleProof(null); setMode("login"); setError(null); setNotice(null); }}
+                onClick={() => { setGoogleLinkProof(null); setGoogleProof(null); setMode("login"); setError(null); setNotice(null); }}
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "login"
@@ -235,7 +254,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </button>
             </div>
 
-            {notice && <p role="status" className="text-xs text-gray-500">{notice}</p>}
+            <div ref={feedback} tabIndex={-1} className="focus:outline-none">
+              {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-[#223e38]">{notice}</p>}
+              {googleProof && <p className="mt-2 font-semibold">Google verificado · Paso 2: completa el registro para guardar tu cuenta.</p>}
+            </div>
             {profilePendingUser && <Button type="button" onClick={() => onSuccess(profilePendingUser)}>Continuar y completar mis datos después</Button>}
             {googleProof && <p className="text-sm text-slate-600">Usaremos el correo de tu cuenta de Google. <button type="button" className="font-semibold underline" onClick={() => { setGoogleProof(null); setNotice(null); }}>Usar correo y contraseña</button></p>}
             {error && (
@@ -391,7 +413,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 ) : mode === "register" ? (
                   "Crear cuenta"
                 ) : (
-                  "Ingresar a Ayni Digital"
+                  googleLinkProof ? "Vincular Google y entrar" : "Ingresar a Ayni Digital"
                 )}
               </Button>
             </form>

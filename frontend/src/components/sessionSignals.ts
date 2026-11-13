@@ -12,6 +12,13 @@ export function requestsVisualContext(text: string): boolean {
     /\b(?:que (?:hay|aparece|se ve)|de que color es)\b[^.?!]*\b(?:en|de)\s+(?:esta|esa|la)\s+(?:imagen|foto|fotografia|captura)\b/.test(phrase);
 }
 
+export function visualSource(text: string): "camera" | "memory" | "auto" {
+  const phrase = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (/\b(?:camara|webcam|en vivo|te muestro|te estoy mostrando|mira aca|mira aqui)\b/.test(phrase)) return "camera";
+  if (/\b(?:foto|fotografia|recuerdo|album|imagen guardada)\b/.test(phrase)) return "memory";
+  return "auto";
+}
+
 export function interpretReply(transcript: string): SpokenChoice {
   const reply = transcript.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim()
     .replace(/^ayni[ ,]+/, "");
@@ -31,7 +38,20 @@ export function interpretReply(transcript: string): SpokenChoice {
 }
 
 export type FaceObservation = "absent" | "multiple" | "present" | "smiling" | "brow";
-export type FaceCue = "smile" | "brow" | "away";
+export type FaceCue = "smile" | "brow" | "away" | "hand";
+
+/** Gesto visible de la cara. Describe la expresión, no lo que la persona siente. */
+export type Expression = "smile" | "surprise" | "brow" | "sad" | "calm";
+
+export function readExpression(score: (name: string) => number): Expression {
+  const both = (name: string) => (score(name + "Left") + score(name + "Right")) / 2;
+  if (both("mouthSmile") >= 0.45) return "smile";
+  if (score("jawOpen") >= 0.35 && score("browInnerUp") >= 0.35) return "surprise";
+  if (both("browDown") >= 0.5) return "brow";
+  if (both("mouthFrown") >= 0.25 || (score("browInnerUp") >= 0.45 && both("mouthSmile") < 0.1)) return "sad";
+  return "calm";
+}
+
 
 export function createFaceCueTracker() {
   let previous: FaceObservation | undefined;

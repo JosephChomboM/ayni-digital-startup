@@ -1,14 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionGuide } from "./SessionGuide";
-import { listMemories, getMemory } from "../api/memories";
+import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
-import { clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
+import { getElderProfile } from "../api/families";
+import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
-vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn() }));
+vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
-vi.mock("../api/sessions", () => ({ clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
+vi.mock("../api/families", () => ({ getElderProfile: vi.fn() }));
+vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ captureRef, onCue, onAnalyzeFrame }: { captureRef?: { current: (() => Promise<string>) | null }; onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => { if (captureRef) captureRef.current = speech.capture; return <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></>; } }));
 const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
@@ -28,6 +30,8 @@ beforeEach(() => {
  vi.mocked(listMemories).mockResolvedValue({items:[memory],total:1,limit:50,offset:0});
  vi.mocked(getMemory).mockResolvedValue(memory);
  vi.mocked(listPhotos).mockResolvedValue([]);
+ vi.mocked(getLook).mockRejectedValue(new Error("sin IA"));
+ vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:[], created_at:"", updated_at:"" });
  vi.mocked(generateSession).mockResolvedValue(guide);
  vi.mocked(getSession).mockResolvedValue(guide);
  vi.mocked(listSessions).mockResolvedValue({items:[guide],total:1,limit:10,offset:0});
@@ -249,4 +253,84 @@ it("si Ayni decide mirar, toma una captura y vuelve a responder con ella",async(
  await screen.findByText("Veo una taza azul. ¿Es tuya?");
  expect(speech.capture).toHaveBeenCalledOnce();
  expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({ image:"data:image/jpeg;base64,current", image_consent:true }),expect.any(AbortSignal));
+});
+it("envía la foto guardada activa al preguntar por ella sin necesitar la cámara", async () => {
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["photo"],{type:"image/jpeg"})}));
+ vi.mocked(imageForConversation).mockResolvedValue("data:image/jpeg;base64,saved");
+ await begin();
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
+ await screen.findByRole("button",{name:"Analizar foto con IA"});
+ fireEvent.change(screen.getByRole("textbox",{name:"Tu respuesta"}),{target:{value:"¿Qué ves en esta foto?"}});
+ fireEvent.click(screen.getByRole("button",{name:"Enviar"}));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide",expect.objectContaining({image:"data:image/jpeg;base64,saved",image_consent:true}),expect.any(AbortSignal));
+ expect(speech.capture).not.toHaveBeenCalled();
+ vi.unstubAllGlobals();
+});
+it("prioriza la cámara explícita sobre una foto activa", async () => {
+ vi.mocked(listPhotos).mockResolvedValue([photo]);
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(["photo"],{type:"image/jpeg"})}));
+ await begin("Empezar con Ayni");
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar actividad"}));
+ await screen.findByRole("button",{name:"Analizar foto con IA"});
+ act(()=>speech.receive?.("Mira mi cámara, ¿qué ves acá?"));
+ await screen.findByText(answer.text);
+ expect(speech.capture).toHaveBeenCalledOnce();
+ expect(imageForConversation).not.toHaveBeenCalled();
+ vi.unstubAllGlobals();
+});
+it("no usa la cámara cuando se pide una foto que no está abierta", async () => {
+ await begin("Empezar con Ayni");
+ act(()=>speech.receive?.("Mira la foto del recuerdo"));
+ await screen.findByText(/Abre la foto del recuerdo/);
+ expect(speech.capture).not.toHaveBeenCalled();
+});
+
+it("permite confirmar un recuerdo nuevo antes de incluirlo en la sesión", async () => {
+ vi.mocked(listMemories).mockResolvedValue({items:[{...memory,is_positive:false}],total:1,limit:50,offset:0});
+ vi.mocked(updateMemory).mockResolvedValue(memory);
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()}/>);
+ const select=await screen.findByRole("combobox",{name:"Recuerdo para la sesión"});
+ await screen.findByRole("option",{name:/Confirma que es un recuerdo bonito/});
+ fireEvent.change(select,{target:{value:memory.id}});
+ expect(screen.getByRole("button",{name:"Empezar con Ayni"})).toBeDisabled();
+ fireEvent.click(screen.getByRole("button",{name:"Confirmar que es un recuerdo bonito"}));
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Empezar con Ayni"})).toBeEnabled());
+ expect(updateMemory).toHaveBeenCalledWith(memory.id,{is_positive:true});
+});
+it("carga también los recuerdos que quedan fuera de la primera página", async () => {
+ vi.mocked(listMemories).mockResolvedValueOnce({items:[memory],total:2,limit:50,offset:0}).mockResolvedValueOnce({items:[{...memory,id:"new",title:"Recuerdo nuevo con imagen"}],total:2,limit:50,offset:1});
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()}/>);
+ expect(await screen.findByRole("option",{name:/Recuerdo nuevo con imagen/})).toBeInTheDocument();
+ expect(listMemories).toHaveBeenCalledWith(expect.objectContaining({offset:1}));
+});
+
+it("si la IA no responde, viste a Ayni con un look por palabras clave de los gustos",async()=>{
+ vi.mocked(getElderProfile).mockResolvedValue({ id:"profile", family_id:"f", name:"Elena", birth_decade:1950, interests:["cocina criolla","boleros"], created_at:"", updated_at:"" });
+ await begin();
+ expect(screen.getAllByText(/Ayni lleva gorro y mandil de cocina/).length).toBeGreaterThan(0);
+});
+const aiLook = { hat:"beret" as const, body:"scarf" as const, glasses:false, hat_color:"#b94c35", outfit_color:"#edce84", accent_color:"#235c50", wall:["#f7f0e1","#f3ead8"] as [string,string], decor:[{icon:"palette",place:"wall" as const}], description:"Ayni se puso una boina de pintor" };
+it("usa el look que diseña la IA y pide otro distinto con el botón",async()=>{
+ vi.mocked(getLook).mockResolvedValueOnce(aiLook).mockResolvedValueOnce({...aiLook, hat:"straw", description:"Ayni se puso un sombrero de paja"});
+ await begin();
+ expect(getLook).toHaveBeenLastCalledWith("guide", 0);
+ expect(screen.getAllByText(/Ayni se puso una boina de pintor/).length).toBeGreaterThan(0);
+ fireEvent.click(screen.getByRole("button",{name:"Otro look para Ayni"}));
+ expect((await screen.findAllByText(/Ayni se puso un sombrero de paja/)).length).toBeGreaterThan(0);
+ expect(getLook).toHaveBeenLastCalledWith("guide", 1);
+});
+it("reúne las opciones en el panel y conserva la conversación al alternar", async () => {
+ await begin();
+ fireEvent.click(screen.getByRole("button",{name:"Abrir opciones de sesión"}));
+ expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","true");
+ fireEvent.click(screen.getByRole("button",{name:"Opciones"}));
+ expect(screen.getByRole("button",{name:"Opciones"})).toHaveAttribute("aria-pressed","true");
+ fireEvent.click(screen.getByRole("button",{name:"Conversación"}));
+ expect(screen.getByRole("log")).toHaveTextContent("Hola, ¿qué disfrutaban de sus paseos?");
+ fireEvent.click(screen.getByRole("button",{name:"Cerrar opciones de sesión"}));
+ expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","false");
+ fireEvent.click(screen.getByRole("button",{name:"Volver al historial"}));
+ await screen.findByRole("heading",{name:"Guía de sesión"});
 });

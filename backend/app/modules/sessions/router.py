@@ -9,6 +9,7 @@ from app.modules.families.service import get_authenticated_user_id
 from app.modules.recommender.service import Recommendation, RecommenderService
 from app.modules.sessions.assistant import ChatRequest
 from app.modules.sessions.conversation import ConversationRequest, ConversationTurn
+from app.modules.sessions.look import LookSpec
 from app.modules.sessions.schemas import (
     GenerateSessionRequest,
     SceneResponse,
@@ -64,6 +65,16 @@ def converse_about_memory(
 @router.get("/{session_id}", response_model=SessionDetail)
 def get_session(session_id: UUID, actor_id: ActorId, service: Service) -> SessionDetail:
     return service.get_session(actor_id, session_id)
+
+
+@router.get("/{session_id}/look", response_model=LookSpec)
+def get_look(
+    session_id: UUID,
+    actor_id: ActorId,
+    service: Service,
+    variant: Annotated[int, Query(ge=0, le=50)] = 0,
+) -> LookSpec:
+    return service.look(actor_id, session_id, variant)
 
 
 @router.get("/{session_id}/messages", response_model=list[SessionMessageResponse])
