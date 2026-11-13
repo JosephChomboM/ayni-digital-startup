@@ -422,7 +422,7 @@ export function GuidedConversation({
       <p className="text-sm font-semibold text-[#435d60]">Si te ayuda, puedes empezar por aquí</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {SESSION_STARTERS.map((starter) => <button key={starter} type="button" disabled={pending}
-          className="min-h-11 rounded-full border border-[#c6d9d5] bg-white px-4 py-2 text-left text-sm font-semibold text-[#235c50] transition-colors hover:bg-[#edf6ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c50]"
+          className="min-h-11 rounded-full border border-[#c6d9d5] bg-white px-4 py-2 text-left text-sm font-semibold text-[#2c5f7c] transition-colors hover:bg-[#eef7fb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2c5f7c]"
           onClick={() => receive(starter)}>{starter}</button>)}
       </div>
     </div>}

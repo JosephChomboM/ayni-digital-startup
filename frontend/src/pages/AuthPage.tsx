@@ -193,7 +193,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-8">
         <button
           onClick={onBack}
-          className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#235c50] hover:underline"
+          className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#2c5f7c] hover:underline"
         >
           <ArrowLeft className="size-4" /> Volver al inicio
         </button>
@@ -203,7 +203,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {mode === "login" && <div className="auth-login-companion hidden items-center gap-3 sm:flex">
             <span className="auth-login-companion-avatar"><AyniCompanion decorative /></span>
             <span className="max-w-40 text-xs leading-snug text-[#435d60]">Ayni te espera para compartir un recuerdo, a tu ritmo.</span>
-            <Button type="button" variant="outline" className="min-h-10 whitespace-nowrap border-[#c6d9d5] text-[#235c50]" onClick={() => emailInput.current?.focus()}>
+            <Button type="button" variant="outline" className="min-h-10 whitespace-nowrap border-[#c6d9d5] text-[#2c5f7c]" onClick={() => emailInput.current?.focus()}>
               Empezar juntos
             </Button>
           </div>}
@@ -213,10 +213,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-7 px-4 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)] lg:items-start lg:gap-14">
         <section className="auth-form order-1 mx-auto w-full max-w-xl">
           <div className="mb-7 max-w-lg">
-            <p className="text-sm font-semibold text-[#b94c35]">
+            <p className="text-sm font-semibold text-[#e76f51]">
               {mode === "register" ? "Un espacio para tus recuerdos" : "Tu espacio familiar te espera"}
             </p>
-            <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-[#235c50] sm:text-4xl">
+            <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-[#2c5f7c] sm:text-4xl">
               {mode === "register" ? "Crea tu espacio en familia" : "Qué bueno verte de nuevo"}
             </h1>
             <p className="mt-3 max-w-xl text-base leading-relaxed text-gray-600">
@@ -234,8 +234,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "register"
-                    ? "border-[#b94c35] text-[#235c50]"
-                    : "border-transparent text-gray-500 hover:text-[#223e38]"
+                    ? "border-[#e76f51] text-[#2c5f7c]"
+                    : "border-transparent text-gray-500 hover:text-[#264653]"
                 }`}
               >
                 Crear cuenta
@@ -246,8 +246,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 disabled={loading}
                 className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                   mode === "login"
-                    ? "border-[#b94c35] text-[#235c50]"
-                    : "border-transparent text-gray-500 hover:text-[#223e38]"
+                    ? "border-[#e76f51] text-[#2c5f7c]"
+                    : "border-transparent text-gray-500 hover:text-[#264653]"
                 }`}
               >
                 Iniciar sesión
@@ -255,7 +255,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
 
             <div ref={feedback} tabIndex={-1} className="focus:outline-none">
-              {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-[#223e38]">{notice}</p>}
+              {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-[#264653]">{notice}</p>}
               {googleProof && <p className="mt-2 font-semibold">Google verificado · Paso 2: completa el registro para guardar tu cuenta.</p>}
             </div>
             {profilePendingUser && <Button type="button" onClick={() => onSuccess(profilePendingUser)}>Continuar y completar mis datos después</Button>}
@@ -270,12 +270,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {mode === "register" && (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1"><label htmlFor="auth-first-name" className="text-xs font-bold text-[#223e38]">Nombre</label><Input id="auth-first-name" required autoComplete="given-name" maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej. María" className="text-sm" /></div>
-                    <div className="space-y-1"><label htmlFor="auth-last-name" className="text-xs font-bold text-[#223e38]">Apellido</label><Input id="auth-last-name" required autoComplete="family-name" maxLength={60} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ej. Martínez" className="text-sm" /></div>
+                    <div className="space-y-1"><label htmlFor="auth-first-name" className="text-xs font-bold text-[#264653]">Nombre</label><Input id="auth-first-name" required autoComplete="given-name" maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ej. María" className="text-sm" /></div>
+                    <div className="space-y-1"><label htmlFor="auth-last-name" className="text-xs font-bold text-[#264653]">Apellido</label><Input id="auth-last-name" required autoComplete="family-name" maxLength={60} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ej. Martínez" className="text-sm" /></div>
                   </div>
 
                   <div className="space-y-1">
-                    <label htmlFor="auth-phone" className="text-xs font-bold text-[#223e38]">Teléfono</label>
+                    <label htmlFor="auth-phone" className="text-xs font-bold text-[#264653]">Teléfono</label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-3 size-4 text-gray-400" />
                       <Input
@@ -294,12 +294,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1"><label htmlFor="auth-city" className="text-xs font-bold text-[#223e38]">Ciudad</label><Input id="auth-city" required autoComplete="address-level2" maxLength={80} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Lima" className="text-sm"/></div>
-                    <div className="space-y-1"><label htmlFor="auth-district" className="text-xs font-bold text-[#223e38]">Distrito</label><Input id="auth-district" required autoComplete="address-level3" maxLength={80} value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Ej. Surco" className="text-sm"/></div>
+                    <div className="space-y-1"><label htmlFor="auth-city" className="text-xs font-bold text-[#264653]">Ciudad</label><Input id="auth-city" required autoComplete="address-level2" maxLength={80} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Lima" className="text-sm"/></div>
+                    <div className="space-y-1"><label htmlFor="auth-district" className="text-xs font-bold text-[#264653]">Distrito</label><Input id="auth-district" required autoComplete="address-level3" maxLength={80} value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Ej. Surco" className="text-sm"/></div>
                   </div>
 
                   <div className="space-y-1">
-                    <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#223e38]">¿Cómo vas a participar?</label>
+                    <label htmlFor="auth-registration-mode" className="text-xs font-bold text-[#264653]">¿Cómo vas a participar?</label>
                     <select
                       id="auth-registration-mode"
                       value={registrationMode}
@@ -312,7 +312,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <label htmlFor="auth-family" className="text-xs font-bold text-[#223e38]">
+                    <label htmlFor="auth-family" className="text-xs font-bold text-[#264653]">
                       {registrationMode === "family" ? "Nombre del grupo familiar" : "Código de invitación"}
                     </label>
                     <div className="relative">
@@ -333,7 +333,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               )}
 
               <div className="space-y-1" hidden={Boolean(googleProof)}>
-                <label htmlFor="auth-email" className="text-xs font-bold text-[#223e38]">Correo Electrónico</label>
+                <label htmlFor="auth-email" className="text-xs font-bold text-[#264653]">Correo Electrónico</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
@@ -351,7 +351,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="auth-password" className="text-xs font-bold text-[#223e38]">Contraseña</label>
+                <label htmlFor="auth-password" className="text-xs font-bold text-[#264653]">Contraseña</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
@@ -366,7 +366,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     placeholder="••••••••"
                     className="pl-9 pr-11 text-sm"
                   />
-                  <button type="button" onClick={() => setShowPassword((show) => !show)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#235c50] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#235c50]">
+                  <button type="button" onClick={() => setShowPassword((show) => !show)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#2c5f7c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2c5f7c]">
                     {showPassword ? <EyeOff className="size-4"/> : <Eye className="size-4"/>}
                   </button>
                 </div>
@@ -392,8 +392,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         <input type="checkbox" checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} required />
                         <span>Acepto el consentimiento mostrado (versión {consent.text_version}).</span>
                       </label>
-                      <label className="flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-[#223e38]">
-                        <input type="checkbox" checked={hasAcceptedPrivacy} onChange={(e) => setHasAcceptedPrivacy(e.target.checked)} required className="mt-0.5 accent-[#235c50]" />
+                      <label className="flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-[#264653]">
+                        <input type="checkbox" checked={hasAcceptedPrivacy} onChange={(e) => setHasAcceptedPrivacy(e.target.checked)} required className="mt-0.5 accent-[#2c5f7c]" />
                         <span>Acepto el tratamiento de mis datos personales conforme a la Ley N.° 29733. Entiendo que Ayni Digital no es una herramienta médica ni emite diagnósticos clínicos.</span>
                       </label>
                     </>
@@ -404,7 +404,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <Button
                 type="submit"
                 disabled={loading || (mode === "register" && (consentLoading || !consent || !hasConsented || !hasAcceptedPrivacy))}
-                className="w-full bg-[#b94c35] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-xs transition-all mt-2"
+                className="w-full bg-[#e76f51] hover:bg-[#d65d3f] text-white font-bold text-xs py-3 rounded-lg shadow-xs transition-all mt-2"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -421,7 +421,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <div className="pt-2 border-t border-gray-100 flex flex-col gap-3">
               <GoogleSignInButton disabled={loading} onCredential={(proof) => { void handleGoogle(proof); }} />
               <div className="flex items-center gap-2 text-[11px] text-gray-500 pt-1">
-                <ShieldCheck className="size-4 text-[#235c50] shrink-0" />
+                <ShieldCheck className="size-4 text-[#2c5f7c] shrink-0" />
                 <span>Tus datos y archivos familiares están protegidos de forma privada.</span>
               </div>
             </div>
@@ -431,8 +431,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <aside aria-label="Ayni acompaña los recuerdos familiares" className="auth-story">
           <div className="auth-mascot"><AyniCompanion decorative/></div>
           <img src="/images/familia-participa.jpg" alt="Una familia comparte recuerdos con una persona mayor" className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-[#193e35]/25" />
-          <div className="absolute inset-x-0 bottom-0 bg-[#193e35]/80 px-5 py-4 text-white sm:px-7 sm:py-6">
+          <div className="absolute inset-0 bg-[#264653]/25" />
+          <div className="absolute inset-x-0 bottom-0 bg-[#264653]/80 px-5 py-4 text-white sm:px-7 sm:py-6">
             <p className="text-base font-semibold leading-snug sm:text-xl">Cada historia merece su espacio.</p>
             <p className="mt-1 max-w-lg text-sm leading-relaxed text-white/85">Compartan fotos, canciones y momentos importantes, cada quien desde donde esté.</p>
           </div>
