@@ -106,7 +106,7 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
               <p className="mt-5 font-semibold text-[#9a4f3c]">{exampleTab === "song" ? "¿Qué canción les gustaría volver a escuchar juntos?" : "¿Qué recuerdo de los domingos les gustaría compartir?"}</p>
             </div>
           </div>
-          <p className="border-t border-slate-200 px-5 py-4 text-xs leading-relaxed text-slate-500 sm:px-6">Este ejemplo no contiene datos de una familia real. Tus recuerdos se gestionan desde <button type="button" onClick={onViewMemories} className="font-semibold text-[#235c50] underline underline-offset-2">Subir recuerdos</button>.</p>
+          <p className="border-t border-slate-200 px-5 py-4 text-xs leading-relaxed text-slate-500 sm:px-6">Este ejemplo no contiene datos de una familia real. Tus recuerdos se gestionan desde <button type="button" onClick={onViewMemories} className="font-semibold text-[#235c50] underline underline-offset-2">Recuerdos</button>.</p>
         </div>
         <div className="grid gap-6 pt-3 lg:grid-cols-2 lg:items-center lg:gap-12">
           <div className="space-y-3">

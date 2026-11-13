@@ -1,5 +1,5 @@
 import { PageIntro } from "./PageIntro";
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Check, FileText, ImagePlus, Link2, Music2, Trash2, Users, Heart } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
@@ -23,6 +23,8 @@ function SpotifyIcon({ className = "size-4" }: { className?: string }) {
 }
 
 export function UploadModule() {
+  const [section, setSection] = useState<"add" | "list">("add")
+  const panel = useRef<HTMLElement>(null)
   const [pending, setPending] = useState(false)
   const [title, setTitle] = useState("")
   const [anecdote, setAnecdote] = useState("")
@@ -39,6 +41,7 @@ export function UploadModule() {
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [successDialog, setSuccessDialog] = useState(false)
+  useEffect(() => { if (!successDialog) panel.current?.focus(); }, [section, successDialog])
 
   useEffect(() => {
     let active = true
@@ -86,6 +89,7 @@ export function UploadModule() {
       setSuccess(editing ? "Cambios guardados." : "Recuerdo guardado.")
       resetForm()
       setRevision((value) => value + 1)
+      setSection("list")
       setSuccessDialog(true)
     } catch (err) {
       setRevision((value) => value + 1)
@@ -102,6 +106,7 @@ export function UploadModule() {
       setMemoryMode(memory.type)
       setEditing(memory); setTitle(memory.title); setAnecdote(memory.text ?? ""); setSong(memory.url ?? "")
       setPositive(memory.is_positive); setSensitive(memory.is_sensitive)
+      setSection("add")
     } catch (err) { setError(memoryErrorMessage(err)) }
     finally { setPending(false) }
   }
@@ -165,7 +170,15 @@ export function UploadModule() {
 
   return (
     <div className="memories-page space-y-6">
-    <PageIntro eyebrow="EL ÁLBUM DE NUESTRA VIDA" title="Pequeños recuerdos. Grandes historias.">Una fotografía, una canción, un momento que merece volver a contarse.</PageIntro>
+    <PageIntro eyebrow="EL ÁLBUM DE NUESTRA VIDA" title="Recuerdos">Una fotografía, una canción, un momento que merece volver a contarse.</PageIntro>
+    <nav aria-label="Secciones de recuerdos" className="flex flex-wrap gap-2">
+      <Button variant={section === "add" ? "default" : "outline"} aria-pressed={section === "add"} disabled={pending} onClick={() => setSection("add")}>{editing ? "Editar recuerdo" : "Agregar recuerdo"}</Button>
+      <Button variant={section === "list" ? "default" : "outline"} aria-pressed={section === "list"} disabled={pending} onClick={() => setSection("list")}>Mis recuerdos</Button>
+    </nav>
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {success && !successDialog && <p role="status" className="text-sm text-[#235c50]">{success}</p>}
+    <section ref={panel} tabIndex={-1} aria-label={section === "add" ? editing ? "Editar recuerdo" : "Agregar recuerdo" : "Mis recuerdos"} className="focus:outline-none">
+    {section === "add" ? <>
     <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
@@ -176,7 +189,7 @@ export function UploadModule() {
             </div>
             <div>
               <CardTitle className="text-lg font-extrabold text-[#235c50]">
-                Construyamos su historia
+                {editing ? "Editar recuerdo" : "Agregar recuerdo"}
               </CardTitle>
               <CardDescription className="text-xs text-gray-500 mt-0.5">
                 Cada recuerdo compartido se convierte en un momento de estímulo y conexión.
@@ -216,8 +229,8 @@ export function UploadModule() {
             </button>
           </div>
         <div className="flex flex-col gap-1.5">
-          {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
-          {success && <p role="status" className="flex items-center gap-2 text-sm font-medium text-[#235c50]"><Check className="size-4" aria-hidden="true" />{success}</p>}
+
+
           <label htmlFor="memory-title" className="text-xs font-bold text-[#223e38]">Título del recuerdo</label>
           <Input id="memory-title" required maxLength={100} value={title} disabled={pending}
             onChange={(e) => { setTitle(e.target.value); setSuccess(null) }}
@@ -284,7 +297,7 @@ export function UploadModule() {
           </Button>
         </div>
 
-        {editing && <Button variant="outline" disabled={pending} onClick={() => { resetForm(); setError(null); setSuccess(null) }}>Cancelar edición</Button>}
+        {editing && <Button variant="outline" disabled={pending} onClick={() => { resetForm(); setError(null); setSuccess(null); setSection("list") }}>Cancelar edición</Button>}
         <Button variant="outline" disabled={pending} onClick={openProfile}>Perfil y familia</Button>
         <Button
           variant="outline"
@@ -296,7 +309,8 @@ export function UploadModule() {
         </div>
       </CardContent>
     </Card>
-    <Contributions revision={revision} busy={pending} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />
+    </> : <Contributions revision={revision} busy={pending} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />}
+    </section>
     {successDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="memory-saved-title" className="w-full max-w-sm rounded-xl bg-white p-7 text-center shadow-xl"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="size-7" aria-hidden="true" /></div><h2 id="memory-saved-title" className="mt-4 text-xl font-semibold text-[#235c50]">¡Se guardó correctamente!</h2><p className="mt-2 text-sm text-slate-600">{success}</p><Button autoFocus onClick={() => setSuccessDialog(false)} className="mt-5 w-full bg-[#235c50] hover:bg-[#194b40]">OK</Button></section></div>}
     </div>
   )

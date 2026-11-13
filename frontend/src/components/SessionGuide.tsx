@@ -7,11 +7,11 @@ import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
-import { recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
-import type { Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
+import { getLook, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
+import type { LookSpec, Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
 import { GuidedConversation } from "./GuidedConversation";
 import type { StageScene } from "./CompanionScene";
-import { themeFor } from "./companionTheme";
+import { lookFor } from "./companionTheme";
 import { getElderProfile } from "../api/families";
 import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
@@ -66,7 +66,10 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [memories, setMemories] = useState<Memory[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoSourceIds, setPhotoSourceIds] = useState<string[]>([]);
-  const [interests, setInterests] = useState<string[]>([]);
+  const [look, setLook] = useState<LookSpec | null>(null);
+  const [lookVariant, setLookVariant] = useState(0);
+  const [lookBusy, setLookBusy] = useState(false);
+  const [lookNotice, setLookNotice] = useState("");
   const [anecdoteId, setAnecdoteId] = useState("");
   const [songId, setSongId] = useState("");
   const [withDevices, setWithDevices] = useState(false);
@@ -176,8 +179,12 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
       const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       const previousReaction = await getRecordedReaction(saved.id);
-      // Los gustos solo ambientan la sala; si el perfil no carga, Ayni sale con su look de siempre.
-      setInterests(await getElderProfile().then((profile) => profile.interests).catch(() => []));
+      // Los gustos solo ambientan la sala: si la IA no responde, se usa un look por palabras clave
+      // y, si tampoco hay gustos, Ayni sale con su look de siempre. Nunca bloquea la sesión.
+      const interests = await getElderProfile().then((profile) => profile.interests).catch(() => []);
+      setLookVariant(0);
+      setLookNotice("");
+      setLook(await getLook(saved.id, 0).catch(() => lookFor(interests, allowed.map((item) => item.title))));
       setMemories(allowed);
       setPhotos(sessionPhotos);
       setPhotoSourceIds(photoSources.map((memory) => memory.id));
@@ -281,7 +288,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
           {recommendation && <div className="rounded border bg-sky-50 p-3 text-sm"><strong>{recommendation.source === "ai" ? "Recomendación con IA" : "Sugerencia por historial"}: {recommendation.title}</strong><p>{recommendation.reason}</p><p>Puedes cambiar la selección antes de empezar. Esto no es un diagnóstico. Es un registro de actividades familiares.</p></div>}
           <p className="text-sm text-slate-700">Ayni usará los recuerdos positivos de esta guía y recordará lo que compartan durante la conversación.</p>
           <button type="button" onClick={onOpenMemories} className="min-h-11 text-sm font-semibold underline">Agregar o revisar mis recuerdos</button>
-          <p className="text-sm text-slate-600">Groq recibe sus respuestas y los recuerdos necesarios para conversar. Los mensajes y detalles observados se guardan en el historial familiar. Al empezar con Ayni y permitir la cámara, se comparte una captura solo cuando pides mirar algo, por ejemplo «mira acá». Puedes desactivar «Contexto visual en vivo». No se guardan fotos ni video de la cámara.</p>
+          <p className="text-sm text-slate-600">Groq recibe sus respuestas y los recuerdos necesarios para conversar, y los gustos del perfil para vestir a Ayni y ambientar la sala (sin nombres ni datos de la cuenta). Los mensajes y detalles observados se guardan en el historial familiar. Al empezar con Ayni y permitir la cámara, se comparte una captura solo cuando pides mirar algo, por ejemplo «mira acá». Puedes desactivar «Contexto visual en vivo». No se guardan fotos ni video de la cámara.</p>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
             <Button type="button" variant="ghost" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
@@ -320,7 +327,18 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
         scene={scene}
         activities={availableActivities}
         songMemory={selectedSong}
-        theme={themeFor(interests, memories.map((item) => item.title))}
+        look={look}
+        lookBusy={lookBusy}
+        lookNotice={lookNotice}
+        onNewLook={async () => {
+          if (lookBusy) return;
+          const variant = lookVariant + 1;
+          setLookBusy(true);
+          setLookNotice("");
+          try { setLook(await getLook(guide.id, variant)); setLookVariant(variant); }
+          catch (cause) { setLookNotice(cause instanceof Error ? cause.message : "No pudimos preparar otro look."); }
+          finally { setLookBusy(false); }
+        }}
         onPause={() => setPaused(true)}
         onResume={() => setPaused(false)}
         onNextActivity={nextActivity}

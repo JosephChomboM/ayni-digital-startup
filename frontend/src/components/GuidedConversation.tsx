@@ -4,11 +4,11 @@ import { History, Settings2, X, AudioLines, BookOpen, Camera, Images, Mic, MicOf
 import type { Memory } from "../api/memories";
 import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, transcribeAudio } from "../api/sessions";
-import type { ChatInput } from "../api/sessions";
+import type { ChatInput, LookSpec } from "../api/sessions";
 import type { CompanionState } from "./AyniCompanion";
 import { CompanionScene } from "./CompanionScene";
 import type { StageScene } from "./CompanionScene";
-import type { CompanionTheme } from "./companionTheme";
+
 import { SessionCamera } from "./SessionCamera";
 import { SongContext } from "./SongContext";
 import { interpretReply, requestsVisualContext, visualSource, speakLocally } from "./sessionSignals";
@@ -31,7 +31,10 @@ interface GuidedConversationProps {
   scene?: StageScene;
   activities: SessionActivity[];
   songMemory?: Memory;
-  theme?: CompanionTheme;
+  look?: LookSpec | null;
+  lookNotice?: string;
+  lookBusy?: boolean;
+  onNewLook?: () => void;
   onPause: (message: string) => void;
   onResume: () => void;
   onNextActivity: (preferred?: SessionActivity) => string;
@@ -39,7 +42,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, theme, onPause, onResume, onNextActivity, onFinish,
+  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
   const liveScene = true;
@@ -391,7 +394,7 @@ export function GuidedConversation({
       </div>
     </header>
 
-    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} theme={theme} camera={<div className="camera-dock">
+    <CompanionScene state={companionState} scene={scene} line={line} pending={pending} paused={paused} look={look} camera={<div className="camera-dock">
       <div className="camera-head">
         <h3>Tu cámara</h3>
         <button type="button" aria-label={camera ? "Apagar cámara" : "Activar cámara"} title={camera ? "Apagar cámara" : "Activar cámara"}
@@ -493,6 +496,16 @@ export function GuidedConversation({
             {pending && <p className="transcript-pending">Ayni está respondiendo…</p>}
           </div>
         </div>
+
+        {onNewLook && <div className="tool-block">
+          <h4>El look de Ayni</h4>
+          {look?.description && <p className="tool-hint">{look.description}.</p>}
+          <button type="button" className="tool-button" disabled={lookBusy} onClick={onNewLook}>
+            <Sparkles aria-hidden="true" className="mr-2 inline size-4" />{lookBusy ? "Ayni se está arreglando…" : "Otro look para Ayni"}
+          </button>
+          {lookNotice && <p role="status" className="tool-hint">{lookNotice}</p>}
+          <p className="tool-hint">Groq diseña la ropa de Ayni y la sala con los gustos del perfil. No recibe nombres ni datos de la cuenta.</p>
+        </div>}
 
         <div className="tool-block">
           <h4>Sobre la cámara</h4>
