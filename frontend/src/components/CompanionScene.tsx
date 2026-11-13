@@ -84,7 +84,7 @@ export function CompanionScene({ state, scene, line, pending, paused, extra, cam
     style={look ? { "--wall-a": look.wall[0], "--wall-b": look.wall[1] } as CSSProperties : undefined} data-arrived={arrived || undefined} data-paused={paused || undefined}>
     <div className="stage-room" aria-hidden="true">
       <span className="room-window"/>
-      <svg className="room-plant" viewBox="0 0 80 120"><path d="M40 78C38 52 22 40 8 38c4 18 16 30 32 40Zm0 0c2-30 14-48 32-54-2 24-14 42-32 54Zm0 0c-1-24-4-44-10-62 12 10 16 34 10 62Z" fill="#7fa58d"/><path d="M22 76h36l-5 40H27Z" fill="#c98a62"/></svg>
+      <svg className="room-plant" viewBox="0 0 80 120"><path d="M40 78C38 52 22 40 8 38c4 18 16 30 32 40Zm0 0c2-30 14-48 32-54-2 24-14 42-32 54Zm0 0c-1-24-4-44-10-62 12 10 16 34 10 62Z" fill="#7fa58d"/><path d="M22 76h36l-5 40H27Z" fill="#e76f51"/></svg>
       <span className="room-rug"/>
       {look?.decor.map((item, index) => <RoomDecor key={item.icon + look.description} icon={item.icon} color={look.accent_color}
         slot={`${item.place}${look.decor.slice(0, index).filter((other) => other.place === item.place).length ? "2" : ""}`} />)}
@@ -171,7 +171,7 @@ function RadioPlayer({ memory, paused }: { memory: Memory; paused: boolean }) {
 function RoomDecor({ icon, color, slot }: { icon: string; color: string; slot: string }) {
   const Icon = ROOM_ICONS[icon];
   if (!Icon) return null;
-  const ink = /^#(?:f|e)/i.test(color) ? "#235c50" : color;
+  const ink = /^#(?:f|e)/i.test(color) ? "#2c5f7c" : color;
   return <span className={`room-decor decor-${slot}`}>
     {slot.startsWith("wall") ? <span className="decor-frame"><Icon style={{ color: ink }} strokeWidth={1.6} /></span> :
       <span className="decor-stand"><Icon style={{ color: ink }} strokeWidth={1.6} /><i/></span>}

@@ -16,5 +16,20 @@ export default defineConfig(({ mode }) => {
         return html.replaceAll('content="/social-preview.png"', `content="${image}"`);
       },
     }],
+    server: {
+      proxy: {
+        "/api": {
+          target: env.VITE_API_PROXY_TARGET || "https://ayni-api-stage.onrender.com",
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/api/, ""),
+          configure: (proxy) => {
+            // The browser talks to Vite on localhost; the proxy forwards to Stage.
+            // Removing Origin lets the API handle the request without a browser CORS check.
+            proxy.on("proxyReq", (proxyRequest) => proxyRequest.removeHeader("origin"));
+          },
+        },
+      },
+    },
   };
 });

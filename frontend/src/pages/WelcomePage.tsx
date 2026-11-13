@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowRight, ArrowUpRight, Heart, Image, Music2, BookOpen, ShieldCheck, Sparkles, Check, Menu, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ArrowUpRight, Heart, Image, Music2, BookOpen, ShieldCheck, MessageCircle, Check, Menu, X } from "lucide-react";
 import type { User } from "../api/auth";
 import { Brand } from "../components/Brand";
 import { AyniCompanion } from "../components/AyniCompanion";
@@ -14,7 +14,26 @@ export function WelcomePage({ onLoginClick, onRegisterClick }: WelcomePageProps)
   const [year] = useState(() => new Date().getFullYear());
   const [menu, setMenu] = useState(false);
   const [example, setExample] = useState<keyof typeof examples>("photo");
+  const journeyGridRef = useRef<HTMLDivElement>(null);
   const sample = examples[example];
+  useEffect(() => {
+    const grid = journeyGridRef.current;
+    if (!grid || typeof IntersectionObserver === "undefined") return;
+
+    const cards = grid.querySelectorAll<HTMLElement>(".journey-card");
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.18, rootMargin: "0px 0px -32px 0px" });
+
+    grid.classList.add("journey-grid--reveal");
+    cards.forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, []);
   return <div className="welcome-page">
     <header className="public-header"><a href="#inicio" aria-label="Ayni, inicio"><Brand /></a>
       <nav className="public-links" aria-label="Secciones de Ayni"><a href="#como-funciona">Cómo funciona</a><a href="#conoce-ayni">Conoce a Ayni</a><a href="#preguntas">Preguntas</a></nav>
@@ -35,14 +54,14 @@ export function WelcomePage({ onLoginClick, onRegisterClick }: WelcomePageProps)
           <figure className="hero-photo"><img src="/images/recuerdos.jpg" alt="Un abuelo y sus nietos comparten un álbum de fotografías" fetchPriority="high"/><figcaption><Heart size={16}/> Las historias más bonitas son las nuestras.</figcaption></figure>
           <div className="memory-sticker"><Music2/><div><strong>Su canción favorita</strong><span>Un buen comienzo para conversar</span></div><span className="mini-wave" aria-hidden="true"><i/><i/><i/><i/></span></div>
           <div className="hero-companion"><AyniCompanion decorative/><p>Hola, soy <strong>Ayni.</strong><br/>¿Conversamos?</p></div>
-          <span className="collage-star" aria-hidden="true">✳</span>
+          <Heart className="collage-heart" aria-hidden="true" />
         </div>
       </section>
       <div className="landing-ribbon"><span><Image size={20}/> Fotos que cuentan</span><i/><span><Music2 size={20}/> Canciones que conectan</span><i/><span><BookOpen size={20}/> Historias que acompañan</span></div>
       <section className="landing-section" id="como-funciona">
         <div className="section-heading"><div><p className="eyebrow">TAN SENCILLO COMO ESTAR JUNTOS</p><h2>Un pequeño momento.<br/><em>Una gran conexión.</em></h2></div><p>No hace falta preparar un discurso ni recordar cada fecha. Solo traer un recuerdo y las ganas de escucharse.</p></div>
-        <div className="journey-grid">
-          {[{icon: Image,title:"Reúnan sus recuerdos",text:"Suban una foto, escriban una anécdota o compartan el enlace de una canción.",color:"peach"}, {icon:Sparkles,title:"Dejen que fluya",text:"Ayni propone preguntas a partir de sus recuerdos y sigue el hilo de la conversación.",color:"sage"}, {icon:Heart,title:"Guarden cómo les fue",text:"Al terminar, registren la reacción y compartan este pequeño momento con la familia.",color:"butter"}].map(({icon:Icon,title,text,color},i)=><article className={`journey-card ${color}`} key={title}><div><Icon size={30} strokeWidth={1.5}/><span>0{i+1}</span></div><h3>{title}</h3><p>{text}</p></article>)}
+        <div className="journey-grid" ref={journeyGridRef}>
+          {[{icon: Image,title:"Reúnan sus recuerdos",text:"Suban una foto, escriban una anécdota o compartan el enlace de una canción.",color:"peach"}, {icon:MessageCircle,title:"Dejen que fluya",text:"Ayni propone preguntas a partir de sus recuerdos y sigue el hilo de la conversación.",color:"sage"}, {icon:Heart,title:"Guarden cómo les fue",text:"Al terminar, registren la reacción y compartan este pequeño momento con la familia.",color:"butter"}].map(({icon:Icon,title,text,color},i)=><article className={`journey-card ${color}`} key={title}><div><Icon size={30} strokeWidth={1.7}/><span>0{i+1}</span></div><h3>{title}</h3><p>{text}</p></article>)}
         </div>
       </section>
       <section className="companion-intro" id="conoce-ayni">

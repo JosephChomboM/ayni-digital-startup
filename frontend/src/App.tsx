@@ -62,7 +62,7 @@ export function App() {
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
           <AyniCompanion state="thinking" className="loading-companion" decorative/>
-          <p className="text-xs font-semibold text-[#223e38]">Cargando Ayni Digital...</p>
+          <p className="text-xs font-semibold text-[#264653]">Cargando Ayni Digital...</p>
         </div>
       </div>
     );
@@ -114,14 +114,14 @@ export function App() {
       <main id="main-content" className="app-content" data-view={view}>
         <div className="workspace-caption"><span>AYNI / TU ESPACIO FAMILIAR</span><span><i/> Momentos que nos acercan</span></div>
         {view === "account" && currentUser && <section className="account-overview space-y-6" aria-labelledby="account-title">
-          <div><h1 id="account-title" className="text-3xl font-bold text-[#235c50]">Mi cuenta</h1><p className="mt-2 leading-relaxed">Esta es la cuenta con la que has iniciado sesión en Ayni.</p></div>
-          <dl className="divide-y divide-[#235c50]/15 rounded-2xl bg-white px-6">
+          <div><h1 id="account-title" className="text-3xl font-bold text-[#2c5f7c]">Mi cuenta</h1><p className="mt-2 leading-relaxed">Esta es la cuenta con la que has iniciado sesión en Ayni.</p></div>
+          <dl className="divide-y divide-[#2c5f7c]/15 rounded-2xl bg-white px-6">
             <div className="py-5"><dt className="text-sm text-gray-600">Nombre</dt><dd className="mt-1 break-words text-lg font-semibold">{currentUser.name || "Nombre no disponible"}</dd></div>
             <div className="py-5"><dt className="text-sm text-gray-600">Correo electrónico</dt><dd className="mt-1 break-all">{currentUser.email}</dd></div>
             <div className="py-5"><dt className="text-sm text-gray-600">Tu participación</dt><dd className="mt-1 font-semibold">{currentUser.role === "cuidador_principal" ? "Persona cuidadora principal" : "Familiar invitado"}</dd><dd className="mt-2 text-sm leading-relaxed">{currentUser.role === "cuidador_principal" ? "Puedes gestionar el perfil de la persona acompañada e invitar a tu familia." : "Puedes consultar el perfil de la persona acompañada y aportar recuerdos."}</dd></div>
           </dl>
           <p className="text-sm leading-relaxed text-gray-600">El perfil de la persona acompañada está en “Perfil familiar”. La edición del nombre y correo de tu cuenta aún no está disponible. Desde aquí puedes revisar el plan y la configuración familiar.</p>
-          <div className="flex flex-wrap gap-3"><button onClick={() => setView("profile")} className="min-h-12 rounded-lg bg-[#235c50] px-5 font-semibold text-white">Ver persona y familia</button><button onClick={() => setView("billing")} className="min-h-12 rounded-lg border border-[#235c50]/30 px-5 font-semibold text-[#235c50]">Plan familiar</button><button onClick={() => setView("settings")} className="min-h-12 rounded-lg border border-[#235c50]/30 px-5 font-semibold text-[#235c50]">Configuración y privacidad</button><button onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }} className="min-h-12 rounded-lg border border-[#235c50]/30 px-5 font-semibold">Cerrar sesión</button></div>
+          <div className="flex flex-wrap gap-3"><button onClick={() => setView("profile")} className="min-h-12 rounded-lg bg-[#2c5f7c] px-5 font-semibold text-white">Ver persona y familia</button><button onClick={() => setView("billing")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Plan familiar</button><button onClick={() => setView("settings")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Configuración y privacidad</button><button onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold">Cerrar sesión</button></div>
         </section>}
 
         {view === "settings" && currentUser && <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} onUserUpdated={setCurrentUser} />}
@@ -158,7 +158,7 @@ export function App() {
             {currentUser && <FamilyDashboard currentUser={currentUser} onOpenMemories={() => setView("memories")} onOpenSession={() => setView("session")} />}
           </div>
         )}
-        {view === "billing" && <div className="module-container plan-page space-y-4"><h1 className="text-2xl font-bold text-[#235c50]">Tu plan familiar</h1><BillingPanel /></div>}
+        {view === "billing" && <div className="module-container plan-page space-y-4"><h1 className="text-2xl font-bold text-[#2c5f7c]">Tu plan familiar</h1><BillingPanel /></div>}
       </main>
     </div>
   );

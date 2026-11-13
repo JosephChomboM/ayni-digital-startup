@@ -15,7 +15,7 @@ export function AyniCompanion({ state = "idle", className = "", decorative = fal
     <svg viewBox="0 0 260 250" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-shell`} x1="70" y1="45" x2="185" y2="202" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#fffdf5"/><stop offset="1" stopColor="#c7e2d5"/>
+          <stop stopColor="#ffffff"/><stop offset="1" stopColor="#c7e2d5"/>
         </linearGradient>
         <linearGradient id={`${id}-face`} x1="78" y1="95" x2="181" y2="154" gradientUnits="userSpaceOnUse">
           <stop stopColor="#294c43"/><stop offset="1" stopColor="#122e28"/>
@@ -23,7 +23,7 @@ export function AyniCompanion({ state = "idle", className = "", decorative = fal
       </defs>
       <ellipse className="robot-shadow" cx="130" cy="225" rx="59" ry="10" fill="#1f5140" opacity=".12"/>
       <g className="robot-body">
-        <path className="robot-antenna" d="M130 68V44" stroke="#467967" strokeWidth="7" strokeLinecap="round"/>
+        <path className="robot-antenna" d="M130 68V44" stroke="#2c5f7c" strokeWidth="7" strokeLinecap="round"/>
         <circle className="robot-light" cx="130" cy="36" r="12" fill="#edab7c" stroke="#fff6dd" strokeWidth="4"/>
         <rect x="36" y="108" width="24" height="45" rx="12" fill="#90baaa"/>
         <rect x="200" y="108" width="24" height="45" rx="12" fill="#90baaa"/>

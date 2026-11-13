@@ -25,7 +25,7 @@ function Progress({
     >
       <div
         data-slot="progress-indicator"
-        className="h-full bg-[#235c50] transition-all duration-300 ease-in-out rounded-full"
+        className="h-full bg-[#2c5f7c] transition-all duration-300 ease-in-out rounded-full"
         style={{ width: `${percentage}%` }}
       />
     </div>
@@ -36,7 +36,7 @@ function ProgressLabel({ className, ...props }: React.HTMLAttributes<HTMLSpanEle
   return (
     <span
       data-slot="progress-label"
-      className={cn("text-xs font-semibold text-[#223e38]", className)}
+      className={cn("text-xs font-semibold text-[#264653]", className)}
       {...props}
     />
   )
@@ -46,7 +46,7 @@ function ProgressValue({ className, value, ...props }: React.HTMLAttributes<HTML
   return (
     <span
       data-slot="progress-value"
-      className={cn("ml-auto text-xs font-mono font-bold text-[#235c50]", className)}
+      className={cn("ml-auto text-xs font-mono font-bold text-[#2c5f7c]", className)}
       {...props}
     >
       {props.children ?? `${value ?? 0}%`}

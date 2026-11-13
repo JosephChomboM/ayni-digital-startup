@@ -6,16 +6,16 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#235c50] select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c5f7c] select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-[#235c50] text-white hover:bg-[#194b40] shadow-xs",
-        outline: "border-gray-300 bg-white text-[#223e38] hover:bg-gray-50",
-        secondary: "bg-[#b94c35] text-white hover:bg-[#9e3f2c] shadow-xs",
-        ghost: "hover:bg-gray-100 text-[#223e38]",
+        default: "bg-[#2c5f7c] text-white hover:bg-[#244f68] shadow-xs",
+        outline: "border-gray-300 bg-white text-[#264653] hover:bg-gray-50",
+        secondary: "bg-[#e76f51] text-white hover:bg-[#9e3f2c] shadow-xs",
+        ghost: "hover:bg-gray-100 text-[#264653]",
         destructive: "bg-red-600 text-white hover:bg-red-700",
-        link: "text-[#235c50] underline-offset-4 hover:underline",
+        link: "text-[#2c5f7c] underline-offset-4 hover:underline",
       },
       size: {
         default: "min-h-11 px-4 py-2 text-sm",

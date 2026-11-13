@@ -72,7 +72,7 @@ function drawTracking(canvas: HTMLCanvasElement | null, video: HTMLVideoElement 
     dots([11, 12, 13, 14, 15, 16, 23, 24].map((index) => body[index]).filter(Boolean), "#f3c09b", 3.5, true);
   }
   for (const hand of hands) {
-    lines(hand, HAND_LINKS, "#edce84dd");
+    lines(hand, HAND_LINKS, "#f4a261dd");
     dots(hand, "#fff3c4", 2.6);
   }
   if (face.length) dots(FACE_POINTS.map((index) => face[index]).filter(Boolean), "#d6efbbe6", 1.9);
