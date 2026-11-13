@@ -19,6 +19,7 @@ from app.modules.sessions.conversation import (
     ConversationTurn,
     select_conversation_turn,
 )
+from app.modules.sessions.look import LookSpec, generate_look
 from app.modules.sessions.models import FamilySession
 from app.modules.sessions.repository import SessionsRepository
 from app.modules.sessions.schemas import (
@@ -403,6 +404,19 @@ class SessionsService:
                 limit=query.limit,
                 offset=query.offset,
             )
+
+    def look(self, actor_id: UUID, session_id: UUID, variant: int = 0) -> LookSpec:
+        """Pide a la IA la ropa de Ayni y la sala según los gustos del perfil."""
+        guide = self.get_session(actor_id, session_id)
+        interests = self.families.get_elder_profile(actor_id).interests
+        titles = []
+        for step in guide.steps:
+            if not step.memory_available or not step.memory_id:
+                continue
+            memory = self.memories.get_memory(actor_id, step.memory_id)
+            if memory.is_positive and not memory.is_sensitive and not memory.deletion_pending:
+                titles.append(memory.title)
+        return generate_look(list(interests), titles, variant)
 
     def get_session(self, actor_id: UUID, session_id: UUID) -> SessionDetail:
         profile_id = self._profile(actor_id)

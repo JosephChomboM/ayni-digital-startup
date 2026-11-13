@@ -108,3 +108,17 @@ export async function imageForConversation(source: Blob | HTMLVideoElement): Pro
     return canvas.toDataURL("image/jpeg", 0.8);
   } finally { if (bitmap instanceof ImageBitmap) bitmap.close(); }
 }
+
+/** Diseño del look de Ayni que arma la IA a partir de los gustos del perfil. */
+export interface LookSpec {
+  hat: "none" | "fedora" | "straw" | "chef" | "beret" | "bucket" | "cap" | "beanie" | "headphones" | "flower_crown";
+  body: "none" | "bowtie" | "tie" | "apron" | "sash" | "scarf" | "bandana" | "cardigan" | "stripes" | "necklace";
+  glasses: boolean;
+  hat_color: string;
+  outfit_color: string;
+  accent_color: string;
+  wall: [string, string];
+  decor: { icon: string; place: "wall" | "floor" }[];
+  description: string;
+}
+export const getLook = (id: string, variant = 0) => apiFetch<LookSpec>(`${route(id)}/look?variant=${variant}`);
