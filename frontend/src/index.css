@@ -1250,6 +1250,19 @@
 .auth-page>header {
   padding-block:25px
 }
+.auth-login-companion-avatar {
+  display:grid;
+  width:42px;
+  height:42px;
+  flex:none;
+  place-items:center;
+  overflow:hidden;
+  border-radius:50%;
+  background:#edf6ef;
+}
+.auth-login-companion-avatar .ayni-robot {
+  width:48px;
+}
 .auth-page>main {
   gap:65px;
   padding-top:25px;

@@ -17,6 +17,12 @@ import { Button } from "./ui/button";
 
 export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
+const SESSION_STARTERS = [
+  "Cuéntame qué te gusta de este recuerdo.",
+  "¿Qué canción te gustaría escuchar juntos?",
+  "Prefiero empezar escuchando.",
+];
+
 interface GuidedConversationProps {
   sessionId: string;
   activeMemoryId?: string;
@@ -373,6 +379,15 @@ export function GuidedConversation({
         catch { setAiError("No pudimos preparar la foto. Prueba con otra imagen."); }
       }}><Sparkles aria-hidden="true" className="size-4" />Analizar foto con IA</button>}
     </>} />
+
+    {messages.length === 1 && messages[0]?.from === "ayni" && !pending && !aiError && !paused && <div className="session-starters" aria-label="Ideas para iniciar la conversación">
+      <p className="text-sm font-semibold text-[#435d60]">Si te ayuda, puedes empezar por aquí</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {SESSION_STARTERS.map((starter) => <button key={starter} type="button" disabled={pending}
+          className="min-h-11 rounded-full border border-[#c6d9d5] bg-white px-4 py-2 text-left text-sm font-semibold text-[#235c50] transition-colors hover:bg-[#edf6ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c50]"
+          onClick={() => receive(starter)}>{starter}</button>)}
+      </div>
+    </div>}
 
     {(observations.length > 0 || aiError || (!aiError && suggestion !== "continue")) && <div className="stage-notes">
       {observations.length > 0 && <div className="note-observed"><strong>Ayni notó:</strong><ul>{observations.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}

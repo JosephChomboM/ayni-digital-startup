@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { ArrowLeft, Mail, Lock, Users, ShieldCheck, Loader2, Phone, Eye, EyeOff } from "lucide-react";
 import { Brand } from "../components/Brand";
 import { AyniCompanion } from "../components/AyniCompanion";
@@ -29,6 +29,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [profilePendingUser, setProfilePendingUser] = useState<UserType | null>(null);
 
   const [email, setEmail] = useState("");
+  const emailInput = useRef<HTMLInputElement>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -91,7 +92,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (Array.from(password).length < 10) {
+    if (mode === "register" && Array.from(password).length < 10) {
       setError("La contraseña debe tener al menos 10 caracteres.");
       return;
     }
@@ -178,7 +179,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <ArrowLeft className="size-4" /> Volver al inicio
         </button>
 
-        <Brand />
+        <div className="flex items-center gap-4">
+          <Brand />
+          {mode === "login" && <div className="auth-login-companion hidden items-center gap-3 sm:flex">
+            <span className="auth-login-companion-avatar"><AyniCompanion decorative /></span>
+            <span className="max-w-40 text-xs leading-snug text-[#435d60]">Ayni te espera para compartir un recuerdo, a tu ritmo.</span>
+            <Button type="button" variant="outline" className="min-h-10 whitespace-nowrap border-[#c6d9d5] text-[#235c50]" onClick={() => emailInput.current?.focus()}>
+              Empezar juntos
+            </Button>
+          </div>}
+        </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-7 px-4 pb-8 sm:px-8 lg:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)] lg:items-start lg:gap-14">
@@ -306,6 +316,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   <Mail className="absolute left-3 top-3 size-4 text-gray-400" />
                   <Input
                     id="auth-email"
+                    ref={emailInput}
                     type="email"
                     required={!googleProof}
                     disabled={Boolean(googleProof)}
@@ -325,7 +336,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     id="auth-password"
                     type={showPassword ? "text" : "password"}
                     required
-                    minLength={10}
+                    minLength={mode === "register" ? 10 : undefined}
                     autoComplete={mode === "register" ? "new-password" : "current-password"}
                     aria-describedby="auth-password-help"
                     value={password}

@@ -31,6 +31,51 @@ export interface MemoryList {
   offset: number;
 }
 
+export interface FamilyMemoryPhoto {
+  id: string;
+  memory_id: string;
+  created_by: string;
+  content_type: string;
+  size_bytes: number;
+  width: number;
+  height: number;
+  created_at: string;
+  url: string;
+  url_expires_at: string;
+}
+
+interface MemoryPhotoList {
+  items: FamilyMemoryPhoto[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export async function listPhotosForMemories(memories: Memory[]): Promise<FamilyMemoryPhoto[]> {
+  const photoLists = await Promise.all(memories
+    .filter((memory) => !memory.deletion_pending)
+    .map(async (memory) => {
+      const photos: FamilyMemoryPhoto[] = [];
+      let offset = 0;
+      let total = 0;
+
+      do {
+        const query = new URLSearchParams({ limit: "100", offset: String(offset) });
+        const page = await apiFetch<MemoryPhotoList>(
+          `/memories/${encodeURIComponent(memory.id)}/photos?${query}`,
+        );
+        photos.push(...page.items);
+        total = page.total;
+        offset += page.items.length;
+        if (!page.items.length) break;
+      } while (offset < total);
+
+      return photos;
+    }));
+
+  return photoLists.flat();
+}
+
 function boundedText(value: string, limit: number, label: string): string {
   const text = value.trim();
   if (!text || Array.from(text).length > limit) {
