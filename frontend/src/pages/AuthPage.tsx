@@ -103,7 +103,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (mode === "register" && Array.from(password).length < 10) {
+    if (Array.from(password).length < 10) {
       setError("La contraseña debe tener al menos 10 caracteres.");
       return;
     }
@@ -358,7 +358,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     id="auth-password"
                     type={showPassword ? "text" : "password"}
                     required
-                    minLength={mode === "register" ? 10 : undefined}
+                    minLength={10}
                     autoComplete={mode === "register" ? "new-password" : "current-password"}
                     aria-describedby="auth-password-help"
                     value={password}
