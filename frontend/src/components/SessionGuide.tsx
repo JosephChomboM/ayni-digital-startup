@@ -309,6 +309,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       </section>}
       {started && guide && <GuidedConversation
         key={guide.id}
+        onBack={() => { setStarted(false); refreshHistory(); }}
         sessionId={guide.id}
         activeMemoryId={activity === "song" ? selectedSong?.id : activity === "anecdote" ? selectedAnecdote?.id :
           activity === "photo" ? photos[photoIndex % Math.max(photos.length, 1)]?.memory_id : undefined}
@@ -343,7 +344,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
         onNextActivity={nextActivity}
         onFinish={finish}
       />}
-      {started && <Button variant="outline" onClick={() => { setStarted(false); refreshHistory(); }}>Volver al historial</Button>}
+
 
       {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
         <div><p className="text-sm font-semibold text-[#b94c35]">Al terminar</p><h2 className="text-xl font-semibold text-[#235c50]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
