@@ -9,7 +9,7 @@ import type { LookSpec } from "../api/sessions";
  */
 export type BuddyPose = "none" | "walk" | "wave" | "present" | "music" | "story";
 
-/** Ayni de cuerpo entero: camina, saluda, gesticula y abre su compartimento de música. */
+/** Ayni de cuerpo entero: búho de compañía que camina, saluda y presenta recuerdos. */
 export function AyniBuddy({ state, pose, look = null }: { state: CompanionState; pose: BuddyPose; look?: LookSpec | null }) {
   const id = useId();
   return <div className="ayni-buddy" data-state={state} data-pose={pose}
@@ -54,26 +54,39 @@ export function AyniBuddy({ state, pose, look = null }: { state: CompanionState;
 
         <g className="buddy-head">
           <rect x="94" y="136" width="12" height="16" rx="5" fill="#8fb3c9"/>
-          <path className="buddy-antenna" d="M100 42V22" stroke="#2c5f7c" strokeWidth="6" strokeLinecap="round"/>
-          <circle className="buddy-light" cx="100" cy="15" r="10" fill="#edab7c" stroke="#fff6dd" strokeWidth="4"/>
-          <rect x="16" y="76" width="18" height="38" rx="9" fill="#8fb3c9"/>
-          <rect x="166" y="76" width="18" height="38" rx="9" fill="#8fb3c9"/>
-          <rect x="28" y="40" width="144" height="104" rx="42" fill={`url(#${id}-shell)`} stroke="#8fb3c9" strokeWidth="2"/>
-          <path d="M50 58Q63 48 80 52" stroke="white" strokeWidth="5" strokeLinecap="round"/>
-          <rect x="43" y="60" width="114" height="68" rx="27" fill={`url(#${id}-face)`}/>
-          <g className="buddy-eyes" fill="#f4d58d">
-            <rect x="69" y="78" width="12" height="21" rx="6"/>
-            <rect x="119" y="78" width="12" height="21" rx="6"/>
+          <path className="buddy-tuft buddy-tuft-left" d="M44 66 39 27Q61 37 77 56" fill="#2c5f7c" stroke="#244f68" strokeWidth="3" strokeLinejoin="round"/>
+          <path className="buddy-tuft buddy-tuft-right" d="m156 66 5-39q-22 10-38 29" fill="#2c5f7c" stroke="#244f68" strokeWidth="3" strokeLinejoin="round"/>
+          <rect x="13" y="73" width="22" height="38" rx="11" fill="#8fb3c9"/>
+          <rect x="165" y="73" width="22" height="38" rx="11" fill="#8fb3c9"/>
+          <path d="M22 76Q22 43 55 41Q78 32 100 41Q122 32 145 41Q178 43 178 76V101Q178 139 145 151H55Q22 139 22 101Z" fill={`url(#${id}-shell)`} stroke="#8fb3c9" strokeWidth="2"/>
+          <path d="M32 91Q35 62 62 60Q78 59 87 74Q100 56 113 74Q122 59 138 60Q165 62 168 91L163 119Q153 143 100 146Q47 143 37 119Z" fill="#fff8ed"/>
+          <path d="M43 58Q57 48 72 52" stroke="white" strokeWidth="5" strokeLinecap="round"/>
+          <g className="buddy-eyes">
+            <g className="buddy-eye buddy-eye-left">
+              <circle cx="72" cy="88" r="21" fill="#ffffff"/>
+              <circle cx="73" cy="89" r="13" fill="#f4d58d"/>
+              <circle cx="75" cy="90" r="7" fill="#264653"/>
+              <circle cx="78" cy="86" r="2.8" fill="#ffffff"/>
+            </g>
+            <g className="buddy-eye buddy-eye-right">
+              <circle cx="128" cy="88" r="21" fill="#ffffff"/>
+              <circle cx="127" cy="89" r="13" fill="#f4d58d"/>
+              <circle cx="125" cy="90" r="7" fill="#264653"/>
+              <circle cx="122" cy="86" r="2.8" fill="#ffffff"/>
+            </g>
           </g>
-          <g className="buddy-eyes-closed" stroke="#f4d58d" strokeWidth="3.5" strokeLinecap="round">
-            <path d="M68 92Q75 97 82 92"/><path d="M118 92Q125 97 132 92"/>
+          <g className="buddy-eyes-closed" stroke="#264653" strokeWidth="3.5" strokeLinecap="round">
+            <path d="M55 91q17 11 34 0M111 91q17 11 34 0"/>
           </g>
-          <ellipse cx="60" cy="106" rx="9" ry="4" fill="#f3c09b" opacity=".4"/>
-          <ellipse cx="140" cy="106" rx="9" ry="4" fill="#f3c09b" opacity=".4"/>
-          <path className="buddy-smile" d="M89 107Q100 118 111 107" stroke="#f4d58d" strokeWidth="3" strokeLinecap="round"/>
-          <g className="buddy-mouth" stroke="#f4d58d" strokeWidth="4" strokeLinecap="round">
-            <path d="M87 106V112"/><path d="M95 102V116"/><path d="M103 104V114"/><path d="M111 106V112"/>
+          <path d="M52 64q18-10 34 0M114 64q16-10 34 0" stroke="#244f68" strokeWidth="4" strokeLinecap="round"/>
+          <ellipse cx="48" cy="111" rx="8" ry="4" fill="#e76f51" opacity=".45"/>
+          <ellipse cx="152" cy="111" rx="8" ry="4" fill="#e76f51" opacity=".45"/>
+          <path className="buddy-smile" d="m91 105 9-9 9 9-9 13Z" fill="#e76f51" stroke="#bf583f" strokeWidth="1.5" strokeLinejoin="round"/>
+          <g className="buddy-mouth">
+            <path d="m90 105 10-9 10 9-10 7Z" fill="#e76f51" stroke="#bf583f" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="m93 115 7-3 7 3-7 7Z" fill="#f4a261" stroke="#bf583f" strokeWidth="1.5" strokeLinejoin="round"/>
           </g>
+          <path className="buddy-light" d="M92 45q8-12 16 0-8 6-16 0Z" fill="#f4d58d" stroke="#e9b85c" strokeWidth="1.5"/>
           <g className="buddy-thinking" fill="#f4d58d">
             <circle cx="176" cy="30" r="4"/><circle cx="188" cy="18" r="5.5"/><circle cx="198" cy="2" r="7"/>
           </g>
@@ -85,12 +98,12 @@ export function AyniBuddy({ state, pose, look = null }: { state: CompanionState;
 
         {/* Los brazos van al final para poder cruzar delante de la cabeza al escuchar o pensar. */}
         <g className="buddy-arm buddy-arm-left">
-          <rect x="40" y="156" width="20" height="58" rx="10" fill="#8fb3c9"/>
-          <circle cx="49" cy="220" r="12" fill="#d9e9dd" stroke="#8eb7a4" strokeWidth="2"/>
+          <path d="M58 161Q34 153 27 176Q22 197 48 211Q63 202 66 181Z" fill="#397a98" stroke="#2c5f7c" strokeWidth="2"/>
+          <path d="M34 177q8 8 14 8m-10 4q7 7 14 7" stroke="#d6e8f1" strokeWidth="3" strokeLinecap="round"/>
         </g>
         <g className="buddy-arm buddy-arm-right">
-          <rect x="140" y="156" width="20" height="58" rx="10" fill="#8fb3c9"/>
-          <circle cx="151" cy="220" r="12" fill="#d9e9dd" stroke="#8eb7a4" strokeWidth="2"/>
+          <path d="M142 161Q166 153 173 176Q178 197 152 211Q137 202 134 181Z" fill="#397a98" stroke="#2c5f7c" strokeWidth="2"/>
+          <path d="M166 177q-8 8-14 8m10 4q-7 7-14 7" stroke="#d6e8f1" strokeWidth="3" strokeLinecap="round"/>
         </g>
       </g>
 

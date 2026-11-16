@@ -197,6 +197,27 @@
   transform-origin:130px 118px;
   animation:robot-blink 6s infinite
 }
+.owl-eyes-closed {
+  display:none;
+  transform-origin:130px 122px
+}
+.owl-ear,.owl-wing,.owl-brow {
+  transform-box:fill-box;
+  transition:transform .35s ease,filter .35s ease
+}
+.owl-ear-left { transform-origin:100% 100% }
+.owl-ear-right { transform-origin:0 100% }
+.owl-wing-left { transform-origin:100% 10% }
+.owl-wing-right { transform-origin:0 10% }
+.owl-brow-left { transform-origin:100% 50% }
+.owl-brow-right { transform-origin:0 50% }
+.ayni-owl[data-mood=curious] .owl-ear-left { transform:rotate(-8deg) }
+.ayni-owl[data-mood=curious] .owl-ear-right { transform:rotate(8deg) }
+.ayni-owl[data-mood=curious] .owl-brow-left { transform:rotate(-9deg) }
+.ayni-owl[data-mood=curious] .owl-brow-right { transform:rotate(9deg) }
+.ayni-owl[data-mood=joyful] .owl-wing-left { transform:rotate(-9deg) }
+.ayni-owl[data-mood=joyful] .owl-wing-right { transform:rotate(9deg) }
+.ayni-owl[data-mood=joyful] .owl-beak { filter:brightness(1.08) }
 .robot-speech {
   display:none
 }
@@ -229,6 +250,8 @@
 .ayni-robot[data-state=paused] .robot-eyes {
   transform:scaleY(.15)
 }
+.ayni-robot[data-state=paused] .robot-eyes { display:none }
+.ayni-robot[data-state=paused] .owl-eyes-closed { display:block }
 @keyframes robot-float {
   50% {
     transform:translateY(-7px) rotate(2deg)
@@ -2860,7 +2883,7 @@
 .buddy-hatch { transform-origin:100px 176px; transition:transform .6s cubic-bezier(.34,1.4,.64,1) }
 .buddy-eyes { transform-origin:100px 88px; animation:buddy-blink 5.5s infinite }
 .buddy-shadow { transform-origin:100px 290px }
-.buddy-light { transform-origin:100px 15px }
+.buddy-light { transform-origin:100px 45px }
 .buddy-eyes-closed,.buddy-mouth,.buddy-thinking,.buddy-sleep,.buddy-notes { display:none }
 
 /* Estados de la conversación */
@@ -3213,4 +3236,51 @@
 .conversation-room .stage-prop { overflow-x: hidden; }
 @media (max-width: 767px) {
   .conversation-room .companion-tools[data-open] { grid-area: 1 / 1 / -1 / -1; }
+}
+
+/* Al comenzar, la conversación ocupa toda la ventana y deja el espacio para la familia. */
+.app-shell:has(.conversation-room) {
+  height:100dvh;
+  min-height:0;
+  overflow:hidden
+}
+.app-shell:has(.conversation-room) .app-sidebar { display:none }
+.app-content:has(.conversation-room) {
+  position:fixed;
+  inset:0;
+  z-index:40;
+  width:100vw;
+  height:100dvh;
+  max-width:none;
+  margin:0;
+  padding:0;
+  overflow:hidden
+}
+.conversation-room {
+  width:100%;
+  height:100%;
+  min-height:0;
+  grid-template-columns:minmax(0,1fr) 320px;
+  border:0;
+  border-radius:0;
+  box-shadow:none
+}
+.conversation-room > .buddy-stage {
+  --buddy-w:clamp(130px,14vw,220px);
+  padding:22px 22px 18px;
+}
+@media (max-width:1000px) {
+  .conversation-room { grid-template-columns:minmax(0,1fr) 280px }
+}
+@media (max-width:767px) {
+  .app-content:has(.conversation-room) { padding:0 }
+  .conversation-room {
+    height:100dvh;
+    grid-template-columns:minmax(0,1fr);
+    border-radius:0
+  }
+  .conversation-room > .buddy-stage {
+    --buddy-w:clamp(62px,17vw,100px);
+    padding:10px 10px 70px
+  }
 }
