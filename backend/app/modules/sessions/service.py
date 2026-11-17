@@ -183,8 +183,7 @@ class SessionsService:
                 )[:1800]
             )
             if active.type == "song" and all(
-                active.id != step.memory_id
-                for step in self.get_session(actor_id, session_id).steps
+                active.id != step.memory_id for step in self.get_session(actor_id, session_id).steps
             ):
                 music = self.memories.get_song_context(actor_id, active.id)
                 if music.get("status") == "confirmed":
