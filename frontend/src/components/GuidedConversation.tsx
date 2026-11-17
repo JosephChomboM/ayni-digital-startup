@@ -82,6 +82,7 @@ export function GuidedConversation({
   const request = useRef<AbortController | null>(null);
   const [aiError, setAiError] = useState("");
   const [recovering, setRecovering] = useState(false);
+  const failedTurns = useRef(0);
   const [suggestion, setSuggestion] = useState("continue");
   const [observations, setObservations] = useState<string[]>([]);
   const lastAttempt = useRef<ChatInput | null>(null);
@@ -156,6 +157,7 @@ export function GuidedConversation({
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
       const result = await sendMessage(sessionId, payload, signal);
       if (controller.signal.aborted) return;
+      failedTurns.current = 0;
       setSuggestion(result.suggestion);
       setObservations(image ? result.observations : []);
       show(result.text, false);
@@ -173,10 +175,20 @@ export function GuidedConversation({
         return;
       }
       setObservations([]);
-      setRecovering(true);
-      setAiError(cause instanceof ApiError
-        ? cause.message
-        : "No pude responder ahora. Tu mensaje sigue en la conversación; puedes reintentarlo.");
+      failedTurns.current += 1;
+      if (failedTurns.current === 1) {
+        const followUp = scene?.kind === "song"
+          ? "Podemos seguir a tu ritmo. ¿Qué te hace sentir esta canción o qué recuerdo te trae?"
+          : scene?.kind === "photo"
+            ? "Podemos seguir a tu ritmo. ¿Qué más recuerdas de ese momento en familia?"
+            : "Podemos seguir a tu ritmo. ¿Qué más te gustaría contar de ese momento?";
+        show(followUp);
+      } else {
+        setRecovering(true);
+        setAiError(cause instanceof ApiError
+          ? cause.message
+          : "No pude responder ahora. Tu mensaje sigue en la conversación; puedes reintentarlo.");
+      }
     } finally {
       if (request.current === controller) { request.current = null; setPending(false); }
     }

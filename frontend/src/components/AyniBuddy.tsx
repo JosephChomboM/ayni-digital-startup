@@ -10,5 +10,5 @@ export function AyniBuddy({ state, pose, mood = "warm" }: {
   pose: BuddyPose;
   mood?: BuddyMood;
 }) {
-  return <AyniCompanion state={state} mood={mood} animation={pose} className="session-owl" decorative />;
+  return <AyniCompanion state={state} mood={mood} animation={pose} className="session-owl" />;
 }

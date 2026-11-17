@@ -207,7 +207,7 @@ export function UploadModule() {
             </label>
           </div>
           {photoError && <p role="alert" className="text-sm text-red-700">{photoError}</p>}
-          {pendingPhotos.length > 0 && <p className="memory-selected-count">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto lista" : "fotos listas"} para acompañar la historia</p>}
+          {pendingPhotos.length > 0 && <p className="memory-selected-count">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada; se guardarán" : "fotos seleccionadas; se guardarán"} junto con el recuerdo.</p>}
           {pendingPhotos.length > 0 && <StagedPhotoGrid files={pendingPhotos} onRemove={(index) => setPendingPhotos((items) => items.filter((_, itemIndex) => itemIndex !== index))} />}
           {pendingPhotos.length === 0 && <p className="memory-photo-empty"><ImagePlus size={19} aria-hidden="true"/> Puedes agregar una o varias fotos; aparecerán aquí antes de guardar.</p>}
         </section>
@@ -215,18 +215,18 @@ export function UploadModule() {
         <div className="memory-story-section">
           <div className="memory-section-heading"><span className="memory-step-number">02</span><div><h3>Guardar un recuerdo</h3><p>Una historia o canción puede abrir una conversación especial.</p></div></div>
           <div className="memory-kind-tabs" role="tablist" aria-label="Tipo de recuerdo">
-            <button type="button" role="tab" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }}>
+            <button type="button" role="tab" aria-label="Anécdota" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }}>
               <FileText aria-hidden="true"/><span>Anécdota</span><small>Un momento contado</small>
             </button>
-            <button type="button" role="tab" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }}>
+            <button type="button" role="tab" aria-label="Canción" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }}>
               <Music2 aria-hidden="true"/><span>Canción</span><small>Una melodía especial</small>
             </button>
           </div>
           <div className="memory-compose-layout">
             <div className="memory-compose-main">
               <div className="memory-fields flex flex-col gap-1.5">
-                <label htmlFor="memory-title">Título del recuerdo <small>Un nombre corto para encontrarlo luego</small></label>
-                <Input id="memory-title" required maxLength={100} value={title} disabled={pending}
+                <label htmlFor="memory-title">Título del recuerdo <small id="memory-title-help">Un nombre corto para encontrarlo luego</small></label>
+                <Input id="memory-title" aria-label="Título del recuerdo" aria-describedby="memory-title-help" required maxLength={100} value={title} disabled={pending}
                   onChange={(e) => { setTitle(e.target.value); setSuccess(null) }}
                   placeholder="Ej. Un paseo en familia" className="memory-title-input" />
                 {memoryMode === "anecdote" && <label htmlFor="memory" className="memory-story-label"><FileText aria-hidden="true"/> Una anécdota especial</label>}
@@ -242,7 +242,7 @@ export function UploadModule() {
               </div>
 
               {memoryMode === "song" && <div className="memory-song-field">
-                <label htmlFor="song"><span><Music2 aria-hidden="true"/> Enlace de YouTube o Spotify</span><span className="memory-song-provider"><SpotifyIcon/> YouTube · Spotify</span></label>
+                <label htmlFor="song"><span><Music2 aria-hidden="true"/> Canción de YouTube o Spotify</span><span className="memory-song-provider"><SpotifyIcon/> YouTube · Spotify</span></label>
                 <div className="relative">
                   <Link2 className="absolute left-4 top-4 size-4 text-[#829397]" aria-hidden="true" />
                   <Input id="song" type="url" maxLength={2048} disabled={pending} value={song}
@@ -383,7 +383,7 @@ export function Contributions({ revision = 0, busy = false, onAdd, onDeletePhoto
       <header className="memory-collection-header">
         <div><p className="memory-collection-kicker">HISTORIAS QUE NOS ACERCAN</p><h2 id="memory-collection-title">El álbum de la familia</h2><p>Encuentra una anécdota, una canción o una foto para volver a compartir.</p></div>
         <div className="memory-collection-count"><strong>{loading ? "—" : total}</strong><span>{total === 1 ? "recuerdo" : "recuerdos"}</span></div>
-        {onAdd && <Button type="button" onClick={onAdd} className="memory-collection-add"><ImagePlus size={17} aria-hidden="true"/> Agregar recuerdo</Button>}
+        {onAdd && <Button type="button" onClick={onAdd} className="memory-collection-add"><ImagePlus size={17} aria-hidden="true"/> Añadir otro recuerdo</Button>}
       </header>
 
       <div className="memory-filter-area">
@@ -416,7 +416,7 @@ export function Contributions({ revision = 0, busy = false, onAdd, onDeletePhoto
           <div className="memory-entry-body">
             <div className="memory-entry-top"><span className={`memory-kind memory-kind-${memory.type}`}>{memory.type === "song" ? "Canción" : "Anécdota"}</span><time dateTime={memory.created_at}>{formatMemoryDate(memory.created_at)}</time></div>
             <div className="memory-entry-heading"><h3>{memory.title}</h3>{canManage && <div className="memory-entry-actions">{onEdit && <button type="button" disabled={busy || memory.deletion_pending} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}><Pencil size={16}/></button>}{onDelete && <button type="button" disabled={busy} onClick={() => onDelete(memory.id)} aria-label={`Eliminar ${memory.title}`}><Trash2 size={16}/></button>}</div>}</div>
-            {memory.deletion_pending && <p role="status" className="memory-pending-note">El borrado quedó pendiente. Puedes volver a intentarlo.</p>}
+            {memory.deletion_pending && <p role="status" className="memory-pending-note">Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.</p>}
             {memory.type === "anecdote" ? <p className="memory-entry-text">{memory.text}</p> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="memory-song-link"><Music2 size={18} aria-hidden="true"/> Escuchar esta canción <span aria-hidden="true">↗</span></a>}
             {memoryPhotos.length > 0 && <div className="memory-entry-photos"><PhotoGrid photos={memoryPhotos} busy={busy} canManage={canManage} onDelete={onDeletePhoto} onRefresh={() => setAttempt((value) => value + 1)} /></div>}
             <div className="memory-entry-tags">{memory.is_positive && <span className="memory-tag memory-tag-warm"><Heart size={13} aria-hidden="true"/> Recuerdo bonito</span>}{memory.is_sensitive && <span className="memory-tag memory-tag-calm">Tema delicado</span>}{memoryPhotos.length > 0 && <span className="memory-tag memory-tag-photo"><ImagePlus size={13} aria-hidden="true"/> {memoryPhotos.length} {memoryPhotos.length === 1 ? "foto" : "fotos"}</span>}</div>
