@@ -5,7 +5,7 @@ import type { CompanionState } from "./companionLabels";
 
 export type { CompanionState };
 export type CompanionMood = "warm" | "curious" | "joyful";
-export type OwlAnimation = "none" | "walk" | "wave" | "present" | "music" | "story";
+export type OwlAnimation = "none" | "walk" | "wave" | "present" | "music" | "story" | "celebrate";
 
 /** El movimiento acompaña el estado de la conversación; no interpreta emociones. */
 export function AyniCompanion({ state = "idle", mood = "warm", animation = "none", className = "", decorative = false }: {

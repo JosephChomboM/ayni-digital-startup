@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowRight, BookOpen, Image, Music2, Share2, Users, Clock3, CalendarDays } from "lucide-react";
+import { ArrowRight, BookOpen, Image, Music2, Share2, Users, Clock3, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import type { User } from "../api/auth";
 import { getFamilyMembers } from "../api/families";
 import type { Member } from "../api/families";
@@ -26,6 +26,7 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
   const [feedback, setFeedback] = useState<SessionFeedback[]>([]);
   const [selectedMember, setSelectedMember] = useState("all");
   const [periodDays, setPeriodDays] = useState<7 | 30 | 90>(7);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -61,9 +62,20 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
 
   const visibleMemories = selectedMember === "all" ? memories : memories.filter((item) => item.created_by === selectedMember);
   const visiblePhotos = selectedMember === "all" ? photos : photos.filter((item) => item.created_by === selectedMember);
+  const dashboardPhotos = visiblePhotos.map((photo) => ({
+    ...photo,
+    memory: memories.find((item) => item.id === photo.memory_id),
+  }));
+  useEffect(() => {
+    if (dashboardPhotos.length < 2) return;
+    const timer = window.setInterval(() => setPhotoIndex((index) => (index + 1) % dashboardPhotos.length), 5000);
+    return () => window.clearInterval(timer);
+  }, [dashboardPhotos.length]);
+  useEffect(() => { setPhotoIndex(0); }, [selectedMember]);
   const visibleFeedback = selectedMember === "all" ? feedback : feedback.filter((item) => item.user_id === selectedMember);
   const ownContributionCount = memories.filter((item) => item.created_by === currentUser.id).length + photos.filter((item) => item.created_by === currentUser.id).length;
   const recentWeek = visibleFeedback.filter((item) => Date.now() - new Date(item.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
+  const recentNotes = recentWeek.filter((item) => item.note.trim());
   const recentPauses = recentWeek.filter((item) => item.experience === "paused" || item.feeling === "tired").length;
   const weeklyFeelings = Object.entries(feelingLabels).map(([key, label]) => ({ key, label, count: recentWeek.filter((item) => item.feeling === key).length }));
   const maxFeelingCount = Math.max(1, ...weeklyFeelings.map((item) => item.count));
@@ -101,15 +113,28 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
 
   return (
     <div className="dashboard-page space-y-8 text-[#264653]">
-      <header className="dashboard-intro flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
+      <header className="dashboard-intro">
+        <div className="dashboard-intro-copy">
           <p className="text-sm font-semibold text-[#e76f51]">EL CAMINO DE SU FAMILIA</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#2c5f7c]">Pequeños momentos, vistos en conjunto</h1>
           <p className="mt-2 max-w-2xl text-slate-600">Revisa lo que han compartido, el tiempo de sus encuentros y cómo participa cada familiar. Las reseñas de duración y sensaciones se guardan en este navegador.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={onOpenMemories}>Recuerdos</Button>
+            <Button onClick={onOpenSession} className="bg-[#e76f51] hover:bg-[#d95f43]">Abrir guía <ArrowRight className="ml-2 size-4" /></Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onOpenMemories}>Recuerdos</Button>
-          <Button onClick={onOpenSession} className="bg-[#e76f51] hover:bg-[#d95f43]">Abrir guía <ArrowRight className="ml-2 size-4" /></Button>
+        <div className="dashboard-photo-hero" aria-label="Fotografías compartidas por la familia" aria-roledescription="carrusel">
+          {dashboardPhotos.length ? <>
+            {dashboardPhotos.map((photo, index) => <figure className="dashboard-photo-slide" key={photo.id} aria-hidden={index !== photoIndex}>
+              <img src={photo.url} alt={photo.memory?.title ? `Foto familiar: ${photo.memory.title}` : "Foto compartida por la familia"} loading={index === photoIndex ? "eager" : "lazy"} />
+              <figcaption><span className="dashboard-photo-caption-label">{photo.memory?.type === "song" ? "Una canción que los reúne" : "Un recuerdo de la familia"}</span><strong>{photo.memory?.title ?? "Un momento para recordar"}</strong><span>{nameFor(photo.created_by)} · {new Date(photo.created_at).toLocaleDateString("es-PE", { day: "numeric", month: "long" })}</span></figcaption>
+            </figure>)}
+            <div className="dashboard-photo-controls" aria-label="Controles de fotografías">
+              <button type="button" aria-label="Foto anterior" disabled={dashboardPhotos.length < 2} onClick={() => setPhotoIndex((index) => (index - 1 + dashboardPhotos.length) % dashboardPhotos.length)}><ChevronLeft size={20}/></button>
+              <div className="dashboard-photo-dots" aria-live="polite" aria-label={`Foto ${photoIndex + 1} de ${dashboardPhotos.length}`}>{dashboardPhotos.map((photo, index) => <button type="button" key={photo.id} aria-label={`Ver foto ${index + 1}`} aria-current={index === photoIndex} onClick={() => setPhotoIndex(index)} />)}</div>
+              <button type="button" aria-label="Foto siguiente" disabled={dashboardPhotos.length < 2} onClick={() => setPhotoIndex((index) => (index + 1) % dashboardPhotos.length)}><ChevronRight size={20}/></button>
+            </div>
+          </> : <div className="dashboard-photo-empty"><Image size={29}/><p>{loading ? "Cargando las fotos de la familia…" : "Las fotos que compartan aparecerán aquí para recorrerlas juntos."}</p>{!loading && <button type="button" onClick={onOpenMemories}>Agregar un recuerdo <ArrowRight size={16}/></button>}</div>}
         </div>
       </header>
 
@@ -182,6 +207,7 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
             {recentWeek.length ? <div className="mt-5 space-y-3" aria-label="Reseñas de la semana">
               {weeklyFeelings.filter((item) => item.count > 0).map((item) => <div key={item.key} className="grid grid-cols-[110px_1fr_24px] items-center gap-3 text-sm"><span>{item.label}</span><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#2c5f7c]" style={{ width: `${Math.max(6, item.count / maxFeelingCount * 100)}%` }} /></div><span className="text-right text-slate-600">{item.count}</span></div>)}
             </div> : <p className="mt-5 text-sm text-slate-600">Todavía no hay reseñas esta semana. Al finalizar una guía, cualquier familiar puede compartir cómo vivió la actividad.</p>}
+            {recentNotes.length > 0 && <ul className="mt-5 space-y-3" aria-label="Comentarios recientes de la familia">{recentNotes.slice(0, 3).map((item) => <li key={item.id} className="border-l-2 border-[#e76f51] bg-[#fff5ef] px-4 py-3"><p className="text-sm leading-relaxed text-slate-700">“{item.note}”</p><p className="mt-2 text-xs text-slate-500">{item.user_name} · {new Date(item.created_at).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}</p></li>)}</ul>}
           </section>
 
           <section className="border-l-2 border-[#f4a261] pl-4">

@@ -1,7 +1,7 @@
 import { AyniCompanion } from "./AyniCompanion";
 import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Play, RotateCcw, Camera, MessageCircle, ChevronRight, Clock3 } from "lucide-react";
+import { Check, Play, RotateCcw, Camera, MessageCircle, ChevronRight, Clock3, Heart, ArrowRight } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -19,11 +19,14 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ApiError } from "../api/client";
 import { getBillingStatus } from "../api/billing";
+import { getFamilySessionFeedback, saveSessionFeedback } from "../api/sessionFeedback";
+import type { SessionFeeling } from "../api/sessionFeedback";
 
 interface SessionGuideProps {
   currentUser: User;
   onOpenMemories: () => void;
   onOpenPlan?: () => void;
+  onOpenDashboard?: () => void;
 }
 
 const reactions: Array<[Reaction, string]> = [
@@ -46,7 +49,7 @@ export function SessionGuide(props: SessionGuideProps) {
   return <PersistedSessionGuide key={`${props.currentUser.id}:${props.currentUser.family_id}`} {...props} />;
 }
 
-function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: SessionGuideProps) {
+function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpenDashboard }: SessionGuideProps) {
   const [memoryChoice, setMemoryChoice] = useState("");
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recommending, setRecommending] = useState(false);
@@ -98,6 +101,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
   const [reactionSaved, setReactionSaved] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [feeling, setFeeling] = useState<SessionFeeling | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
 
   const songs = useMemo(() => memories.filter((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive), [memories]);
   const anecdotes = useMemo(() => memories.filter((memory) =>
@@ -195,6 +200,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
       const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
       const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       const previousReaction = await getRecordedReaction(saved.id);
+      const previousFeedback = getFamilySessionFeedback(currentUser.family_id).find((item) => item.id === saved.id);
       // Los gustos solo ambientan la sala: si la IA no responde, se usa un look por palabras clave
       // y, si tampoco hay gustos, Ayni sale con su look de siempre. Nunca bloquea la sesión.
       const interests = await getElderProfile().then((profile) => profile.interests).catch(() => []);
@@ -218,6 +224,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
       setSaved(false);
       setReaction(previousReaction?.reaction ?? null);
       setReactionSaved(Boolean(previousReaction));
+      setFeeling(previousFeedback?.feeling ?? null);
+      setReviewNote(previousFeedback?.note ?? "");
       setReviewError("");
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === "session_limit_reached") setQuotaBlocked(true);
@@ -230,7 +238,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
     setStarted(false);
     setPaused(false);
     setReviewVoice(speak);
-    setSaved(reactionSaved);
+    setSaved(false);
     setReviewOpen(true);
   }
 
@@ -253,12 +261,24 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
   }
 
   const saveReview = async () => {
-    if (!guide || !reaction || reactionSaved || busy) return;
+    if (!guide || !reaction || !feeling || busy) return;
     setBusy(true);
     setReviewError("");
     try {
-      await recordReaction(guide.id, reaction);
-      setReactionSaved(true);
+      if (!reactionSaved) {
+        await recordReaction(guide.id, reaction);
+        setReactionSaved(true);
+      }
+      saveSessionFeedback({
+        id: guide.id,
+        family_id: currentUser.family_id,
+        user_id: currentUser.id,
+        user_name: currentUser.name,
+        feeling,
+        note: reviewNote.trim(),
+        duration_seconds: elapsed,
+        created_at: new Date().toISOString(),
+      });
       setSaved(true);
     } catch (cause) {
       setReviewError(cause instanceof Error ? cause.message : "No pudimos guardar la reacción.");
@@ -378,18 +398,43 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: Sess
       />}
 
 
-      {reviewOpen && !saved && <section className="max-w-2xl space-y-5">
-        <div><p className="text-sm font-semibold text-[#e76f51]">Al terminar</p><h2 className="text-xl font-semibold text-[#2c5f7c]">¿Cómo fue este momento?</h2><p className="mt-1 text-sm text-slate-600">La reacción se comparte con tu familia y queda asociada a esta guía.</p></div>
-        <fieldset className="space-y-2" disabled={busy || reactionSaved}><legend className="text-sm font-medium text-[#264653]">Elige una reacción</legend><div className="flex flex-wrap gap-2">{reactions.map(([value, label]) => <Choice key={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div></fieldset>
+      {reviewOpen && !saved && <section className="session-review-flow" aria-labelledby="session-review-title">
+        <div className="session-review-welcome">
+          <AyniCompanion className="session-review-owl" decorative mood="joyful" animation="celebrate" />
+          <div><p className="session-review-kicker">Con cariño, Ayni</p><h2 id="session-review-title">¡Qué alegría que compartieran este rato!</h2><p>¿Cómo se sintieron al terminar? Elige lo que mejor refleje el momento.</p></div>
+        </div>
+        <fieldset className="session-review-group" disabled={busy || reactionSaved}>
+          <legend>¿Cómo reaccionó la persona que acompañaron?</legend>
+          <div className="session-review-choices">{reactions.map(([value, label]) => <Choice key={value} tone={value} selected={reaction === value} onClick={() => setReaction(value)}>{label}</Choice>)}</div>
+          {reactionSaved && <p className="mt-2 text-sm text-slate-600">La reacción de esta guía ya está guardada; puedes completar tu reseña.</p>}
+        </fieldset>
+        <fieldset className="session-review-group" disabled={busy}>
+          <legend>¿Cómo te sentiste tú al acompañarle?</legend>
+          <div className="session-review-choices">{([
+            ["content", "A gusto"], ["calm", "Tranquilo/a"], ["tired", "Cansado/a"], ["no_answer", "Prefiero no decir"],
+          ] as const).map(([value, label]) => <Choice key={value} tone={value} selected={feeling === value} onClick={() => setFeeling(value)}>{label}</Choice>)}</div>
+        </fieldset>
+        <label className="session-review-note">¿Quieren dejar una nota sobre este momento? <span>Opcional</span>
+          <textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value.slice(0, 400))} maxLength={400} rows={3} placeholder="Por ejemplo: nos gustó recordar ese paseo juntos." disabled={busy} />
+          <small>{reviewNote.length}/400</small>
+        </label>
         {reviewError && <p role="alert" className="text-sm text-red-700">{reviewError}</p>}
-        <div className="flex flex-wrap gap-3"><Button disabled={!reaction || busy || reactionSaved} onClick={() => void saveReview()} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando reacción…" : reactionSaved ? "Reacción ya guardada" : "Guardar reacción"}</Button><Button variant="outline" disabled={busy} onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir por ahora</Button></div>
+        <div className="session-review-actions"><Button disabled={!reaction || !feeling || busy} onClick={() => void saveReview()} variant="secondary" className="w-auto"><Check className="mr-2 size-4" />{busy ? "Guardando…" : "Guardar y terminar"}</Button><Button variant="outline" disabled={busy} onClick={() => { setReviewOpen(false); setStarted(false); }} className="w-auto">Omitir por ahora</Button></div>
       </section>}
 
-      {reviewOpen && saved && <div className="space-y-3 py-6" role="status"><Check className="size-6 text-[#2c5f7c]" /><h2 className="text-xl font-semibold text-[#2c5f7c]">Reacción guardada en tu familia</h2><p className="text-sm text-slate-600">Gracias por compartir cómo fue este momento.</p><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button></div>}
+      {reviewOpen && saved && <section className="session-review-success" role="status">
+        <div className="session-review-success-owl"><AyniCompanion className="session-review-owl" decorative mood="joyful" animation="celebrate" /></div>
+        <p className="session-review-kicker">Hasta el próximo recuerdo</p>
+        <h2>¡Gracias por compartir este momento!</h2>
+        <p>El cierre quedó guardado. Gracias por compartir cómo vivieron la sesión.</p>
+        <div className="session-review-summary"><span><Clock3 size={17}/>{formatTime(elapsed)} compartidos</span><span><Heart size={17}/>{feeling === "content" ? "A gusto" : feeling === "calm" ? "Tranquilo/a" : feeling === "tired" ? "Cansado/a" : "Prefirió no decir"}</span></div>
+        {reviewNote.trim() && <blockquote>“{reviewNote.trim()}”</blockquote>}
+        <div className="session-review-actions"><Button variant="outline" onClick={() => { setReviewOpen(false); setStarted(false); setElapsed(0); refreshHistory(); }} className="w-auto"><RotateCcw className="mr-2 size-4" />Volver al historial</Button>{onOpenDashboard && <Button onClick={onOpenDashboard} className="w-auto">Ver avances familiares <ArrowRight className="ml-2 size-4" /></Button>}</div>
+      </section>}
     </CardContent>
   </Card>;
 }
 
-function Choice({ children, selected, onClick }: { children: string; selected: boolean; onClick: () => void }) {
-  return <button type="button" aria-pressed={selected} onClick={onClick} className={`rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-[#2c5f7c] bg-[#2c5f7c] text-white" : "border-slate-300 text-slate-700 hover:border-[#2c5f7c]"}`}>{children}</button>;
+function Choice({ children, selected, onClick, tone = "receptivo" }: { children: string; selected: boolean; onClick: () => void; tone?: string }) {
+  return <button type="button" data-tone={tone} aria-pressed={selected} onClick={onClick} className={`rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-[#2c5f7c] bg-[#2c5f7c] text-white" : "border-slate-300 text-slate-700 hover:border-[#2c5f7c]"}`}>{children}</button>;
 }
