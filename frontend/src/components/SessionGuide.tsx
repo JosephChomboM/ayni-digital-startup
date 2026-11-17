@@ -1,7 +1,7 @@
 import { AyniCompanion } from "./AyniCompanion";
 import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Play, RotateCcw } from "lucide-react";
+import { Check, Play, RotateCcw, Camera, MessageCircle, ChevronRight, Clock3 } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -17,10 +17,13 @@ import { speakLocally } from "./sessionSignals";
 import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { ApiError } from "../api/client";
+import { getBillingStatus } from "../api/billing";
 
 interface SessionGuideProps {
   currentUser: User;
   onOpenMemories: () => void;
+  onOpenPlan?: () => void;
 }
 
 const reactions: Array<[Reaction, string]> = [
@@ -34,11 +37,16 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainder}`;
 }
 
+function formatMemoryDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+}
+
 export function SessionGuide(props: SessionGuideProps) {
   return <PersistedSessionGuide key={`${props.currentUser.id}:${props.currentUser.family_id}`} {...props} />;
 }
 
-function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProps) {
+function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan }: SessionGuideProps) {
   const [memoryChoice, setMemoryChoice] = useState("");
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recommending, setRecommending] = useState(false);
@@ -49,6 +57,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
   const [busy, setBusy] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [freePlan, setFreePlan] = useState(false);
+  const [quotaBlocked, setQuotaBlocked] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
@@ -59,6 +69,11 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     return () => { active = false; };
   }, [offset, revision]);
   const refreshHistory = (next = offset) => { setHistoryLoading(true); setOffset(next); setRevision((value) => value + 1); };
+  useEffect(() => {
+    let active = true;
+    getBillingStatus().then((status) => { if (active) setFreePlan(status.plan === "free"); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [currentUser.family_id]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [photos, setPhotos] = useState<MemoryPhoto[]>([]);
@@ -164,6 +179,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     if (busy) return;
     setBusy(true);
     setLoadError("");
+    setQuotaBlocked(false);
     try {
       const saved = id ? await getSession(id) : await generateSession(memoryChoice || undefined);
       setGuide(saved);
@@ -203,7 +219,10 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
       setReaction(previousReaction?.reaction ?? null);
       setReactionSaved(Boolean(previousReaction));
       setReviewError("");
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos abrir la guía."); }
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === "session_limit_reached") setQuotaBlocked(true);
+      else setLoadError(cause instanceof Error ? cause.message : "No pudimos abrir la guía.");
+    }
     finally { setBusy(false); }
   }
 
@@ -254,19 +273,29 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     {!started && <PageIntro eyebrow="UN MOMENTO PARA CONECTAR" title="Guía de sesión">Conversen a su ritmo con la ayuda de Ayni.</PageIntro>}
     <CardContent className={`session-content space-y-6 px-0 ${!started && !reviewOpen ? "session-preparation" : ""}`}>
       {loadError && <p role="alert" className="text-sm text-red-700">{loadError}</p>}
+      {quotaBlocked && <section role="alert" className="session-quota-notice">
+        <div><strong>Por ahora no puedes preparar otra guía nueva.</strong><p>El Plan Gratis permite crear una guía cada siete días. Puedes continuar una conversación guardada desde el historial o revisar el Plan Familia. Elegir otro recuerdo cambia la conversación, pero no este límite.</p></div>
+        <div className="session-quota-actions"><a href="#saved-guides" onClick={(event) => { event.preventDefault(); document.getElementById("saved-guides")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>Ver mis conversaciones</a>{onOpenPlan && <Button type="button" variant="outline" onClick={onOpenPlan}>Ver Plan Familia</Button>}</div>
+      </section>}
       {!started && !reviewOpen && <section aria-labelledby="prepare-session" className="session-setup">
-        <div className="flex items-start gap-4">
+        <div className="session-welcome">
           <AyniCompanion className="setup-companion" decorative/>
-          <div>
+          <div className="session-welcome-copy">
+            <span className="session-kicker">A TU RITMO</span>
             <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
-            <p className="mt-1 text-base text-slate-700">Te haré una pregunta y esperaré tu respuesta. Puedes hablar o escribir a tu ritmo.</p>
+            <p className="mt-1 text-base text-slate-700">Elige un recuerdo y empezamos a conversar.</p>
           </div>
         </div>
-        {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="mt-5 space-y-4">
-          <label className="block text-sm font-semibold">¿Con qué recuerdo quieres empezar?
+        {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="session-setup-body">
+          <div className="session-steps" aria-label="Antes de empezar">
+            <div className="session-step"><span>01</span><div><strong>Elige el recuerdo</strong><small>Una historia, canción o selección de Ayni</small></div></div>
+            <ChevronRight aria-hidden="true" size={19}/>
+            <div className="session-step"><span>02</span><div><strong>Conversa a tu ritmo</strong><small>Puedes hablar, escribir o solo escuchar</small></div></div>
+          </div>
+          <label className="session-memory-label">¿Con qué recuerdo quieres empezar?
             <select aria-label="Recuerdo para la sesión" className="mt-2 w-full rounded border bg-white p-3 font-normal" value={memoryChoice} onChange={(event) => setMemoryChoice(event.target.value)}>
               <option value="">Dejar que Ayni prepare una selección</option>
-              {memories.map((item) => <option key={item.id} value={item.id} disabled={item.is_sensitive || item.deletion_pending}>{item.title} · {item.is_sensitive ? "Tema delicado: no disponible" : item.deletion_pending ? "Eliminándose" : !item.is_positive ? "Confirma que es un recuerdo bonito" : item.type === "song" ? "Canción" : "Anécdota"}</option>)}
+              {memories.map((item) => <option key={item.id} value={item.id} disabled={item.is_sensitive || item.deletion_pending}>{item.title}{formatMemoryDate(item.created_at) ? ` · ${formatMemoryDate(item.created_at)}` : ""} · {item.is_sensitive ? "Tema delicado: no disponible" : item.deletion_pending ? "Eliminándose" : !item.is_positive ? "Confirma que es un recuerdo bonito" : item.type === "song" ? "Canción" : "Anécdota"}</option>)}
             </select>
           </label>
           {memories.some((item) => item.id === memoryChoice && !item.is_positive && !item.is_sensitive) && <div className="rounded-xl border bg-amber-50 p-4 space-y-3">
@@ -278,30 +307,33 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
               finally { setBusy(false); }
             }}>Confirmar que es un recuerdo bonito</Button>
           </div>}
-          <p className="text-sm text-slate-600">Las sesiones usan recuerdos bonitos y sin temas delicados. Las imágenes acompañan al recuerdo donde las guardaste.</p>
-          <Button variant="outline" disabled={recommending || busy} onClick={async () => {
+          <div className="session-choice-actions"><span>Solo se incluyen recuerdos marcados como bonitos.</span><Button variant="outline" disabled={recommending || busy} onClick={async () => {
             setRecommending(true); setLoadError("");
             try { const result = await recommendMemory(); setRecommendation(result); setMemoryChoice(result.memory_id); }
             catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos recomendar un recuerdo."); }
             finally { setRecommending(false); }
-          }}>{recommending ? "Buscando una opción…" : "Recomendar un recuerdo"}</Button>
-          {recommendation && <div className="rounded border bg-sky-50 p-3 text-sm"><strong>{recommendation.source === "ai" ? "Recomendación con IA" : "Sugerencia por historial"}: {recommendation.title}</strong><p>{recommendation.reason}</p><p>Puedes cambiar la selección antes de empezar. Esto no es un diagnóstico. Es un registro de actividades familiares.</p></div>}
-          <p className="text-sm text-slate-700">Ayni usará los recuerdos positivos de esta guía y recordará lo que compartan durante la conversación.</p>
-          <button type="button" onClick={onOpenMemories} className="min-h-11 text-sm font-semibold underline">Agregar o revisar mis recuerdos</button>
-          <p className="text-sm text-slate-600">Groq recibe sus respuestas y los recuerdos necesarios para conversar, y los gustos del perfil para vestir a Ayni y ambientar la sala (sin nombres ni datos de la cuenta). Los mensajes y detalles observados se guardan en el historial familiar. Al empezar con Ayni y permitir la cámara, se comparte una captura solo cuando pides mirar algo, por ejemplo «mira acá». Puedes desactivar «Contexto visual en vivo». No se guardan fotos ni video de la cámara.</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
-            <Button type="button" variant="ghost" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(false)} className="w-auto">Empezar sin cámara ni micrófono</Button>
+          }}>{recommending ? "Buscando una opción…" : "Recomendar un recuerdo"}</Button></div>
+          <p className="session-memory-date-hint">Puedes elegir un recuerdo bonito de hoy o de una fecha anterior.</p>
+          {freePlan && history.some((item) => Date.now() - new Date(item.created_at).getTime() < 7 * 24 * 60 * 60 * 1000) && <p className="session-quota-hint"><Clock3 size={15}/> Plan Gratis: una guía nueva cada siete días. Puedes seguir una conversación desde tu historial.</p>}
+          {recommendation && <div className="session-recommendation"><strong>{recommendation.source === "ai" ? "Recomendación con IA" : "Sugerencia por historial"}: {recommendation.title}</strong><p>{recommendation.reason}</p><p>Puedes cambiar la selección antes de empezar. Esto no es un diagnóstico. Es un registro de actividades familiares.</p></div>}
+          <button type="button" onClick={onOpenMemories} className="session-memory-link">Agregar o revisar mis recuerdos <ChevronRight size={16}/></button>
+          <div className="session-start-block">
+            <div className="session-start-heading"><span className="session-start-icon"><MessageCircle size={19}/></span><div><strong>¿Cómo quieren conversar?</strong><small>Elige la opción más cómoda para ustedes.</small></div></div>
+            <div className="session-start-actions">
+              <Button type="button" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+              <Button type="button" variant="outline" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(false)} className="w-auto"><MessageCircle className="size-4"/>Empezar sin cámara ni micrófono</Button>
+            </div>
+            <div className="session-device-note"><Camera size={16}/><span>Si eliges Ayni, el navegador pedirá permiso para cámara y micrófono. También puedes iniciar sin ellos.</span></div>
           </div>
-          <p className="text-sm text-slate-600">Al empezar con Ayni, tu navegador pedirá permiso para la cámara y el micrófono. El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Ayni acompaña actividades familiares; no es un servicio de salud.</p>
+          <details className="session-privacy"><summary>Privacidad y uso de cámara</summary><p>El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Los mensajes y detalles compartidos se guardan en el historial familiar. La cámara solo comparte una captura cuando pides explícitamente mirar algo; no se guardan fotos ni video de la cámara. Ayni acompaña actividades familiares y no es un servicio de salud.</p></details>
         </div>}
       </section>}
       {!started && !reviewOpen && <section className="session-history space-y-3" aria-labelledby="saved-guides">
-        <h2 id="saved-guides" className="text-lg font-semibold">Mis guías y conversaciones</h2>
+        <div className="session-history-heading"><span className="session-kicker">TU HISTORIAL</span><h2 id="saved-guides" className="text-lg font-semibold">Mis conversaciones</h2><p>Retoma un momento cuando quieras.</p></div>
         {historyLoading ? <p role="status">Cargando historial…</p> : historyError ? <div role="alert"><p>{historyError}</p><Button variant="outline" onClick={() => refreshHistory()}>Reintentar historial</Button></div> : <>
-          {total === 0 && <p className="text-sm">Tu primera guía y conversación aparecerán aquí.</p>}
-          <ul className="space-y-2">{history.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-            <span>Guía del {new Date(item.created_at).toLocaleString("es-PE")} · {item.duration_minutes} minutos</span>
+          {total === 0 && <p className="session-history-empty">Tu primera conversación aparecerá aquí después de iniciar una guía.</p>}
+          <ul className="session-history-list">{history.map((item) => <li key={item.id}>
+            <span className="session-history-date"><Clock3 size={17}/>{new Date(item.created_at).toLocaleString("es-PE")}<small>{item.duration_minutes} min</small></span>
             <Button variant="outline" disabled={busy} onClick={() => void begin(false, item.id)}>Continuar conversación</Button>
           </li>)}</ul>
           {total > 10 && <nav aria-label="Páginas del historial" className="flex flex-wrap gap-3"><Button variant="outline" disabled={offset === 0 || busy} onClick={() => refreshHistory(Math.max(0, offset - 10))}>Página anterior</Button><Button variant="outline" disabled={offset + 10 >= total || busy} onClick={() => refreshHistory(offset + 10)}>Página siguiente</Button></nav>}

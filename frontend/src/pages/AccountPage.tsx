@@ -73,7 +73,7 @@ export function AccountPage({ currentUser, initialSection, onSectionChange, onUs
           </div>
         </>}
 
-        {initialSection === "family" && <div className="max-w-2xl"><p className="mb-5 text-sm font-semibold text-[#e76f51]">Perfil de la familia</p><ProfilePage currentUser={currentUser} /></div>}
+        {initialSection === "family" && <div className="account-family-layout"><ProfilePage currentUser={currentUser} /></div>}
 
         {initialSection === "personal" && <div className="max-w-2xl space-y-6">
           <div><p className="text-sm font-semibold text-[#e76f51]">Información del perfil</p><h1 className="mt-1 text-2xl font-semibold text-[#2c5f7c]">Mis datos</h1><p className="mt-2 text-sm text-slate-600">Información asociada a tu cuenta de Ayni Digital.</p></div>

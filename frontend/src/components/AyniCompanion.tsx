@@ -5,13 +5,14 @@ import type { CompanionState } from "./companionLabels";
 
 export type { CompanionState };
 export type CompanionMood = "warm" | "curious" | "joyful";
+export type OwlAnimation = "none" | "walk" | "wave" | "present" | "music" | "story";
 
 /** El movimiento acompaña el estado de la conversación; no interpreta emociones. */
-export function AyniCompanion({ state = "idle", mood = "warm", className = "", decorative = false }: {
-  state?: CompanionState; mood?: CompanionMood; className?: string; decorative?: boolean;
+export function AyniCompanion({ state = "idle", mood = "warm", animation = "none", className = "", decorative = false }: {
+  state?: CompanionState; mood?: CompanionMood; animation?: OwlAnimation; className?: string; decorative?: boolean;
 }) {
   const id = useId();
-  return <div className={`ayni-robot ayni-owl ${className}`} data-state={state} data-mood={mood} role={decorative ? undefined : "img"}
+  return <div className={`ayni-robot ayni-owl ${className}`} data-state={state} data-mood={mood} data-animation={animation} role={decorative ? undefined : "img"}
     aria-label={decorative ? undefined : companionLabels[state]} aria-hidden={decorative || undefined}>
     <svg viewBox="0 0 260 250" fill="none" aria-hidden="true">
       <defs>
@@ -49,8 +50,8 @@ export function AyniCompanion({ state = "idle", mood = "warm", className = "", d
         </g>
         <path className="owl-brow owl-brow-left" d="M86 91q18-12 37 0" stroke="#244f68" strokeWidth="5" strokeLinecap="round"/>
         <path className="owl-brow owl-brow-right" d="M137 91q19-12 37 0" stroke="#244f68" strokeWidth="5" strokeLinecap="round"/>
-        <ellipse cx="82" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".45"/>
-        <ellipse cx="178" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".45"/>
+        <ellipse className="owl-blush" cx="82" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".38"/>
+        <ellipse className="owl-blush" cx="178" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".38"/>
         <path className="robot-smile owl-beak" d="m121 143 9-9 9 9-9 13Z" fill="#e76f51" stroke="#bf583f" strokeWidth="2" strokeLinejoin="round"/>
         <g className="robot-speech owl-speaking-beak">
           <path d="m120 141 10-8 10 8-10 7Z" fill="#e76f51" stroke="#bf583f" strokeWidth="2" strokeLinejoin="round"/>

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BookOpen, Image, Music2, Share2, Users } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, BookOpen, Image, Music2, Share2, Users, Clock3, CalendarDays } from "lucide-react";
 import type { User } from "../api/auth";
 import { getFamilyMembers } from "../api/families";
 import type { Member } from "../api/families";
-import { listMemories } from "../api/memories";
-import type { Memory } from "../api/memories";
-import { getLocalFamilyPhotos } from "../api/localMedia";
-import type { LocalFamilyPhoto } from "../api/localMedia";
+import { listMemories, listPhotosForMemories } from "../api/memories";
+import type { FamilyMemoryPhoto, Memory } from "../api/memories";
 import { getFamilySessionFeedback } from "../api/sessionFeedback";
 import type { SessionFeedback } from "../api/sessionFeedback";
 import { Button } from "./ui/button";
@@ -23,9 +22,10 @@ const feelingLabels = { content: "A gusto", calm: "Tranquilo/a", tired: "Cansado
 export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: FamilyDashboardProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
-  const [photos, setPhotos] = useState<LocalFamilyPhoto[]>([]);
+  const [photos, setPhotos] = useState<FamilyMemoryPhoto[]>([]);
   const [feedback, setFeedback] = useState<SessionFeedback[]>([]);
   const [selectedMember, setSelectedMember] = useState("all");
+  const [periodDays, setPeriodDays] = useState<7 | 30 | 90>(7);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -35,10 +35,11 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
       setLoading(true);
       setLoadError("");
       try {
-        const [memberResult, memoryResult, photoResult] = await Promise.all([
-          getFamilyMembers(), listMemories({ include_sensitive: true, limit: 100, offset: 0 }),
-          getLocalFamilyPhotos(currentUser.family_id),
+        const [memberResult, memoryResult] = await Promise.all([
+          getFamilyMembers(), listMemories({ include_sensitive: false, limit: 100, offset: 0 }),
         ]);
+        if (!active) return;
+        const photoResult = await listPhotosForMemories(memoryResult.items);
         if (!active) return;
         setMembers(memberResult.items);
         setMemories(memoryResult.items);
@@ -66,20 +67,35 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
   const recentPauses = recentWeek.filter((item) => item.experience === "paused" || item.feeling === "tired").length;
   const weeklyFeelings = Object.entries(feelingLabels).map(([key, label]) => ({ key, label, count: recentWeek.filter((item) => item.feeling === key).length }));
   const maxFeelingCount = Math.max(1, ...weeklyFeelings.map((item) => item.count));
-  const dailyDurations = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (6 - index));
-    const dayItems = visibleFeedback.filter((item) => { const created = new Date(item.created_at); return created.getFullYear() === date.getFullYear() && created.getMonth() === date.getMonth() && created.getDate() === date.getDate(); });
-    return { date, minutes: Math.round(dayItems.reduce((sum, item) => sum + item.duration_seconds, 0) / 60), count: dayItems.length };
+  const bucketCount = periodDays === 7 ? 7 : periodDays === 30 ? 5 : 13;
+  const rangeStart = new Date(); rangeStart.setHours(0, 0, 0, 0); rangeStart.setDate(rangeStart.getDate() - (periodDays - 1));
+  const bucketSize = periodDays / bucketCount;
+  const durationBuckets = Array.from({ length: bucketCount }, (_, index) => {
+    const start = new Date(rangeStart.getTime() + index * bucketSize * 86400000);
+    const end = new Date(rangeStart.getTime() + (index + 1) * bucketSize * 86400000);
+    const entries = visibleFeedback.filter((item) => { const created = new Date(item.created_at); return created >= start && created < end; });
+    const minutes = Math.round(entries.reduce((sum, item) => sum + item.duration_seconds, 0) / 60);
+    const label = periodDays === 7 ? start.toLocaleDateString("es-PE", { weekday: "short" }) : start.toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+    return { start, end, minutes, count: entries.length, label };
   });
-  const maxMinutes = Math.max(5, Math.ceil(Math.max(...dailyDurations.map((item) => item.minutes)) / 5) * 5);
-  const chartPoints = dailyDurations.map((item, index) => `${80 + index * 120},${250 - item.minutes / maxMinutes * 180}`).join(" ");
+  const maxMinutes = Math.max(5, Math.ceil(Math.max(...durationBuckets.map((item) => item.minutes)) / 5) * 5);
+  const chartPoints = durationBuckets.map((item, index) => {
+    const x = 80 + index * (770 / Math.max(1, durationBuckets.length - 1));
+    return `${x},${250 - item.minutes / maxMinutes * 180}`;
+  }).join(" ");
   const leaders = Object.entries(visibleFeedback.reduce<Record<string, number>>((counts, item) => { counts[item.user_id] = (counts[item.user_id] ?? 0) + 1; return counts; }, {})).sort((a, b) => b[1] - a[1]);
-  const memberContributions = people.map((person) => ({ name: person.name, count: visibleMemories.filter((item) => item.created_by === person.id).length + visiblePhotos.filter((item) => item.created_by === person.id).length })).filter((item) => item.count > 0);
+  const memberContributions = people.map((person) => ({ id: person.id, name: person.name, count: visibleMemories.filter((item) => item.created_by === person.id).length + visiblePhotos.filter((item) => item.created_by === person.id).length })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "es"));
   const maxContribution = Math.max(1, ...memberContributions.map((item) => item.count));
+  const memoryMix = [
+    { label: "Anécdotas", count: visibleMemories.filter((item) => item.type === "anecdote").length, color: "#e76f51" },
+    { label: "Canciones", count: visibleMemories.filter((item) => item.type === "song").length, color: "#e9b85c" },
+    { label: "Fotos", count: visiblePhotos.length, color: "#2c5f7c" },
+  ];
+  const memoryMixTotal = memoryMix.reduce((total, item) => total + item.count, 0);
 
   const activity = [
     ...visibleMemories.map((item) => ({ id: `memory-${item.id}`, creatorId: item.created_by, title: item.title, kind: item.type === "song" ? "Canción compartida" : "Anécdota compartida", date: item.created_at, icon: item.type === "song" ? "music" : "book" })),
-    ...visiblePhotos.map((item) => ({ id: `photo-${item.id}`, creatorId: item.created_by, title: item.name, kind: "Foto compartida", date: item.created_at, icon: "image" })),
+    ...visiblePhotos.map((item) => ({ id: `photo-${item.id}`, creatorId: item.created_by, title: memories.find((memory) => memory.id === item.memory_id)?.title ?? "Foto familiar", kind: "Foto compartida", date: item.created_at, icon: "image" })),
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   const nameFor = (id: string) => people.find((person) => person.id === id)?.name ?? (id === currentUser.id ? currentUser.name : "Familiar");
 
@@ -87,9 +103,9 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
     <div className="dashboard-page space-y-8 text-[#264653]">
       <header className="dashboard-intro flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-semibold text-[#e76f51]">Tu espacio familiar</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#2c5f7c]">Recuerdos que comparten</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">Anécdotas y canciones de tu familia, junto con fotos y reseñas guardadas solo en este navegador. Las fotos y reseñas no se sincronizan entre dispositivos.</p>
+          <p className="text-sm font-semibold text-[#e76f51]">EL CAMINO DE SU FAMILIA</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#2c5f7c]">Pequeños momentos, vistos en conjunto</h1>
+          <p className="mt-2 max-w-2xl text-slate-600">Revisa lo que han compartido, el tiempo de sus encuentros y cómo participa cada familiar. Las reseñas de duración y sensaciones se guardan en este navegador.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onOpenMemories}>Recuerdos</Button>
@@ -101,13 +117,23 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
 
       <ReactionHistory familyId={currentUser.family_id} />
 
-      <section aria-label="Resumen familiar" className="dashboard-metrics grid gap-5 sm:grid-cols-3">
-        <Metric label="Aportes tuyos" value={loading ? "…" : ownContributionCount} detail="Recuerdos y fotos aportados por ti" />
-        <Metric label="Recuerdos compartidos" value={loading ? "…" : visibleMemories.length + visiblePhotos.length} detail="Anécdotas, canciones y fotos disponibles" />
-        <Metric label="Reseñas de sesiones" value={loading ? "…" : visibleFeedback.length} detail="Registradas por la familia" />
+      <section aria-label="Panorama familiar" className="dashboard-metrics grid gap-5 sm:grid-cols-3">
+        <Metric icon={<Users/>} label="Tus aportes" value={loading ? "…" : ownContributionCount} detail="Recuerdos y fotos que sumaste" />
+        <Metric icon={<BookOpen/>} label="Álbum familiar" value={loading ? "…" : visibleMemories.length + visiblePhotos.length} detail="Historias, canciones y fotografías" />
+        <Metric icon={<Clock3/>} label="Encuentros registrados" value={loading ? "…" : visibleFeedback.length} detail="Sesiones con reseña guardada" />
       </section>
 
-      <section className="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <section className="dashboard-memory-mix" aria-label="Contenido del álbum familiar">
+        <div className="dashboard-section-heading"><div><p className="dashboard-eyebrow">LO QUE ESTÁN REUNIENDO</p><h2>El álbum toma forma</h2></div><span>{memoryMixTotal} {memoryMixTotal === 1 ? "recuerdo" : "recuerdos"}</span></div>
+        {memoryMixTotal ? <>
+          <div className="dashboard-mix-bar" role="img" aria-label={memoryMix.map((item) => `${item.label}: ${item.count}`).join(", ")}>
+            {memoryMix.filter((item) => item.count).map((item) => <span key={item.label} style={{ width: `${item.count / memoryMixTotal * 100}%`, backgroundColor: item.color }} />)}
+          </div>
+          <ul className="dashboard-mix-legend">{memoryMix.map((item) => <li key={item.label}><span style={{ backgroundColor: item.color }}/><span>{item.label}</span><strong>{item.count}</strong></li>)}</ul>
+        </> : <p className="dashboard-empty-note">Cuando compartan anécdotas, canciones o fotos, aquí verán cómo va creciendo el álbum.</p>}
+      </section>
+
+      <section className="dashboard-member-filter flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="text-xl font-semibold">Aportes de la familia</h2><p className="mt-1 text-sm text-slate-600">Consulta quién compartió cada recuerdo.</p></div>
         <label className="flex items-center gap-3 text-sm font-medium">Ver aportes de
           <select value={selectedMember} onChange={(event) => setSelectedMember(event.target.value)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[#264653]">
@@ -117,27 +143,26 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
         </label>
       </section>
 
-      <section className="grid gap-8 xl:grid-cols-[1.5fr_.8fr]" aria-label="Gráficas de actividad familiar">
+      <section className="dashboard-insights-grid" aria-label="Gráficas de actividad familiar">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#e76f51]">Actividad familiar · últimos 7 días</p><h2 className="mt-1 text-xl font-semibold">Duración de las sesiones</h2>
-          <p className="mt-2 text-sm text-slate-600">Cada punto muestra los minutos conversados ese día.</p>
-          {dailyDurations.some((item) => item.count > 0) ? <div className="mt-4 w-full overflow-x-auto" role="img" aria-label={`Duración diaria en minutos. ${dailyDurations.map((item) => `${item.date.toLocaleDateString("es-PE", { weekday: "long" })}: ${item.minutes} minutos`).join(". ")}`}>
-            <svg viewBox="0 0 900 320" className="min-w-[640px] w-full" aria-hidden="true">
+          <div className="dashboard-section-heading dashboard-duration-heading"><div><p className="dashboard-eyebrow">TIEMPO COMPARTIDO</p><h2>Duración de los encuentros</h2><p>Minutos registrados al terminar cada sesión.</p></div><label className="dashboard-period-filter"><CalendarDays size={17}/><span className="sr-only">Periodo de actividad</span><select aria-label="Periodo de actividad" value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value) as 7 | 30 | 90)}><option value={7}>7 días</option><option value={30}>30 días</option><option value={90}>90 días</option></select></label></div>
+          {durationBuckets.some((item) => item.count > 0) ? <div className="dashboard-chart" role="img" aria-label={`Duración en minutos para ${periodDays} días. ${durationBuckets.map((item) => `${item.label}: ${item.minutes} minutos`).join(". ")}`}>
+            <svg viewBox="0 0 900 320" className="w-full" aria-hidden="true">
               {[0, 1, 2, 3, 4].map((tick) => { const y = 250 - tick * 45; const value = Math.round(maxMinutes * tick / 4); return <g key={tick}><line x1="76" y1={y} x2="850" y2={y} stroke={tick === 0 ? "#94a3b8" : "#e2e8f0"} strokeWidth="1"/><text x="62" y={y + 4} textAnchor="end" fontSize="12" fill="#64748b">{value}</text></g>; })}
               <text x="18" y="155" transform="rotate(-90 18 155)" textAnchor="middle" fontSize="13" fill="#475569">Minutos</text>
               <polyline points={chartPoints} fill="none" stroke="#2c5f7c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-              {dailyDurations.map((item, index) => { const x = 80 + index * 120; const y = 250 - item.minutes / maxMinutes * 180; return <g key={item.date.toISOString()}><circle cx={x} cy={y} r="6" fill="#e76f51"/><text x={x} y={y - 14} textAnchor="middle" fontSize="12" fontWeight="600" fill="#264653">{item.minutes}</text><text x={x} y="275" textAnchor="middle" fontSize="12" fill="#64748b">{item.date.toLocaleDateString("es-PE", { weekday: "short" })}</text></g>; })}
+              {durationBuckets.map((item, index) => { const x = 80 + index * (770 / Math.max(1, durationBuckets.length - 1)); const y = 250 - item.minutes / maxMinutes * 180; return <g key={item.start.toISOString()}><circle cx={x} cy={y} r="6" fill="#e76f51"/><text x={x} y={y - 14} textAnchor="middle" fontSize="12" fontWeight="600" fill="#264653">{item.minutes}</text><text x={x} y="275" textAnchor="middle" fontSize={periodDays === 7 ? "12" : "10"} fill="#64748b">{item.label}</text></g>; })}
               <text x="460" y="310" textAnchor="middle" fontSize="13" fill="#475569">Día</text>
             </svg>
-          </div> : <div className="mt-5 flex min-h-52 items-center justify-center text-center text-sm text-slate-500">Al cerrar sesiones con una reseña, aquí aparecerán los minutos por día.</div>}
+          </div> : <div className="dashboard-chart-empty"><Clock3/><p>Aún no hay sesiones registradas en este periodo.</p><span>Al finalizar una sesión, su duración aparecerá aquí.</span></div>}
         </div>
-        <div>
-          <p className="text-sm font-semibold text-[#e76f51]">Participación</p><h2 className="mt-1 text-xl font-semibold">Aportes por familiar</h2><p className="mt-2 text-sm text-slate-600">Recuerdos y fotos compartidos.</p>
-          {memberContributions.length ? <div className="mt-6 space-y-5">{memberContributions.map((item) => <div key={item.name}><div className="mb-1 flex justify-between gap-3 text-sm"><span className="truncate">{item.name}</span><span className="font-semibold">{item.count}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#f4a261]" style={{ width: `${item.count / maxContribution * 100}%` }} /></div></div>)}</div> : <p className="mt-5 text-sm text-slate-500">Los aportes aparecerán cuando la familia comparta recuerdos.</p>}
+        <div className="dashboard-contributors">
+          <p className="dashboard-eyebrow">PARTICIPACIÓN</p><h2>Quién está sumando recuerdos</h2><p className="dashboard-supporting-copy">Aportes visibles según el filtro de familia.</p>
+          {memberContributions.length ? <div className="dashboard-contribution-list">{memberContributions.map((item, index) => <div className="dashboard-contribution" key={item.id}><div className="dashboard-contributor-name"><span className={`dashboard-contributor-rank rank-${index + 1}`}>{String(index + 1).padStart(2, "0")}</span><span>{item.name}</span><strong>{item.count}</strong></div><div className="dashboard-contribution-track"><span style={{ width: `${item.count / maxContribution * 100}%` }}/></div></div>)}</div> : <p className="dashboard-empty-note">Los aportes de cada familiar aparecerán aquí cuando compartan recuerdos.</p>}
         </div>
       </section>
 
-      <section className="grid gap-10 lg:grid-cols-[1.1fr_.9fr]">
+      <section className="dashboard-lower-grid grid gap-10 lg:grid-cols-[1.1fr_.9fr]">
         <div>
           <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-semibold text-[#e76f51]">Últimos movimientos</p><h2 className="mt-1 text-xl font-semibold">Recuerdos compartidos</h2></div><button onClick={onOpenMemories} className="text-sm font-semibold text-[#2c5f7c] hover:underline">Ver recuerdos</button></div>
           {activity.length ? <ul className="mt-5 divide-y divide-slate-100">
@@ -171,6 +196,6 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
   );
 }
 
-function Metric({ label, value, detail }: { label: string; value: number | string; detail: string }) {
-  return <div className="border-l-2 border-[#f4a261] pl-5"><p className="text-sm font-semibold text-slate-600">{label}</p><p className="mt-2 text-4xl font-bold tracking-tight text-[#2c5f7c]">{value}</p><p className="mt-2 text-sm text-slate-500">{detail}</p></div>;
+function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: number | string; detail: string }) {
+  return <div className="dashboard-metric"><div className="dashboard-metric-icon" aria-hidden="true">{icon}</div><p className="text-sm font-semibold text-slate-600">{label}</p><p className="dashboard-metric-value">{value}</p><p className="mt-2 text-sm text-slate-500">{detail}</p></div>;
 }
