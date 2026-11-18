@@ -101,7 +101,8 @@ jobs:
           node-version: 24
       - name: Librerías de npm con vulnerabilidades conocidas
         working-directory: frontend
-        run: npm audit --audit-level=high
+        # Excepción temporal y estricta: docs/security/npm-audit-exception.md
+        run: node scripts/check-npm-audit.mjs
 
   security-regressions:
     name: Regresiones de seguridad (backend)
