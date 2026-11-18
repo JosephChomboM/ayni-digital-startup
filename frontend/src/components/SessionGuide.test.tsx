@@ -168,8 +168,9 @@ it("saves a reaction through the API instead of storing review data in the brows
  await begin(); expect(speech.enabled).toBe(false);
  fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
  fireEvent.click(screen.getByRole("button",{name:"Receptivo"}));
- fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
- await screen.findByRole("heading",{name:"Reacción guardada en tu familia"});
+ fireEvent.click(screen.getByRole("button",{name:"Tranquilo/a"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar y terminar"}));
+ await screen.findByRole("heading",{name:"¡Gracias por compartir este momento!"});
  expect(recordReaction).toHaveBeenCalledWith("guide","receptivo");
 });
 it("una captura explícita se envía con consentimiento y muestra detalles detectados",async()=>{
@@ -214,9 +215,10 @@ it("keeps the review open and shows the server error if a reaction cannot be sav
  vi.mocked(recordReaction).mockRejectedValue(new Error("No pudimos guardar la reacción."));
  fireEvent.click(screen.getByRole("button",{name:"Terminar"}));
  fireEvent.click(screen.getByRole("button",{name:"Emocionado"}));
- fireEvent.click(screen.getByRole("button",{name:"Guardar reacción"}));
+ fireEvent.click(screen.getByRole("button",{name:"Tranquilo/a"}));
+ fireEvent.click(screen.getByRole("button",{name:"Guardar y terminar"}));
  expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar la reacción.");
- expect(screen.queryByRole("heading",{name:"Reacción guardada en tu familia"})).not.toBeInTheDocument();
+ expect(screen.queryByRole("heading",{name:"¡Gracias por compartir este momento!"})).not.toBeInTheDocument();
 });
 
 it("permite escoger manualmente el recuerdo antes de generar",async()=>{
@@ -317,20 +319,20 @@ it("usa el look que diseña la IA y pide otro distinto con el botón",async()=>{
  await begin();
  expect(getLook).toHaveBeenLastCalledWith("guide", 0);
  expect(screen.getAllByText(/Ayni se puso una boina de pintor/).length).toBeGreaterThan(0);
- fireEvent.click(screen.getByRole("button",{name:"Otro look para Ayni"}));
+ fireEvent.click(screen.getByRole("button",{name:"Cambiar ambiente"}));
  expect((await screen.findAllByText(/Ayni se puso un sombrero de paja/)).length).toBeGreaterThan(0);
  expect(getLook).toHaveBeenLastCalledWith("guide", 1);
 });
 it("reúne las opciones en el panel y conserva la conversación al alternar", async () => {
  await begin();
- fireEvent.click(screen.getByRole("button",{name:"Abrir opciones de sesión"}));
- expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","true");
+ fireEvent.click(screen.getByRole("button",{name:"Ampliar panel de conversación"}));
+ expect(screen.getByRole("button",{name:"Reducir panel de conversación"})).toHaveAttribute("aria-expanded","true");
  fireEvent.click(screen.getByRole("button",{name:"Opciones"}));
  expect(screen.getByRole("button",{name:"Opciones"})).toHaveAttribute("aria-pressed","true");
  fireEvent.click(screen.getByRole("button",{name:"Conversación"}));
  expect(screen.getByRole("log")).toHaveTextContent("Hola, ¿qué disfrutaban de sus paseos?");
  fireEvent.click(screen.getByRole("button",{name:"Cerrar opciones de sesión"}));
- expect(screen.getByRole("button",{name:"Abrir opciones de sesión"})).toHaveAttribute("aria-expanded","false");
+ expect(screen.getByRole("button",{name:"Ampliar panel de conversación"})).toHaveAttribute("aria-expanded","false");
  fireEvent.click(screen.getByRole("button",{name:"Volver al historial"}));
  await screen.findByRole("heading",{name:"Guía de sesión"});
 });
