@@ -815,6 +815,216 @@
   margin:18px 0 30px;
   font-weight:400
 }
+.plans-section {
+  scroll-margin-top:90px;
+  padding:clamp(58px,8vw,96px) clamp(22px,5vw,70px);
+  background:linear-gradient(112deg,#fff5eb 0%,#f4f7f7 53%,#f2f1e5 100%);
+}
+.plans-heading {
+  max-width:760px;
+  margin:0 auto 36px;
+  text-align:center
+}
+.plans-heading .eyebrow {
+  color:#c65c43
+}
+.plans-heading h2 {
+  margin:14px 0;
+  color:#264653;
+  font-size:clamp(2.3rem,4.3vw,3.5rem);
+  line-height:1.1
+}
+.plans-heading h2 em {
+  color:#d96b4f;
+  font-style:normal
+}
+.plans-heading>p:last-child {
+  max-width:56ch;
+  margin:0 auto;
+  color:#536b7b;
+  font-size:1.02rem
+}
+.plans-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:20px;
+  max-width:1020px;
+  margin:0 auto
+}
+.welcome-plan-card {
+  position:relative;
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  padding:clamp(24px,4vw,38px);
+  border:1px solid #dce7e5;
+  border-radius:20px;
+  background:#ffffff;
+  box-shadow:0 14px 38px #2646530b
+}
+.welcome-plan-family {
+  overflow:hidden;
+  border-color:#264653;
+  background:#264653;
+  color:#ffffff
+}
+.welcome-plan-family::after {
+  position:absolute;
+  top:-95px;
+  right:-85px;
+  width:210px;
+  height:210px;
+  border:1px solid #ffffff24;
+  border-radius:50%;
+  content:"";
+  pointer-events:none
+}
+.welcome-plan-kicker {
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  color:#bd5c42;
+  font-size:.75rem;
+  font-weight:750;
+  letter-spacing:.09em;
+  text-transform:uppercase
+}
+.welcome-plan-kicker svg {
+  color:#e76f51
+}
+.welcome-plan-family .welcome-plan-kicker {
+  color:#f4d58d
+}
+.welcome-plan-family .welcome-plan-kicker svg {
+  color:#f4d58d
+}
+.welcome-plan-spark {
+  color:#f4d58d;
+  font-size:1.45rem
+}
+.welcome-plan-card h3 {
+  margin:14px 0 4px;
+  color:#264653;
+  font-size:1.65rem;
+  font-weight:650;
+  letter-spacing:-.025em
+}
+.welcome-plan-family h3 {
+  color:#ffffff
+}
+.welcome-plan-description {
+  min-height:48px;
+  margin:0;
+  color:#5a707a;
+  line-height:1.55
+}
+.welcome-plan-family .welcome-plan-description {
+  color:#e2eaeb
+}
+.welcome-plan-price {
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+  margin:20px 0 17px;
+  color:#264653
+}
+.welcome-plan-price strong {
+  font-size:clamp(2.15rem,4vw,2.8rem);
+  font-weight:650;
+  letter-spacing:-.055em;
+  line-height:1
+}
+.welcome-plan-price span {
+  color:#667a82;
+  font-size:.88rem
+}
+.welcome-plan-family .welcome-plan-price {
+  color:#ffffff
+}
+.welcome-plan-family .welcome-plan-price span {
+  color:#d7e2e3
+}
+.welcome-plan-card ul {
+  display:grid;
+  gap:13px;
+  margin:0 0 26px;
+  padding:18px 0 0;
+  border-top:1px solid #e5eceb;
+  list-style:none
+}
+.welcome-plan-family ul {
+  border-color:#ffffff30
+}
+.welcome-plan-card li {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  color:#38545c;
+  font-size:.91rem;
+  line-height:1.45
+}
+.welcome-plan-card li svg {
+  flex:none;
+  margin-top:1px;
+  color:#d96b4f
+}
+.welcome-plan-family li {
+  color:#f2f5f4
+}
+.welcome-plan-family li svg {
+  color:#f4d58d
+}
+.welcome-plan-secondary,.welcome-plan-primary {
+  display:flex;
+  width:100%;
+  min-height:50px;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-top:auto;
+  border-radius:100px;
+  padding:12px 18px;
+  font-size:.94rem;
+  font-weight:700;
+  transition:transform .18s ease,background .18s ease
+}
+.welcome-plan-secondary {
+  border:1px solid #2c5f7c;
+  background:#ffffff;
+  color:#2c5f7c
+}
+.welcome-plan-secondary:hover {
+  transform:translateY(-2px);
+  background:#edf4f6
+}
+.welcome-plan-primary {
+  background:#e76f51;
+  color:#ffffff
+}
+.welcome-plan-primary:hover {
+  transform:translateY(-2px);
+  background:#d95f43
+}
+.plans-payment-note {
+  display:flex;
+  max-width:1020px;
+  align-items:flex-start;
+  justify-content:center;
+  gap:9px;
+  margin:22px auto 0;
+  color:#536b7b;
+  font-size:.82rem;
+  line-height:1.55;
+  text-align:center
+}
+.plans-payment-note svg {
+  flex:none;
+  margin-top:2px;
+  color:#2c5f7c
+}
 .invitation-flower {
   position:absolute;
   right:-22px;
@@ -2646,6 +2856,34 @@
   .app-content {
     margin:0;
     padding:0
+  }
+}
+@media(max-width:700px) {
+  .plans-section {
+    padding:54px 20px
+  }
+  .plans-heading {
+    margin-bottom:26px;
+    text-align:left
+  }
+  .plans-heading>p:last-child {
+    margin:0
+  }
+  .plans-grid {
+    grid-template-columns:1fr;
+    gap:14px
+  }
+  .welcome-plan-card {
+    padding:25px 22px
+  }
+  .welcome-plan-description {
+    min-height:0
+  }
+  .welcome-plan-price strong {
+    font-size:2.35rem
+  }
+  .plans-payment-note {
+    text-align:left
   }
 }
 .app-sidebar { overflow-y: auto; }

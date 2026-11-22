@@ -36,10 +36,10 @@ export function WelcomePage({ onLoginClick, onRegisterClick }: WelcomePageProps)
   }, []);
   return <div className="welcome-page">
     <header className="public-header"><a href="#inicio" aria-label="Ayni, inicio"><Brand /></a>
-      <nav className="public-links" aria-label="Secciones de Ayni"><a href="#como-funciona">Cómo funciona</a><a href="#conoce-ayni">Conoce a Ayni</a><a href="#preguntas">Preguntas</a></nav>
-      <div className="public-actions"><button className="text-action" onClick={onLoginClick}>Iniciar sesión</button><button className="primary-action" onClick={onRegisterClick}>Crear cuenta <ArrowUpRight size={17}/></button></div>
+      <nav className="public-links" aria-label="Secciones de Ayni"><a href="#como-funciona">Cómo funciona</a><a href="#conoce-ayni">Conoce a Ayni</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a></nav>
+      <div className="public-actions"><button className="text-action" onClick={onLoginClick}>Iniciar sesión</button><a className="primary-action" href="#planes">Prueba hoy <ArrowRight size={17}/></a></div>
       <button className="mobile-menu" onClick={() => setMenu(!menu)} aria-label={menu ? "Cerrar menú" : "Abrir menú"} aria-expanded={menu}>{menu ? <X/> : <Menu/>}</button>
-      {menu && <nav className="public-mobile-menu" aria-label="Menú móvil"><a href="#como-funciona" onClick={() => setMenu(false)}>Cómo funciona</a><a href="#conoce-ayni" onClick={() => setMenu(false)}>Conoce a Ayni</a><button onClick={onLoginClick}>Iniciar sesión</button><button onClick={onRegisterClick}>Crear cuenta</button></nav>}
+      {menu && <nav className="public-mobile-menu" aria-label="Menú móvil"><a href="#como-funciona" onClick={() => setMenu(false)}>Cómo funciona</a><a href="#conoce-ayni" onClick={() => setMenu(false)}>Conoce a Ayni</a><a href="#planes" onClick={() => setMenu(false)}>Planes · Prueba hoy</a><button onClick={onLoginClick}>Iniciar sesión</button><button onClick={onRegisterClick}>Crear cuenta</button></nav>}
     </header>
     <main id="inicio">
       <section className="landing-hero">
@@ -69,6 +69,42 @@ export function WelcomePage({ onLoginClick, onRegisterClick }: WelcomePageProps)
         <div className="preview-session"><div className="preview-top"><span className="status-dot"/> Un vistazo a una sesión <small>Ejemplo ilustrativo</small></div><div className="preview-stage"><AyniCompanion decorative mood={example === "photo" ? "curious" : example === "song" ? "joyful" : "warm"}/><div className="preview-bubble">{sample.question}</div></div><div className="example-picker" role="group" aria-label="Explorar ejemplos de recuerdos">{Object.entries(examples).map(([key,value])=><button key={key} aria-pressed={key===example} onClick={()=>setExample(key as keyof typeof examples)}>{value.label}</button>)}</div><figure className="sample-memory"><img src={sample.image} alt="Escena familiar ilustrativa" loading="lazy"/><figcaption><small>EL RECUERDO QUE NOS REÚNE</small><strong>{sample.title}</strong></figcaption></figure></div>
       </section>
       <section className="landing-section family-promise"><div className="promise-photo"><img src="/images/familia-participa.jpg" alt="Familia reunida alrededor de una persona mayor" loading="lazy"/><span>Estar presentes.<br/>Incluso desde lejos.</span></div><div><p className="eyebrow">HECHO PARA TU FAMILIA</p><h2>Lo importante<br/>es <em>compartirlo.</em></h2><p>Cada familiar puede aportar una historia. Juntos construyen un lugar para volver a las cosas que les gusta recordar.</p><div className="promise-points"><span><ShieldCheck/> Recuerdos privados</span><span><Heart/> Sin respuestas correctas</span><span><BookOpen/> A su propio ritmo</span></div></div></section>
+      <section className="plans-section" id="planes" aria-labelledby="plans-title">
+        <div className="plans-heading">
+          <p className="eyebrow">UN ESPACIO PARA CADA FAMILIA</p>
+          <h2 id="plans-title">Empieza gratis.<br/><em>Crece a tu ritmo.</em></h2>
+          <p>Prueba Ayni sin costo y, cuando quieran compartir más, elijan el Plan Familia.</p>
+        </div>
+        <div className="plans-grid">
+          <article className="welcome-plan-card welcome-plan-free" aria-labelledby="free-plan-title">
+            <div className="welcome-plan-kicker"><span>Para comenzar</span><Heart size={19} aria-hidden="true"/></div>
+            <h3 id="free-plan-title">Plan Gratis</h3>
+            <p className="welcome-plan-description">Un primer espacio para guardar recuerdos y conversar en familia.</p>
+            <p className="welcome-plan-price"><strong>S/ 0</strong><span>sin costo</span></p>
+            <ul>
+              <li><Check size={18}/>Hasta 10 fotos familiares</li>
+              <li><Check size={18}/>Hasta 3 canciones</li>
+              <li><Check size={18}/>1 guía de sesión cada 7 días</li>
+              <li><Check size={18}/>Invita a 1 familiar</li>
+            </ul>
+            <button className="welcome-plan-secondary" onClick={onRegisterClick}>Empezar gratis <ArrowRight size={17}/></button>
+          </article>
+          <article className="welcome-plan-card welcome-plan-family" aria-labelledby="family-plan-title">
+            <div className="welcome-plan-kicker"><span>Para compartir más</span><span className="welcome-plan-spark" aria-hidden="true">✳</span></div>
+            <h3 id="family-plan-title">Plan Familia</h3>
+            <p className="welcome-plan-description">Más espacio para reunir historias y preparar nuevos encuentros.</p>
+            <p className="welcome-plan-price"><strong>S/ 19.90</strong><span>al mes</span></p>
+            <ul>
+              <li><Check size={18}/>Fotos sin límite durante el plan activo</li>
+              <li><Check size={18}/>Guías de sesión sin límite semanal</li>
+              <li><Check size={18}/>Anécdotas, canciones y recuerdos en familia</li>
+              <li><Check size={18}/>Suscripción administrada desde tu cuenta</li>
+            </ul>
+            <button className="welcome-plan-primary" onClick={onRegisterClick}>Crear cuenta y continuar <ArrowRight size={17}/></button>
+          </article>
+        </div>
+        <p className="plans-payment-note"><ShieldCheck size={17}/>Los pagos están en modo de prueba: todavía no se realizan cobros reales. Para continuar con Plan Familia, crea una cuenta y abre “Plan” en tu espacio.</p>
+      </section>
       <section className="landing-section faq-section" id="preguntas"><div><p className="eyebrow">ANTES DE EMPEZAR</p><h2>¿Conversamos<br/><em>un poquito más?</em></h2></div><div>{[
         ["¿Qué necesito para empezar?","Crea tu cuenta, completa el perfil familiar y comparte un recuerdo positivo. Puedes empezar escribiendo, sin cámara ni micrófono."],
         ["¿Ayni reemplaza la atención de un profesional?","No. Ayni facilita conversaciones y actividades familiares. No es un servicio de salud ni realiza diagnósticos. Si tu familiar tiene un diagnóstico de demencia, consulta con su médico antes de empezar."],
