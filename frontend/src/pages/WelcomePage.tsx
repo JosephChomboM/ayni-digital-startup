@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, Heart, Image, Music2, BookOpen, ShieldCheck, MessageCircle, Check, Menu, X, Play, Mail, Phone } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Heart, Image, Music2, BookOpen, ShieldCheck, Check, Menu, X, Play, Mail, Phone } from "lucide-react";
 import type { User } from "../api/auth";
 import { Brand } from "../components/Brand";
 import { AyniCompanion } from "../components/AyniCompanion";
