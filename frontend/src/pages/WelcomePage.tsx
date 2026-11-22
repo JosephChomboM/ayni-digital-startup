@@ -156,7 +156,11 @@ export function WelcomePage({ onLoginClick, onRegisterClick }: WelcomePageProps)
     <footer className="public-footer">
       <div className="footer-brand"><Brand/><p>Acompañamos momentos familiares.<br/>Ayni no es un servicio de salud.</p></div>
       <div className="footer-contact"><strong>Contacto</strong><a href="mailto:ayni.recuerdos@gmail.com"><Mail size={16}/>ayni.recuerdos@gmail.com</a><a href="tel:+51991171700"><Phone size={16}/>+51 991 171 700</a></div>
-      <nav className="footer-socials" aria-label="Redes sociales de Ayni"><strong>Síguenos</strong><a href="https://www.instagram.com/its_ayni/" target="_blank" rel="noreferrer">Instagram <span>@its_ayni</span></a><a href="https://www.facebook.com/its_ayni" target="_blank" rel="noreferrer">Facebook <span>its_ayni</span></a><a href="https://www.tiktok.com/@its_ayni" target="_blank" rel="noreferrer">TikTok <span>@its_ayni</span></a></nav>
+      <nav className="footer-socials" aria-label="Redes sociales de Ayni"><strong>Síguenos</strong>
+        <a href="https://www.instagram.com/its_ayni/" target="_blank" rel="noreferrer"><span className="footer-social-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle className="footer-social-dot" cx="17.7" cy="6.5" r=".9"/></svg></span><span className="footer-social-label">Instagram <span>@its_ayni</span></span></a>
+        <a href="https://www.facebook.com/its_ayni" target="_blank" rel="noreferrer"><span className="footer-social-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14.2 21v-8h2.7l.4-3.2h-3.1V7.7c0-.9.3-1.5 1.6-1.5h1.7V3.3c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.3H8v3.2h2.8v8z"/></svg></span><span className="footer-social-label">Facebook <span>its_ayni</span></span></a>
+        <a href="https://www.tiktok.com/@its_ayni" target="_blank" rel="noreferrer"><span className="footer-social-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3v11.2a4.2 4.2 0 1 1-3.4-4.1"/><path d="M14 3c.4 2.7 2.1 4.4 5 4.7"/></svg></span><span className="footer-social-label">TikTok <span>@its_ayni</span></span></a>
+      </nav>
       <p className="footer-copyright">Hecho con cariño en Perú. · © {year} Ayni Digital</p>
     </footer>
   </div>;

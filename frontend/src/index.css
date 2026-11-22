@@ -1282,7 +1282,13 @@
 .footer-contact a,.footer-socials a { display:inline-flex; align-items:center; gap:8px; color:#536b7b; text-decoration:none; transition:color .18s ease,transform .18s ease; }
 .footer-contact a:hover,.footer-socials a:hover { color:#d9654c; transform:translateX(2px); }
 .footer-contact a svg { color:#2c5f7c; }
-.footer-socials a span { color:#87969a; }
+.footer-social-label { display:grid; gap:2px; }
+.footer-social-label>span { color:#87969a; font-size:.8rem; }
+.footer-social-icon { display:grid; width:30px; height:30px; flex:none; place-items:center; border:1px solid #d6e5ed; border-radius:10px; background:linear-gradient(145deg,#f8fcfe,#e7f1f6); color:#2c5f7c; box-shadow:inset 0 1px 0 #fff,0 2px 0 #d4e2e9; transition:transform .2s ease,box-shadow .2s ease; }
+.footer-social-icon svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.footer-social-icon svg .footer-social-dot { fill:currentColor; stroke:none; }
+.footer-socials a:nth-of-type(2) .footer-social-icon svg path { fill:currentColor; stroke:none; }
+.footer-socials a:hover .footer-social-icon { transform:translateY(-2px); box-shadow:inset 0 1px 0 #fff,0 4px 0 #c5d9e3,0 7px 12px #2c5f7c22; }
 .footer-copyright { grid-column:1/-1; margin:4px 0 0; padding-top:16px; border-top:1px solid #e8eeee; font-size:.74rem; color:#74868b; }
 .footer-contact a:focus-visible,.footer-socials a:focus-visible { outline:3px solid #f0bc4d; outline-offset:3px; border-radius:4px; }
 @media(max-width:700px) {
