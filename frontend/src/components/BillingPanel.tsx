@@ -5,6 +5,9 @@ import type { BillingStatus } from "../api/billing";
 import { ApiError } from "../api/client";
 import { Button } from "./ui/button";
 
+const apiUrl = import.meta.env.VITE_API_URL?.toLowerCase() ?? "";
+const isTestBillingEnvironment = import.meta.env.DEV || /localhost|127\.0\.0\.1|stage/.test(apiUrl);
+
 interface BillingPanelProps {
   onCheckout?: (url: string) => void;
   embedded?: boolean;
@@ -102,10 +105,10 @@ export function BillingPanel({ onCheckout = (url) => window.location.assign(url)
         </div>
         <div className={embedded ? "flex shrink-0 flex-col items-start gap-3 lg:min-w-56 lg:items-end" : "flex shrink-0 flex-col items-start gap-4 sm:items-end"}>
           <p className={`text-3xl font-bold ${embedded ? "text-[#2c5f7c]" : "text-white sm:text-4xl"}`}>S/ 19.90 <span className={`text-base font-medium ${embedded ? "text-slate-500" : "text-white/70"}`}>al mes</span></p>
-          {caregiver && canSubscribe && !loading && <Button type="button" variant="secondary" disabled={saving} onClick={checkout} className="w-auto min-h-11 px-5 text-sm">{saving ? "Abriendo pago..." : status?.subscription_status === "canceled" ? "Renovar suscripción" : status?.subscription_status === "incomplete_expired" ? "Reintentar pago" : "Suscribirme"}</Button>}
-          {caregiver && !loading && status && status.subscription_status !== "canceled" && !status.cancel_at_period_end && !confirmCancel && (
+          {isTestBillingEnvironment && caregiver && canSubscribe && !loading && <Button type="button" variant="secondary" disabled={saving} onClick={checkout} className="w-auto min-h-11 px-5 text-sm">{saving ? "Abriendo pago..." : status?.subscription_status === "canceled" ? "Renovar suscripción" : status?.subscription_status === "incomplete_expired" ? "Reintentar pago" : "Suscribirme"}</Button>}
+          {isTestBillingEnvironment && caregiver && !loading && status && status.subscription_status !== "canceled" && !status.cancel_at_period_end && !confirmCancel && (
             <Button type="button" variant="outline" disabled={saving} onClick={() => { setNotice(""); setConfirmCancel(true); }} className={embedded ? "w-auto border-slate-300 bg-white text-[#2c5f7c] hover:bg-slate-50" : "w-auto border-white/40 bg-transparent text-white hover:bg-white/10"}>Cancelar suscripción</Button>)}
-          <p className={`max-w-xs text-xs ${embedded ? "text-slate-500 lg:text-right" : "text-white/60 sm:text-right"}`}>Los pagos están en modo de prueba y todavía no se realizan cobros reales.</p>
+          <p className={`max-w-xs text-xs ${embedded ? "text-slate-500 lg:text-right" : "text-white/60 sm:text-right"}`}>{isTestBillingEnvironment ? "Tus datos de pago se procesan de forma segura en Stripe. Este modo de prueba no realiza cobros reales." : "La contratación de Plan Familia aún no está habilitada en producción."}</p>
         </div>
       </div>
       {confirmCancel && <div role="group" aria-label="Confirmación de cancelación" className={`mt-6 space-y-3 pt-5 ${embedded ? "border-t border-slate-200" : "mx-auto max-w-7xl border-t border-white/20"}`}>

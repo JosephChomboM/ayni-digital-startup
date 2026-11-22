@@ -4,7 +4,7 @@ import type { GoogleProof } from "../api/account";
 
 interface GoogleIdentityClient {
   initialize: (options: { client_id: string; nonce: string; callback: (result: { credential: string }) => void }) => void;
-  renderButton: (element: HTMLElement, options: { type: string; theme: string; size: string; text: string; locale: string; width: number }) => void;
+  renderButton: (element: HTMLElement, options: { type: string; theme: string; size: string; text: string; locale: string; width: number; shape: string }) => void;
 }
 type GoogleWindow = Window & { google?: { accounts: { id: GoogleIdentityClient } } };
 let scriptLoad: Promise<GoogleIdentityClient> | undefined;
@@ -41,6 +41,10 @@ export function GoogleSignInButton({ disabled = false, onCredential }: { disable
     if (disabled) return;
     let active = true;
     const node = container.current;
+    let resizeObserver: ResizeObserver | undefined;
+    let mutationObserver: MutationObserver | undefined;
+    let fitFrame = 0;
+    let fitTimer = 0;
     setState("loading");
     async function initialize() {
       try {
@@ -53,17 +57,52 @@ export function GoogleSignInButton({ disabled = false, onCredential }: { disable
         client.initialize({ client_id: config.client_id, nonce: challenge.nonce,
           callback: (result) => { if (active && result.credential) callback.current({ credential: result.credential, challenge_id: challenge.challenge_id }); },
         });
-        client.renderButton(node, { type: "standard", theme: "outline", size: "large", text: "continue_with", locale: "es", width: Math.min(node.clientWidth || 400, 400) });
+        client.renderButton(node, { type: "standard", theme: "outline", size: "large", text: "continue_with", locale: "es", shape: "pill", width: Math.min(node.clientWidth || 400, 400) });
+        const fitButton = () => {
+          node.style.width = "100%";
+          node.style.display = "flex";
+          node.style.justifyContent = "center";
+          node.style.overflow = "visible";
+          const frames = [...node.querySelectorAll<HTMLIFrameElement>("iframe")]
+            .filter((frame) => frame.offsetWidth > 0 && frame.offsetHeight > 0)
+            .sort((left, right) => right.offsetWidth - left.offsetWidth);
+          const frame = frames[0];
+          if (!frame || !node.clientWidth) return false;
+          const scale = Math.max(1, node.clientWidth / frame.offsetWidth);
+          frame.style.transformOrigin = "center center";
+          frame.style.transform = `scale(${scale})`;
+          for (let parent = frame.parentElement; parent && parent !== node; parent = parent.parentElement) {
+            parent.style.overflow = "visible";
+          }
+          node.style.height = `${Math.ceil(frame.offsetHeight * scale)}px`;
+          return true;
+        };
+        const observeGoogleFrame = () => {
+          node.querySelectorAll<HTMLIFrameElement>("iframe").forEach((frame) => frame.addEventListener("load", fitButton, { once: true }));
+          fitButton();
+        };
+        if (typeof ResizeObserver !== "undefined") {
+          resizeObserver = new ResizeObserver(fitButton);
+          resizeObserver.observe(node);
+        }
+        if (typeof MutationObserver !== "undefined") {
+          mutationObserver = new MutationObserver(fitButton);
+          mutationObserver.observe(node, { childList: true, subtree: true });
+        }
+        fitFrame = window.requestAnimationFrame(observeGoogleFrame);
+        fitTimer = window.setInterval(() => {
+          if (fitButton()) window.clearInterval(fitTimer);
+        }, 80);
         setState("ready");
       } catch { if (active) setState("error"); }
     }
     void initialize();
-    return () => { active = false; node?.replaceChildren(); };
+    return () => { active = false; resizeObserver?.disconnect(); mutationObserver?.disconnect(); window.cancelAnimationFrame(fitFrame); window.clearInterval(fitTimer); node?.replaceChildren(); };
   }, [disabled, attempt]);
 
-  return <div className="space-y-2">
-    <div ref={container} aria-label="Acceso con Google" aria-disabled={disabled} className={disabled ? "pointer-events-none opacity-50" : "min-h-0"} />
-    {(disabled || state !== "ready") && <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>{disabled ? "Continuar con Google" : state === "loading" ? "Cargando Google…" : "Continuar con Google · Próximamente"}</button>}
+  return <div className="google-sign-in-button w-full space-y-2">
+    <div ref={container} aria-label="Acceso con Google" aria-disabled={disabled} className={`google-sign-in-button__provider flex w-full justify-center ${disabled ? "pointer-events-none opacity-50" : "min-h-0"}`} />
+    {(disabled || state !== "ready") && <button type="button" disabled className="flex min-h-[50px] w-full items-center justify-center gap-3 rounded-full border border-gray-300 bg-white px-4 py-3 text-[15px] font-semibold text-[#264653] disabled:cursor-not-allowed"><span aria-hidden="true" className="text-base font-bold">G</span>{disabled ? "Continuar con Google" : state === "loading" ? "Cargando Google…" : "Continuar con Google · Próximamente"}</button>}
     {state === "error" && <p className="text-xs text-slate-500">No pudimos cargar Google. Puedes usar tu correo y contraseña. <button type="button" disabled={disabled} onClick={() => setAttempt((value) => value + 1)} className="font-semibold underline">Volver a intentar Google</button></p>}
   </div>;
 }
