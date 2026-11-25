@@ -12,7 +12,6 @@ const detector = vi.hoisted(() => ({
 }));
 
 vi.mock("@mediapipe/tasks-vision", () => ({
-  FilesetResolver: { isSimdSupported: vi.fn().mockResolvedValue(true) },
   FaceLandmarker: { createFromOptions: vi.fn().mockResolvedValue(detector) },
 }));
 
