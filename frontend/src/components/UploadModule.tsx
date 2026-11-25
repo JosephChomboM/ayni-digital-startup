@@ -1,6 +1,6 @@
 import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, FileText, ImagePlus, Link2, Music2, Trash2, Users, Heart } from "lucide-react"
+import { Check, FileText, ImagePlus, Link2, Music2, Trash2, Users, Heart, Search, CalendarDays, Pencil, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Input } from "./ui/input"
@@ -179,101 +179,87 @@ export function UploadModule() {
     {success && !successDialog && <p role="status" className="text-sm text-[#2c5f7c]">{success}</p>}
     <section ref={panel} tabIndex={-1} aria-label={section === "add" ? editing ? "Editar recuerdo" : "Agregar recuerdo" : "Mis recuerdos"} className="focus:outline-none">
     {section === "add" ? <>
-    <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
-      <CardHeader className="pb-4">
+    <Card className="memory-composer">
+      <CardHeader className="memory-composer-header">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-[#2c5f7c] text-white shadow-xs shrink-0">
-              <Heart className="size-5 fill-current text-[#e76f51]" />
-              <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[#f4a261]" />
-            </div>
+            <div className="memory-composer-mark"><Heart className="size-6 fill-current text-[#e76f51]" aria-hidden="true" /></div>
             <div>
-              <CardTitle className="text-lg font-extrabold text-[#2c5f7c]">
+              <CardTitle className="memory-composer-title">
                 {editing ? "Editar recuerdo" : "Agregar recuerdo"}
               </CardTitle>
-              <CardDescription className="text-xs text-gray-500 mt-0.5">
+              <CardDescription className="memory-composer-description">
                 Cada recuerdo compartido se convierte en un momento de estímulo y conexión.
               </CardDescription>
             </div>
           </div>
-          <div className="rounded-2xl bg-[#2c5f7c]/10 p-2.5 text-[#2c5f7c] shrink-0">
-            <Users className="size-5" />
-          </div>
+          <span className="memory-family-note"><Users size={17} aria-hidden="true"/> Un espacio familiar</span>
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-5">
-        <section className="space-y-4 py-2" aria-labelledby="family-photos-title">
+      <CardContent className="memory-composer-content">
+        <section className="memory-photo-section" aria-labelledby="family-photos-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><h3 id="family-photos-title" className="font-semibold text-[#2c5f7c]">Fotos para compartir</h3><p className="mt-1 text-sm text-slate-600">Elige imágenes familiares para acompañar una conversación.</p></div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#2c5f7c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244f68] has-[:disabled]:opacity-60">
+            <div className="memory-section-heading"><span className="memory-step-number">01</span><div><h3 id="family-photos-title">Fotos para compartir</h3><p>Elige imágenes familiares para acompañar una conversación.</p></div></div>
+            <label className="memory-photo-picker">
               <ImagePlus className="size-4" /> Seleccionar fotos
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={pending || !currentUser} onChange={(event) => { handlePhotoFiles(event.target.files); event.currentTarget.value = "" }} className="sr-only" />
             </label>
           </div>
-          <p className="text-xs text-slate-500">Si guardaste fotos antes en este navegador, vuelve a seleccionarlas para compartirlas.</p>
           {photoError && <p role="alert" className="text-sm text-red-700">{photoError}</p>}
-          {pendingPhotos.length > 0 && <p className="text-sm font-medium text-[#2c5f7c]">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada" : "fotos seleccionadas"}; se guardarán junto con el recuerdo.</p>}
+          {pendingPhotos.length > 0 && <p className="memory-selected-count">{pendingPhotos.length} {pendingPhotos.length === 1 ? "foto seleccionada; se guardarán" : "fotos seleccionadas; se guardarán"} junto con el recuerdo.</p>}
           {pendingPhotos.length > 0 && <StagedPhotoGrid files={pendingPhotos} onRemove={(index) => setPendingPhotos((items) => items.filter((_, itemIndex) => itemIndex !== index))} />}
-          {pendingPhotos.length === 0 && <p className="py-3 text-sm text-slate-500">Las fotos se guardarán de forma privada y podrás verlas desde otros dispositivos de tu familia.</p>}
+          {pendingPhotos.length === 0 && <p className="memory-photo-empty"><ImagePlus size={19} aria-hidden="true"/> Puedes agregar una o varias fotos; aparecerán aquí antes de guardar.</p>}
         </section>
 
-        <div className="space-y-4 border-t border-slate-200 pt-5">
-          <div><h3 className="font-semibold text-[#2c5f7c]">Guardar un recuerdo</h3><p className="mt-1 text-sm text-slate-600">Conserva una historia o una canción que ayude a abrir la conversación.</p></div>
-          <div className="flex gap-2" role="tablist" aria-label="Tipo de recuerdo">
-            <button type="button" role="tab" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "anecdote" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}>
-              <FileText className="mr-2 inline size-4" />Anécdota
+        <div className="memory-story-section">
+          <div className="memory-section-heading"><span className="memory-step-number">02</span><div><h3>Guardar un recuerdo</h3><p>Una historia o canción puede abrir una conversación especial.</p></div></div>
+          <div className="memory-kind-tabs" role="tablist" aria-label="Tipo de recuerdo">
+            <button type="button" role="tab" aria-label="Anécdota" aria-selected={memoryMode === "anecdote"} onClick={() => { setMemoryMode("anecdote"); setSong(""); setError(null) }}>
+              <FileText aria-hidden="true"/><span>Anécdota</span><small>Un momento contado</small>
             </button>
-            <button type="button" role="tab" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }} className={`rounded-lg px-4 py-2 text-sm font-semibold ${memoryMode === "song" ? "bg-[#2c5f7c] text-white" : "text-[#2c5f7c] hover:bg-slate-100"}`}>
-              <Music2 className="mr-2 inline size-4" />Canción
+            <button type="button" role="tab" aria-label="Canción" aria-selected={memoryMode === "song"} onClick={() => { setMemoryMode("song"); setAnecdote(""); setError(null) }}>
+              <Music2 aria-hidden="true"/><span>Canción</span><small>Una melodía especial</small>
             </button>
           </div>
-        <div className="flex flex-col gap-1.5">
+          <div className="memory-compose-layout">
+            <div className="memory-compose-main">
+              <div className="memory-fields flex flex-col gap-1.5">
+                <label htmlFor="memory-title">Título del recuerdo <small id="memory-title-help">Un nombre corto para encontrarlo luego</small></label>
+                <Input id="memory-title" aria-label="Título del recuerdo" aria-describedby="memory-title-help" required maxLength={100} value={title} disabled={pending}
+                  onChange={(e) => { setTitle(e.target.value); setSuccess(null) }}
+                  placeholder="Ej. Un paseo en familia" className="memory-title-input" />
+                {memoryMode === "anecdote" && <label htmlFor="memory" className="memory-story-label"><FileText aria-hidden="true"/> Una anécdota especial</label>}
+                {memoryMode === "anecdote" && <Textarea
+                  id="memory"
+                  maxLength={5000}
+                  disabled={pending || memoryMode !== "anecdote"}
+                  value={anecdote}
+                  onChange={(e) => { setAnecdote(e.target.value); setSuccess(null) }}
+                  placeholder="¿Qué pasó? ¿Quiénes estaban? ¿Qué detalle de ese día recuerdan con cariño?"
+                  className="memory-story-input"
+                />}
+              </div>
 
-
-          <label htmlFor="memory-title" className="text-xs font-bold text-[#264653]">Título del recuerdo</label>
-          <Input id="memory-title" required maxLength={100} value={title} disabled={pending}
-            onChange={(e) => { setTitle(e.target.value); setSuccess(null) }}
-            placeholder="Ej. Un paseo en familia" className="text-xs border-gray-200 bg-gray-50/50" />
-          {memoryMode === "anecdote" && <label htmlFor="memory" className="flex items-center gap-2 text-xs font-bold text-[#264653]">
-            <FileText className="size-4 text-[#e76f51]" /> Una anécdota especial
-          </label>}
-          {memoryMode === "anecdote" && <Textarea
-            id="memory"
-            maxLength={5000}
-            disabled={pending || memoryMode !== "anecdote"}
-            value={anecdote}
-            onChange={(e) => { setAnecdote(e.target.value); setSuccess(null) }}
-            placeholder="¿Qué pasó? ¿Quiénes estaban? ¿Qué detalle de ese día recuerdan con cariño?"
-            className="min-h-24 text-xs border-gray-200 bg-gray-50/50"
-          />}
-        </div>
-
-        {memoryMode === "song" && <div className="flex flex-col gap-1.5">
-          <label htmlFor="song" className="flex items-center justify-between text-xs font-bold text-[#264653]">
-            <span className="flex items-center gap-2">
-              <Music2 className="size-4 text-[#e76f51]" /> Canción de YouTube o Spotify
-            </span>
-            <span className="text-[11px] text-[#1DB954] font-semibold flex items-center gap-1">
-              <SpotifyIcon className="size-3.5" /> Enlace de canción
-            </span>
-          </label>
-          <div className="relative">
-            <Link2 className="absolute left-3 top-3 size-4 text-gray-400" />
-            <Input
-              id="song"
-              type="url"
-              maxLength={2048}
-              disabled={pending}
-              value={song}
-              onChange={(e) => { setSong(e.target.value); setSuccess(null) }}
-              className="pl-9 text-xs border-gray-200 bg-gray-50/50"
-              placeholder="Pega un enlace de video de YouTube o de canción de Spotify"
-            />
+              {memoryMode === "song" && <div className="memory-song-field">
+                <label htmlFor="song"><span><Music2 aria-hidden="true"/> Canción de YouTube o Spotify</span><span className="memory-song-provider"><SpotifyIcon/> YouTube · Spotify</span></label>
+                <div className="relative">
+                  <Link2 className="absolute left-4 top-4 size-4 text-[#829397]" aria-hidden="true" />
+                  <Input id="song" type="url" maxLength={2048} disabled={pending} value={song}
+                    onChange={(e) => { setSong(e.target.value); setSuccess(null) }}
+                    className="memory-song-input" placeholder="Pega aquí el enlace de la canción" />
+                </div>
+              </div>}
+            </div>
+            <aside className={`memory-writing-ideas memory-writing-${memoryMode}`}>
+              <span className="memory-ideas-icon">{memoryMode === "song" ? <Music2 aria-hidden="true"/> : <Heart aria-hidden="true"/>}</span>
+              <p>Una pista para empezar</p>
+              <h4>{memoryMode === "song" ? "Las canciones guardan momentos." : "No hace falta contarlo todo."}</h4>
+              <ul>{(memoryMode === "song" ? ["¿Cuándo la escuchaban?", "¿Quién la elegía?", "¿Qué les hace sentir?"] : ["¿Quién estaba contigo?", "¿Qué detalle recuerdas?", "¿Qué los hizo reír?"]).map(item => <li key={item}>{item}</li>)}</ul>
+            </aside>
           </div>
-        </div>}
 
-        <div className="flex flex-col gap-2 text-xs text-[#264653]">
+        <div className="memory-feelings flex flex-col gap-2 text-xs text-[#264653]">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={positive} disabled={pending} onChange={(e) => setPositive(e.target.checked)} />
             Es un recuerdo bonito
@@ -284,8 +270,8 @@ export function UploadModule() {
           </label>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <Badge variant="secondary" className="bg-[#e76f51]/10 text-[#e76f51] hover:bg-[#e76f51]/20 font-bold text-[10px]">
+        <div className="memory-save-row">
+          <Badge variant="secondary" className="memory-private-badge">
             <Check className="size-3 mr-1" /> Contenido protegido
           </Badge>
           <Button
@@ -298,18 +284,11 @@ export function UploadModule() {
         </div>
 
         {editing && <Button variant="outline" disabled={pending} onClick={() => { resetForm(); setError(null); setSuccess(null); setSection("list") }}>Cancelar edición</Button>}
-        <Button variant="outline" disabled={pending} onClick={openProfile}>Perfil y familia</Button>
-        <Button
-          variant="outline"
-          onClick={handleShareWhatsApp}
-          className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 font-bold text-xs rounded-xl"
-        >
-          <Users className="size-4 mr-2" /> Compartir Ayni por WhatsApp
-        </Button>
+        <div className="memory-utility-actions"><button type="button" disabled={pending} onClick={openProfile}>Perfil y familia <span aria-hidden="true">→</span></button><button type="button" onClick={handleShareWhatsApp}><Users size={16} aria-hidden="true"/> Compartir Ayni por WhatsApp</button></div>
         </div>
       </CardContent>
     </Card>
-    </> : <Contributions revision={revision} busy={pending} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />}
+    </> : <Contributions revision={revision} busy={pending} onAdd={() => setSection("add")} onDeletePhoto={handleDeletePhoto} onEdit={handleEdit} onDelete={handleDelete} />}
     </section>
     {successDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="memory-saved-title" className="w-full max-w-sm rounded-xl bg-white p-7 text-center shadow-xl"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="size-7" aria-hidden="true" /></div><h2 id="memory-saved-title" className="mt-4 text-xl font-semibold text-[#2c5f7c]">¡Se guardó correctamente!</h2><p className="mt-2 text-sm text-slate-600">{success}</p><Button autoFocus onClick={() => setSuccessDialog(false)} className="mt-5 w-full bg-[#2c5f7c] hover:bg-[#244f68]">OK</Button></section></div>}
     </div>
@@ -347,8 +326,9 @@ function StagedPhotoGrid({ files, onRemove }: { files: File[]; onRemove: (index:
   return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{files.map((_, index) => <figure key={index} className="overflow-hidden rounded-lg">{sources[index] && <img src={sources[index]} alt={`Vista previa de foto ${index + 1}`} className="aspect-square w-full object-cover" />}<figcaption className="flex items-center justify-between gap-2 py-2 text-xs text-slate-600"><span className="truncate">Foto seleccionada {index + 1}</span><button type="button" onClick={() => onRemove(index)} aria-label={`Quitar foto ${index + 1}`} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-red-700"><Trash2 className="size-4" /></button></figcaption></figure>)}</div>
 }
 
-export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdit, onDelete }: {
+export function Contributions({ revision = 0, busy = false, onAdd, onDeletePhoto, onEdit, onDelete }: {
   revision?: number; busy?: boolean;
+  onAdd?: () => void;
   onDeletePhoto?: (photo: MemoryPhoto) => void;
   onEdit?: (id: string) => void; onDelete?: (id: string) => void;
 }) {
@@ -366,6 +346,8 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
   const [dateRange, setDateRange] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [typeFilter, setTypeFilter] = useState<"all" | "anecdote" | "song">("all")
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest")
 
   useEffect(() => {
     let active = true
@@ -392,79 +374,56 @@ export function Contributions({ revision = 0, busy = false, onDeletePhoto, onEdi
     if (dateRange === "week" && date < new Date(now.getTime() - 7 * 86400000)) return false
     if (dateFrom && date < new Date(`${dateFrom}T00:00:00`)) return false
     if (dateTo && date > new Date(`${dateTo}T23:59:59.999`)) return false
+    if (typeFilter !== "all" && memory.type !== typeFilter) return false
     return true
-  }), [items, dateRange, dateFrom, dateTo])
+  }).sort((left, right) => (sortOrder === "newest" ? -1 : 1) * (Date.parse(left.created_at) - Date.parse(right.created_at))), [items, dateRange, dateFrom, dateTo, typeFilter, sortOrder])
+  const formatMemoryDate = (value: string) => new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "long", year: "numeric" }).format(new Date(value))
   return (
-    <Card className="border border-gray-200 bg-white shadow-xs rounded-2xl">
-      <CardHeader>
-        <CardTitle className="text-base font-bold text-[#2c5f7c]">
-          Contribuciones familiares
-        </CardTitle>
-        <CardDescription className="text-xs text-gray-500 mt-0.5">
-          Los recuerdos que comparte la red familiar entre todos.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <section className="memory-collection" aria-labelledby="memory-collection-title">
+      <header className="memory-collection-header">
+        <div><p className="memory-collection-kicker">HISTORIAS QUE NOS ACERCAN</p><h2 id="memory-collection-title">El álbum de la familia</h2><p>Encuentra una anécdota, una canción o una foto para volver a compartir.</p></div>
+        <div className="memory-collection-count"><strong>{loading ? "—" : total}</strong><span>{total === 1 ? "recuerdo" : "recuerdos"}</span></div>
+        {onAdd && <Button type="button" onClick={onAdd} className="memory-collection-add"><ImagePlus size={17} aria-hidden="true"/> Añadir otro recuerdo</Button>}
+      </header>
 
-        <form className="flex flex-col gap-2" onSubmit={(event) => {
-          event.preventDefault(); setPage(0); setQuery(searchText.trim())
-        }}>
-          <label htmlFor="memory-search" className="text-xs font-bold text-[#264653]">Buscar recuerdos</label>
-          <Input id="memory-search" maxLength={100} value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Título, palabras, personas o lugares" />
-          <div className="flex gap-2">
-            <Button type="submit" size="sm" variant="outline">Buscar</Button>
-            <Button type="button" size="sm" variant="outline" disabled={!searchText && !query}
-              onClick={() => { setSearchText(""); setQuery(""); setPage(0) }}>Limpiar búsqueda</Button>
-          </div>
+      <div className="memory-filter-area">
+        <form className="memory-search-form" role="search" onSubmit={(event) => { event.preventDefault(); setPage(0); setQuery(searchText.trim()) }}>
+          <Search size={19} aria-hidden="true"/><label className="sr-only" htmlFor="memory-search">Buscar recuerdos</label>
+          <Input id="memory-search" maxLength={100} value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Busca por título, persona o lugar" />
+          {query && <button type="button" aria-label="Limpiar búsqueda" onClick={() => { setSearchText(""); setQuery(""); setPage(0) }}>×</button>}
+          <Button type="submit" aria-label="Buscar"><Search size={17} aria-hidden="true"/><span>Buscar</span></Button>
         </form>
-        <label className="flex items-center gap-2 text-xs text-[#264653]">
-          <input type="checkbox" checked={includeSensitive} onChange={(e) => { setIncludeSensitive(e.target.checked); setPage(0); setLoading(true) }} />
-          Mostrar temas delicados
-        </label>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Fecha
-            <select value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal">
-              <option value="all">Cualquier fecha</option><option value="3days">Últimos 3 días</option><option value="week">Última semana</option><option value="custom">Elegir fechas</option>
-            </select>
-          </label>
-          {dateRange === "custom" && <><label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label><label className="flex flex-col gap-1 text-xs font-semibold text-[#264653]">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label></>}
-        </div>
-        {loading && <p role="status" className="text-xs text-gray-500">Cargando recuerdos...</p>}
-        {error && <div role="alert" className="text-xs text-red-700">
-          <p>{error}</p>
-          <button className="underline" onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>Volver a intentar</button>
-        </div>}
-        {!loading && !error && visibleItems.length === 0 && <p className="text-xs text-gray-500">{items.length ? "No hay recuerdos en ese periodo." : query ? "No encontramos recuerdos con esa búsqueda." : "Todavía no hay recuerdos para mostrar."}</p>}
-        {!loading && !error && visibleItems.map((memory) => (
-          <div key={memory.id} className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-            <p className="text-xs font-bold text-[#264653]">{memory.title}</p>
-            {memory.deletion_pending && <p role="status" className="text-xs text-amber-800">Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.</p>}
-            <PhotoGrid photos={photos[memory.id] ?? []} busy={busy}
-              canManage={!!user && (user.role === "cuidador_principal" || user.id === memory.created_by)}
-              onDelete={onDeletePhoto} onRefresh={() => setAttempt((value) => value + 1)} />
-            {memory.type === "anecdote"
-              ? <p className="text-[11px] text-gray-500 whitespace-pre-wrap wrap-break-word">{memory.text}</p>
-              : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2c5f7c] underline">Abrir canción</a>}
-            <div className="flex gap-2">
-              {memory.is_positive && <Badge variant="outline">Recuerdo bonito</Badge>}
-              {memory.is_sensitive && <Badge variant="outline">Tema delicado</Badge>}
-            </div>
-            {user && (user.role === "cuidador_principal" || user.id === memory.created_by) && (
-              <div className="flex gap-2">
-                {onEdit && <Button size="sm" variant="outline" disabled={busy || memory.deletion_pending} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}>Editar</Button>}
-                {onDelete && <Button size="sm" variant="outline" disabled={busy} onClick={() => onDelete(memory.id)} aria-label={`Eliminar ${memory.title}`}>Eliminar</Button>}
-              </div>
-            )}
+        <div className="memory-filter-row">
+          <div className="memory-type-filters" role="group" aria-label="Filtrar por tipo de recuerdo">
+            {([{ id: "all", label: "Todos" }, { id: "anecdote", label: "Anécdotas" }, { id: "song", label: "Canciones" }] as const).map(filter => <button key={filter.id} type="button" aria-pressed={typeFilter === filter.id} onClick={() => setTypeFilter(filter.id)}>{filter.label}</button>)}
           </div>
-        ))}
-        {!loading && !error && <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-          <span>{visibleItems.length} mostrados · {total} recuerdos en total</span>
-          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => { setPage((value) => value - 1); setLoading(true) }}>Anterior</Button>
-          <Button size="sm" variant="outline" disabled={(page + 1) * 100 >= total} onClick={() => { setPage((value) => value + 1); setLoading(true) }}>Siguiente</Button>
-        </div>}
-      </CardContent>
-    </Card>
+          <label className="memory-date-filter"><CalendarDays size={17} aria-hidden="true"/><span className="sr-only">Filtrar por fecha</span><select aria-label="Filtrar por fecha" value={dateRange} onChange={(event) => setDateRange(event.target.value)}><option value="all">Cualquier fecha</option><option value="3days">Últimos 3 días</option><option value="week">Última semana</option><option value="custom">Elegir fechas</option></select></label>
+          <label className="memory-sort-filter"><span>Ordenar:</span><select aria-label="Orden de los recuerdos" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "newest" | "oldest")}><option value="newest">Más recientes</option><option value="oldest">Más antiguos</option></select></label>
+          <label className="memory-sensitive-filter"><input type="checkbox" aria-label="Mostrar temas delicados" checked={includeSensitive} onChange={(e) => { setIncludeSensitive(e.target.checked); setPage(0); setLoading(true) }}/><span>Incluir temas delicados</span></label>
+        </div>
+        {dateRange === "custom" && <div className="memory-custom-dates"><label>Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)}/></label><label>Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)}/></label></div>}
+      </div>
+
+      {loading && <p role="status" className="memory-list-status">Reuniendo sus recuerdos…</p>}
+      {error && <div role="alert" className="memory-list-error"><p>{error}</p><button onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>Volver a intentar</button></div>}
+      {!loading && !error && visibleItems.length === 0 && <div className="memory-empty-state"><span><Heart size={25} aria-hidden="true"/></span><h3>{items.length ? "No hay recuerdos con estos filtros" : query ? "No encontramos recuerdos con esa búsqueda." : "Todavía no hay recuerdos para mostrar."}</h3><p>{items.length ? "Prueba otro periodo o tipo de recuerdo para ampliar la búsqueda." : query ? "Revisa las palabras o intenta buscar por otro título o lugar." : "El álbum empieza con una historia: guarda una anécdota, una canción o una foto para volver a compartirla."}</p>{!items.length && onAdd && <Button type="button" onClick={onAdd} className="memory-collection-add"><ImagePlus size={17} aria-hidden="true"/> Agregar el primer recuerdo</Button>}</div>}
+      {!loading && !error && visibleItems.length > 0 && <div className="memory-list-intro"><span>Una colección familiar, a su ritmo</span><span>{visibleItems.length} en esta vista · {total} en total</span></div>}
+      {!loading && !error && <div className="memory-collection-list">{visibleItems.map((memory, index) => {
+        const canManage = !!user && (user.role === "cuidador_principal" || user.id === memory.created_by);
+        const memoryPhotos = photos[memory.id] ?? [];
+        return <article key={memory.id} className={`memory-entry memory-entry-${index % 3}`}>
+          <div className="memory-entry-rail"><span>{memory.type === "song" ? <Music2 size={20} aria-hidden="true"/> : <FileText size={20} aria-hidden="true"/>}</span><i aria-hidden="true"/></div>
+          <div className="memory-entry-body">
+            <div className="memory-entry-top"><span className={`memory-kind memory-kind-${memory.type}`}>{memory.type === "song" ? "Canción" : "Anécdota"}</span><time dateTime={memory.created_at}>{formatMemoryDate(memory.created_at)}</time></div>
+            <div className="memory-entry-heading"><h3>{memory.title}</h3>{canManage && <div className="memory-entry-actions">{onEdit && <button type="button" disabled={busy || memory.deletion_pending} onClick={() => onEdit(memory.id)} aria-label={`Editar ${memory.title}`}><Pencil size={16}/></button>}{onDelete && <button type="button" disabled={busy} onClick={() => onDelete(memory.id)} aria-label={`Eliminar ${memory.title}`}><Trash2 size={16}/></button>}</div>}</div>
+            {memory.deletion_pending && <p role="status" className="memory-pending-note">Borrado pendiente. Vuelve a eliminar este recuerdo para completarlo.</p>}
+            {memory.type === "anecdote" ? <p className="memory-entry-text">{memory.text}</p> : <a href={memory.url ?? undefined} target="_blank" rel="noopener noreferrer" className="memory-song-link"><Music2 size={18} aria-hidden="true"/> Escuchar esta canción <span aria-hidden="true">↗</span></a>}
+            {memoryPhotos.length > 0 && <div className="memory-entry-photos"><PhotoGrid photos={memoryPhotos} busy={busy} canManage={canManage} onDelete={onDeletePhoto} onRefresh={() => setAttempt((value) => value + 1)} /></div>}
+            <div className="memory-entry-tags">{memory.is_positive && <span className="memory-tag memory-tag-warm"><Heart size={13} aria-hidden="true"/> Recuerdo bonito</span>}{memory.is_sensitive && <span className="memory-tag memory-tag-calm">Tema delicado</span>}{memoryPhotos.length > 0 && <span className="memory-tag memory-tag-photo"><ImagePlus size={13} aria-hidden="true"/> {memoryPhotos.length} {memoryPhotos.length === 1 ? "foto" : "fotos"}</span>}</div>
+          </div>
+        </article>;
+      })}</div>}
+      {!loading && !error && total > 100 && <nav className="memory-pagination" aria-label="Páginas de recuerdos"><span>Página {page + 1} de {Math.ceil(total / 100)}</span><div><Button size="sm" variant="outline" aria-label="Anterior" disabled={page === 0} onClick={() => { setPage((value) => value - 1); setLoading(true) }}><ChevronLeft size={17}/></Button><Button size="sm" variant="outline" aria-label="Siguiente" disabled={(page + 1) * 100 >= total} onClick={() => { setPage((value) => value + 1); setLoading(true) }}><ChevronRight size={17}/></Button></div></nav>}
+    </section>
   )
 }

@@ -1,7 +1,7 @@
 import { PageIntro } from "../components/PageIntro";
 import React, { useEffect, useState } from "react";
 import { Button } from "../components/Button";
-import { UserRound, Users, Mail } from "lucide-react";
+import { UserRound, ImagePlus, Trash2 } from "lucide-react";
 import type { User } from "../api/auth";
 import {
   getElderProfile,
@@ -13,6 +13,7 @@ import {
 } from "../api/families";
 import type { ElderProfile, Member, Invitation } from "../api/families";
 import { ApiError } from "../api/client";
+import { deleteLocalFamilyProfilePhoto, getLocalFamilyProfilePhoto, saveLocalFamilyProfilePhoto } from "../api/localMedia";
 
 interface ProfilePageProps {
   currentUser: User;
@@ -42,6 +43,52 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [membersError, setMembersError] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
+  const [photoRefresh, setPhotoRefresh] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    getLocalFamilyProfilePhoto(currentUser.family_id).then((blob) => {
+      if (active && blob) {
+        objectUrl = URL.createObjectURL(blob);
+        setProfilePhotoUrl(objectUrl);
+      } else if (active) setProfilePhotoUrl(null);
+    }).catch(() => { if (active) setProfilePhotoError("No se pudo cargar la foto. Puedes intentar seleccionarla otra vez."); });
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [currentUser.family_id, photoRefresh]);
+
+  const handleProfilePhoto = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setProfilePhotoError("Elige una imagen JPG, PNG o WebP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setProfilePhotoError("La foto debe pesar menos de 8 MB.");
+      return;
+    }
+    try {
+      await saveLocalFamilyProfilePhoto(currentUser.family_id, file);
+      setProfilePhotoError(null);
+      setPhotoRefresh(value => value + 1);
+    } catch {
+      setProfilePhotoError("No pudimos guardar la foto en este navegador.");
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    try {
+      await deleteLocalFamilyProfilePhoto(currentUser.family_id);
+      setProfilePhotoError(null);
+      setPhotoRefresh(value => value + 1);
+    } catch {
+      setProfilePhotoError("No pudimos quitar la foto. Inténtalo otra vez.");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -179,28 +226,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
 
   return (
     <div className="profile-page space-y-6">
-      <PageIntro eyebrow="LAS PERSONAS DETRÁS DE LAS HISTORIAS" title="Nuestra familia">Sus gustos, sus historias y quienes los acompañan.</PageIntro>
+      <PageIntro eyebrow="NUESTRA HISTORIA EN FAMILIA" title="Perfil familiar">Un espacio para conocer sus gustos y a las personas que la acompañan.</PageIntro>
       {/* Encabezado */}
       <div className="profile-banner">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 text-[#2c5f7c]">
-          <UserRound className="size-8" aria-hidden="true" />
+        <div className="profile-avatar-wrap">
+          {profilePhotoUrl ? <img src={profilePhotoUrl} alt={`Foto de ${profile?.name || "tu familiar"}`} className="profile-avatar-image" /> : <UserRound className="profile-avatar-placeholder" aria-hidden="true" />}
+          {isCuidador && <label className="profile-photo-action" htmlFor="family-profile-photo" title={profilePhotoUrl ? "Cambiar foto" : "Agregar foto"}><ImagePlus size={18} aria-hidden="true"/><span className="sr-only">{profilePhotoUrl ? "Cambiar foto del familiar" : "Agregar foto del familiar"}</span></label>}
         </div>
-        <h2 className="text-xl font-bold text-ayni-green mt-3">
-          {profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}
-        </h2>
-        <p className="text-xs text-gray-600">
-          {profile ? `Década de ${profile.birth_decade}s` : "Registra la información del adulto mayor"}
-        </p>
+        <div className="profile-banner-copy">
+          <p className="profile-banner-kicker">LA PERSONA QUE ACOMPAÑAMOS</p>
+          <h2>{profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}</h2>
+          <p>{profile ? `Década de ${profile.birth_decade}s` : "Un espacio para conocer sus gustos y compartir en familia."}</p>
+          {profile?.interests?.length ? <div className="profile-interest-chips">{profile.interests.slice(0, 4).map(interest => <span key={interest}>{interest}</span>)}</div> : null}
+          {isCuidador && <div className="profile-photo-tools"><label htmlFor="family-profile-photo">{profilePhotoUrl ? "Cambiar foto" : "Agregar una foto"}</label>{profilePhotoUrl && <button type="button" onClick={handleRemoveProfilePhoto}><Trash2 size={14} aria-hidden="true"/> Quitar</button>}<small>La foto queda guardada en este navegador.</small></div>}
+          <input id="family-profile-photo" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProfilePhoto} disabled={!isCuidador}/>
+          {profilePhotoError && <p className="profile-photo-error" role="alert">{profilePhotoError}</p>}
+        </div>
       </div>
 
-      {/* Formulario Perfil */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-4">
-        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-          <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <UserRound className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Perfil del Adulto Mayor
-          </h3>
+      <div className="profile-workspace">
+      <section className="profile-panel profile-edit-panel space-y-4" aria-labelledby="elder-profile-heading">
+        <div className="profile-section-heading">
+          <span>01</span><div><h3 id="elder-profile-heading">Sus datos y gustos</h3><p>Completa solo lo que ayude a preparar conversaciones significativas.</p></div>
           {!isCuidador && (
-            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm font-medium">
+            <span className="profile-readonly-label">
               Solo lectura
             </span>
           )}
@@ -211,7 +260,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
         ) : (
           <>
             {profileNotFound && isCuidador && (
-              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-xs">
+              <div className="profile-inline-notice">
                 Completa el perfil de tu familiar para comenzar las actividades.
               </div>
             )}
@@ -223,7 +272,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
             )}
 
             {profileError && (
-              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
+              <div role="alert" className="profile-error-notice">
                 {profileError}
                 {!profile && !profileNotFound && (
                   <button type="button" className="block mt-2 underline"
@@ -235,15 +284,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
             )}
 
             {profileSuccess && (
-              <div role="status" className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl text-xs">
+              <div role="status" className="profile-success-notice">
                 {profileSuccess}
               </div>
             )}
 
             {isCuidador && (profile !== null || profileNotFound) ? (
-              <form onSubmit={handleSaveProfile} className="space-y-3">
-                <div>
-                  <label htmlFor="elder-name" className="block text-xs font-semibold text-gray-700 mb-1">Nombre o Apodo</label>
+              <form onSubmit={handleSaveProfile} className="profile-fields">
+                <div className="profile-field profile-field-wide">
+                  <label htmlFor="elder-name">Nombre o apodo</label>
                   <input
                     id="elder-name"
                     type="text"
@@ -252,17 +301,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                     value={name}
                     onChange={(e) => { setName(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. Mamá Elena"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
+                    className="profile-input"
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="elder-birth-decade" className="block text-xs font-semibold text-gray-700 mb-1">Década de Nacimiento</label>
+                <div className="profile-field">
+                  <label htmlFor="elder-birth-decade">Década de nacimiento</label>
                   <select
                     id="elder-birth-decade"
                     value={birthDecade}
                     onChange={(e) => { setBirthDecade(Number(e.target.value)); setProfileSuccess(null); }}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F] bg-white"
+                    className="profile-input"
                   >
                     <option value={1930}>Década de 1930</option>
                     <option value={1940}>Década de 1940</option>
@@ -272,21 +321,19 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
                   </select>
                 </div>
 
-                <div>
-                  <label htmlFor="elder-interests" className="block text-xs font-semibold text-gray-700 mb-1">
-                    Intereses y Gustos (separados por comas)
-                  </label>
+                <div className="profile-field profile-field-wide">
+                  <label htmlFor="elder-interests">Intereses y gustos <span>Sepáralos con comas</span></label>
                   <input
                     id="elder-interests"
                     type="text"
                     value={interestsText}
                     onChange={(e) => { setInterestsText(e.target.value); setProfileSuccess(null); }}
                     placeholder="Ej. música, jardinería, boleros"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
+                    className="profile-input"
                   />
                 </div>
 
-                <Button type="submit" disabled={savingProfile}>
+                <Button type="submit" disabled={savingProfile} className="profile-save-button">
                   {savingProfile ? "Guardando..." : "Guardar Perfil"}
                 </Button>
               </form>
@@ -299,55 +346,48 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
             )}
           </>
         )}
-      </div>
+      </section>
 
       {/* Miembros de la Familia */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
-        <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-          <Users className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Miembros de la Familia
-        </h3>
+      <div className="profile-family-column">
+      <section className="profile-panel profile-members-panel space-y-3" aria-labelledby="family-members-heading">
+        <div className="profile-section-heading"><span>02</span><div><h3 id="family-members-heading">Quienes están cerca</h3><p>Las personas que forman parte de este espacio.</p></div></div>
 
         {membersError && <div role="alert" className="space-y-2 text-sm text-red-700"><p>No pudimos consultar todos los miembros o invitaciones de tu familia.</p><button type="button" onClick={() => setProfileAttempt(value => value + 1)} className="min-h-11 underline">Volver a intentar</button></div>}
         {loadingMembers ? (
           <p className="text-xs text-gray-500 text-center py-2">Cargando miembros...</p>
         ) : (
-          <div className="space-y-2">
+          <div className="profile-member-list">
             {!membersError && members.length === 0 && <p className="text-sm text-gray-600">Todavía no hay miembros para mostrar.</p>}
             {members.map((m) => (
-              <div key={m.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                <div>
-                  <p className="font-bold text-gray-800">{m.name}{m.id === currentUser.id && <span className="ml-2 font-normal">(Tú)</span>}</p>
-                  <p className="text-[10px] text-gray-500 capitalize">{m.role.replace("_", " ")}</p>
+              <div key={m.id} className="profile-member-row">
+                <span className="profile-member-initial" aria-hidden="true">{m.name.trim().charAt(0).toLocaleUpperCase()}</span><div>
+                  <p>{m.name}{m.id === currentUser.id && <span className="profile-you-label">Tú</span>}</p>
+                  <p className="profile-member-role">{m.role === "cuidador_principal" ? "Cuidador principal" : "Familiar colaborador"}</p>
                 </div>
-                <span className="text-[10px] bg-white text-[#2c5f7c] px-2 py-1 rounded-sm font-semibold border border-slate-200">Activo</span>
+                <span className="profile-member-status"><i aria-hidden="true"/>Activo</span>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Invitaciones (Solo Cuidador Principal) */}
       {isCuidador && (
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
-          <h3 className="text-sm font-bold text-ayni-green flex items-center gap-2">
-            <Mail className="size-4 text-[#2c5f7c]" aria-hidden="true" /> Invitar Familiar
-          </h3>
+        <section className="profile-panel profile-invite-panel space-y-3" aria-labelledby="invite-family-heading">
+          <div className="profile-section-heading"><span>03</span><div><h3 id="invite-family-heading">Sumar a alguien más</h3><p>Invita a un familiar para compartir recuerdos y acompañar.</p></div></div>
 
-          <form onSubmit={handleCreateInvitation} className="flex gap-2">
+          <form onSubmit={handleCreateInvitation} className="profile-invite-form">
             <input
               type="email"
               required
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
+              aria-label="Correo electrónico del familiar"
               placeholder="familiar@example.com"
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-xs focus:outline-hidden focus:ring-2 focus:ring-[#0D7A5F]"
+              className="profile-input"
             />
-            <button
-              type="submit"
-              className="px-3 py-2 bg-[#e76f51] text-white font-semibold text-xs rounded-lg hover:bg-[#d65d3f]"
-            >
-              Invitar
-            </button>
+            <button type="submit">Invitar familiar <span aria-hidden="true">→</span></button>
           </form>
 
           {inviteError && (
@@ -355,30 +395,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           )}
 
           {generatedToken && (
-            <div className="bg-[#FEF3C7] border border-[#D97706]/30 p-3 rounded-xl space-y-1">
-              <p className="text-xs font-bold text-[#92400E]">Código de invitación generado:</p>
-              <p className="text-xs font-mono bg-white p-2 rounded-sm border border-[#D97706]/20 select-all font-bold">
+            <div className="profile-invitation-code">
+              <p>Código de invitación</p>
+              <p>
                 {generatedToken}
               </p>
-              <p className="text-[10px] text-[#92400E]/80">
-                Copia y comparte este código directamente con tu familiar. Vence en 72 horas.
+              <p>
+                Compártelo con tu familiar. Vence en 72 horas.
               </p>
             </div>
           )}
 
           {invitations.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Invitaciones pendientes:</p>
+            <div className="profile-pending-invitations">
+              <p>Invitaciones pendientes</p>
               {invitations.map((inv) => (
-                <div key={inv.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg text-xs">
+                <div key={inv.id} className="profile-invitation-row">
                   <div>
-                    <p className="font-medium text-gray-800">{inv.email}</p>
-                    <p className="text-[10px] text-gray-400">Estado: {inv.status}</p>
+                    <p>{inv.email}</p>
+                    <p>Estado: {inv.status}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRevokeInvitation(inv.id)}
-                    className="text-[10px] text-red-600 hover:underline font-bold"
+                    className="profile-revoke-button"
                   >
                     Revocar
                   </button>
@@ -386,8 +426,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
+      </div>
+      </div>
     </div>
   );
 };

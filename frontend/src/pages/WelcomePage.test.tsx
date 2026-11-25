@@ -16,10 +16,10 @@ it("conecta la invitación principal al registro y mantiene el acceso existente"
 
 it("permite explorar los ejemplos sin presentarlos como una conversación real", () => {
   render(<WelcomePage/>);
-  fireEvent.click(screen.getByRole("button", { name: "Una canción" }));
-  expect(screen.getByText("La canción de las tardes en casa")).toBeInTheDocument();
-  expect(screen.getByText("Ejemplo ilustrativo")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Una canción" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Canciones" }));
+  expect(screen.getByRole("heading", { name: "Una canción puede traer muchos recuerdos" })).toBeInTheDocument();
+  expect(screen.getByText("Música que despierta recuerdos")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Canciones" })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
   expect(screen.getByRole("navigation", { name: "Menú móvil" })).toBeInTheDocument();
 });

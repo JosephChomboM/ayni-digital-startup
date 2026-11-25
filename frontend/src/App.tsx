@@ -137,7 +137,7 @@ export function App() {
 
         {view === "session" && (
           <div className="module-container">
-            {currentUser && <SessionGuide currentUser={currentUser} onOpenMemories={() => setView("memories")} />}
+            {currentUser && <SessionGuide currentUser={currentUser} onOpenMemories={() => setView("memories")} onOpenPlan={() => setView("billing")} onOpenDashboard={() => setView("dashboard")} />}
           </div>
         )}
 
