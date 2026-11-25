@@ -78,14 +78,8 @@ function drawTracking(canvas: HTMLCanvasElement | null, video: HTMLVideoElement 
   if (face.length) dots(FACE_POINTS.map((index) => face[index]).filter(Boolean), "#d6efbbe6", 1.9);
 }
 const wasmAssets = {
-  simd: {
-    wasmLoaderPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.js", import.meta.url).href,
-    wasmBinaryPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm", import.meta.url).href,
-  },
-  basic: {
-    wasmLoaderPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_nosimd_internal.js", import.meta.url).href,
-    wasmBinaryPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_nosimd_internal.wasm", import.meta.url).href,
-  },
+  wasmLoaderPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.js", import.meta.url).href,
+  wasmBinaryPath: new URL("../../node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm", import.meta.url).href,
 };
 const statusText: Record<FaceObservation, string> = {
   absent: "Colócate frente a la cámara.",
@@ -316,9 +310,7 @@ export function SessionCamera({ captureRef, onCue, canFollowExpression, onAnalyz
       try {
         vision = await import("@mediapipe/tasks-vision");
         if (stopped) return;
-        const simd = await vision.FilesetResolver.isSimdSupported();
-        if (stopped) return;
-        assets = simd ? wasmAssets.simd : wasmAssets.basic;
+        assets = wasmAssets;
         const model = await vision.FaceLandmarker.createFromOptions(assets, {
           baseOptions: { modelAssetPath: MODEL, delegate: "CPU" },
           runningMode: "VIDEO",
