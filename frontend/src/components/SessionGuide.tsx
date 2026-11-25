@@ -13,7 +13,7 @@ import { GuidedConversation } from "./GuidedConversation";
 import type { StageScene } from "./CompanionScene";
 import { lookFor } from "./companionTheme";
 import { getElderProfile } from "../api/families";
-import { speakLocally } from "./sessionSignals";
+import { SessionVoice } from "./sessionVoice";
 import type { SessionActivity } from "./sessionSignals";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -149,11 +149,13 @@ function PersistedSessionGuide({ currentUser, onOpenMemories }: SessionGuideProp
     return () => window.clearInterval(timer);
   }, [started, paused]);
 
+  const voiceSessionId = guide?.id;
   useEffect(() => {
-    if (!reviewOpen || !reviewVoice) return;
-    speakLocally("Gracias por compartir este momento conmigo. Si quieren, pueden contar cómo les fue.");
-    return () => window.speechSynthesis?.cancel();
-  }, [reviewOpen, reviewVoice]);
+    if (!reviewOpen || !reviewVoice || !voiceSessionId) return;
+    const voice = new SessionVoice();
+    void voice.speak(voiceSessionId, "Gracias por compartir este momento conmigo. Si quieren, pueden contar cómo les fue.", () => {}, () => {});
+    return () => voice.cancel();
+  }, [reviewOpen, reviewVoice, voiceSessionId]);
 
   const availableActivities: SessionActivity[] = [];
   if (selectedAnecdote) availableActivities.push("anecdote");
