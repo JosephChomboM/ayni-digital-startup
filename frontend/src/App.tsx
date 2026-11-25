@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { House, Images, MessageCircle, ChartNoAxesCombined, Users, Leaf, LogOut, UserRound } from "lucide-react";
 import { Brand } from "./components/Brand";
 import { AyniCompanion } from "./components/AyniCompanion";
@@ -16,6 +16,7 @@ import { SessionGuide } from "./components/SessionGuide";
 import { UploadModule } from "./components/UploadModule";
 import { BillingPanel } from "./components/BillingPanel";
 import { FamilyDashboard } from "./components/FamilyDashboard";
+const PageAssistant = lazy(() => import("./components/PageAssistant").then(module => ({ default: module.PageAssistant })));
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -23,6 +24,12 @@ export function App() {
   const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard" | "billing" | "account" | "settings">("welcome");
 
   const [accountSection, setAccountSection] = useState<AccountSection>("overview");
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantRequest, setAssistantRequest] = useState<{ id: string; text: string }>();
+  const askAssistant = (text: string) => {
+    setAssistantRequest({ id: crypto.randomUUID(), text });
+    setAssistantOpen(true);
+  };
 
   useEffect(() => {
     let active = true;
@@ -97,7 +104,7 @@ export function App() {
 
   // 3. NAVEGACIÓN Y APLICACIÓN PRINCIPAL
   return (
-    <div className="app-shell">
+    <><div className="app-shell">
       <a href="#main-content" className="skip-link">Ir al contenido</a>
       <header className="app-sidebar">
         <button onClick={() => setView("home")} aria-label="Ayni Digital, ir al inicio" className="brand-button"><Brand /></button>
@@ -137,7 +144,7 @@ export function App() {
 
         {view === "session" && (
           <div className="module-container">
-            {currentUser && <SessionGuide currentUser={currentUser} onOpenMemories={() => setView("memories")} onOpenPlan={() => setView("billing")} onOpenDashboard={() => setView("dashboard")} />}
+            {currentUser && <SessionGuide currentUser={currentUser} assistantActive={assistantOpen} onAppInstruction={askAssistant} onOpenMemories={() => setView("memories")} onOpenPlan={() => setView("billing")} onOpenDashboard={() => setView("dashboard")} />}
           </div>
         )}
 
@@ -161,6 +168,8 @@ export function App() {
         {view === "billing" && <div className="module-container plan-page space-y-4"><h1 className="text-2xl font-bold text-[#2c5f7c]">Tu plan familiar</h1><BillingPanel /></div>}
       </main>
     </div>
+    {currentUser && <Suspense fallback={null}><PageAssistant key={currentUser.id} open={assistantOpen} onOpenChange={setAssistantOpen} request={assistantRequest} /></Suspense>}
+    </>
   );
 }
 
