@@ -11,9 +11,9 @@ it("muestra conteos, historial y la alerta recibida del backend", async () => {
   vi.mocked(getFamilyReactions).mockResolvedValue(data);
   render(<ReactionHistory familyId="f" />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Te sugerimos pausar");
-  expect(screen.getByText("Agitado: 1")).toBeInTheDocument();
-  expect(screen.getByText(data.summary.disclaimer)).toBeInTheDocument();
-  expect(screen.getByText(/Indiferente no cuenta/)).toBeInTheDocument();
+  expect(screen.getByText("Agitado").parentElement).toHaveTextContent("1");
+  expect(screen.getByText(/Esto no es un diagnóstico/)).toBeInTheDocument();
+  expect(screen.getByText(/“indiferente” no se interpreta/)).toBeInTheDocument();
 });
 
 it("no transforma errores de API en ausencia de alertas y permite reintentar", async () => {

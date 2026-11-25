@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { History, Settings2, X, AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { History, PanelRightClose, PanelRightOpen, X, AudioLines, BookOpen, Camera, Images, Mic, MicOff, Music, Pause, Play, Send, Sparkles, Square, VideoOff, Volume2, VolumeX } from "lucide-react";
 import type { Memory } from "../api/memories";
 import { ApiError } from "../api/client";
 import { getMessages, sendMessage, imageForConversation, transcribeAudio } from "../api/sessions";
@@ -63,7 +63,6 @@ export function GuidedConversation({
   const [toolsPanel, setToolsPanel] = useState("history");
   const [cloudVoice, setCloudVoice] = useState(false);
   const [reviewVoice, setReviewVoice] = useState(false);
-  const [failedTurns, setFailedTurns] = useState(0);
   const [line, setLine] = useState(SESSION_GREETING);
   const [messages, setMessages] = useState<{ id: number; from: "ayni" | "you"; text: string }[]>([]);
   const nextMessage = useRef(0);
@@ -84,6 +83,7 @@ export function GuidedConversation({
   const request = useRef<AbortController | null>(null);
   const [aiError, setAiError] = useState("");
   const [recovering, setRecovering] = useState(false);
+  const failedTurns = useRef(0);
   const [suggestion, setSuggestion] = useState("continue");
   const [observations, setObservations] = useState<string[]>([]);
   const lastAttempt = useRef<ChatInput | null>(null);
@@ -156,7 +156,7 @@ export function GuidedConversation({
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
       const result = await sendMessage(sessionId, payload, signal);
       if (controller.signal.aborted) return;
-      setFailedTurns(0);
+      failedTurns.current = 0;
       setSuggestion(result.suggestion);
       setObservations(image ? result.observations : []);
       show(result.text, false);
@@ -173,17 +173,20 @@ export function GuidedConversation({
         setAiError(cause.message);
         return;
       }
-      const failures = failedTurns + 1;
-      setFailedTurns(failures);
-      setSuggestion("continue");
       setObservations([]);
-      if (!cue) {
-        show(image ? "No pude ver bien la imagen esta vez. ¿Qué querías mostrarme?" :
-          text ? "Podemos seguir a tu ritmo. ¿Qué más te gustaría contar de ese momento?" : SESSION_GREETING);
-      }
-      if (failures >= 2 && !cue) {
+      failedTurns.current += 1;
+      if (failedTurns.current === 1) {
+        const followUp = scene?.kind === "song"
+          ? "Podemos seguir a tu ritmo. ¿Qué te hace sentir esta canción o qué recuerdo te trae?"
+          : scene?.kind === "photo"
+            ? "Podemos seguir a tu ritmo. ¿Qué más recuerdas de ese momento en familia?"
+            : "Podemos seguir a tu ritmo. ¿Qué más te gustaría contar de ese momento?";
+        show(followUp);
+      } else {
         setRecovering(true);
-        setAiError("La conexión con Ayni está intermitente. Puedes seguir conversando.");
+        setAiError(cause instanceof ApiError
+          ? cause.message
+          : "No pude responder ahora. Tu mensaje sigue en la conversación; puedes reintentarlo.");
       }
     } finally {
       if (request.current === controller) { request.current = null; setPending(false); }
@@ -391,7 +394,7 @@ export function GuidedConversation({
       </div>
       <div className="flex items-center gap-1">
         {onBack && <button type="button" className="bar-action" aria-label="Volver al historial" title="Volver al historial" onClick={onBack}><History size={18}/></button>}
-        <button type="button" className="bar-icon session-tools-toggle" aria-label="Abrir opciones de sesión" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}><Settings2 size={20}/></button>
+        <button type="button" className="bar-icon session-tools-toggle" aria-label={toolsOpen ? "Reducir panel de conversación" : "Ampliar panel de conversación"} title={toolsOpen ? "Reducir panel" : "Ampliar conversación"} aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>{toolsOpen ? <PanelRightClose size={20}/> : <PanelRightOpen size={20}/>}</button>
         <button type="button" title={sound ? "Silenciar a Ayni" : "Activar voz"} aria-label={sound ? "Silenciar a Ayni" : "Activar voz"}
           className="bar-icon" onClick={toggleSound}>
           {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
@@ -517,13 +520,13 @@ export function GuidedConversation({
         </div>
 
         {onNewLook && <div className="tool-block">
-          <h4>El look de Ayni</h4>
+          <h4>Ambiente de la sesión</h4>
           {look?.description && <p className="tool-hint">{look.description}.</p>}
           <button type="button" className="tool-button" disabled={lookBusy} onClick={onNewLook}>
-            <Sparkles aria-hidden="true" className="mr-2 inline size-4" />{lookBusy ? "Ayni se está arreglando…" : "Otro look para Ayni"}
+            <Sparkles aria-hidden="true" className="mr-2 inline size-4" />{lookBusy ? "Preparando otro ambiente…" : "Cambiar ambiente"}
           </button>
           {lookNotice && <p role="status" className="tool-hint">{lookNotice}</p>}
-          <p className="tool-hint">Groq diseña la ropa de Ayni y la sala con los gustos del perfil. No recibe nombres ni datos de la cuenta.</p>
+          <p className="tool-hint">Ayni adapta el ambiente de la sala según los gustos del perfil; el búho conserva su apariencia para que siempre lo reconozcas.</p>
         </div>}
 
         <div className="tool-block">

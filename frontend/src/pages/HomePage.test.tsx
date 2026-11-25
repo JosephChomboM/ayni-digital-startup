@@ -25,7 +25,8 @@ it("uses the real memory total instead of counting profile interests", async () 
   expect(await screen.findByText(/7 recuerdos disponibles/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Preparar una sesión/ }));
   expect(props.onStartSession).toHaveBeenCalledOnce();
-  expect(screen.getByText(/no se sincronizan/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /Tu espacio familiar/ })).toBeInTheDocument();
+  expect(screen.queryByText(/no se sincronizan/)).not.toBeInTheDocument();
 });
 
 it("guides a caregiver to the missing profile before a first session", async () => {

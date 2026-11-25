@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, Music2, X } from "lucide-react
 import type { Memory } from "../api/memories";
 import type { MemoryPhoto } from "../api/photos";
 import { AyniBuddy } from "./AyniBuddy";
-import type { BuddyPose } from "./AyniBuddy";
+import type { BuddyMood, BuddyPose } from "./AyniBuddy";
 import type { CompanionState } from "./AyniCompanion";
 import type { LookSpec } from "../api/sessions";
 import { ROOM_ICONS } from "./roomIcons";
@@ -78,6 +78,7 @@ export function CompanionScene({ state, scene, line, pending, paused, extra, cam
   }, [kind, reduced]);
 
   const pose: BuddyPose = gesture ?? (paused ? "none" : kind === "song" ? "music" : kind === "photo" ? "present" : kind === "anecdote" ? "story" : "none");
+  const mood: BuddyMood = kind === "song" ? "joyful" : kind === "photo" ? "curious" : "warm";
   const words = line.split(/(\s+)/);
 
   return <div className="buddy-stage" data-scene={kind} data-camera={camera ? true : undefined} data-look={look ? true : undefined}
@@ -94,7 +95,7 @@ export function CompanionScene({ state, scene, line, pending, paused, extra, cam
     <div className="stage-speech" data-pending={pending || undefined}>
       <p key={line} className="speech-line">
         {words.map((word, index) => /^\s+$/.test(word) ? word :
-          <span key={index} style={{ "--i": index / 2 } as CSSProperties}>{word}</span>)}
+          <span key={index} style={{ "--i": words.slice(0, index).filter((part) => !/^\s+$/.test(part)).length } as CSSProperties}>{word}</span>)}
       </p>
       {pending && <span className="speech-dots" aria-hidden="true"><i/><i/><i/></span>}
     </div>
@@ -112,7 +113,7 @@ export function CompanionScene({ state, scene, line, pending, paused, extra, cam
     {camera && <div className="stage-camera">{camera}</div>}
 
     <div className="buddy-walker">
-      <AyniBuddy state={state} pose={pose} look={look} />
+      <AyniBuddy state={state} pose={pose} mood={mood} />
     </div>
   </div>;
 }

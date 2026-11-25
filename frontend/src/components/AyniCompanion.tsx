@@ -4,45 +4,63 @@ import { companionLabels } from "./companionLabels";
 import type { CompanionState } from "./companionLabels";
 
 export type { CompanionState };
+export type CompanionMood = "warm" | "curious" | "joyful";
+export type OwlAnimation = "none" | "walk" | "wave" | "present" | "music" | "story" | "celebrate";
 
-/** El movimiento refleja el estado de la conversación; no interpreta emociones. */
-export function AyniCompanion({ state = "idle", className = "", decorative = false }: {
-  state?: CompanionState; className?: string; decorative?: boolean;
+/** El movimiento acompaña el estado de la conversación; no interpreta emociones. */
+export function AyniCompanion({ state = "idle", mood = "warm", animation = "none", className = "", decorative = false }: {
+  state?: CompanionState; mood?: CompanionMood; animation?: OwlAnimation; className?: string; decorative?: boolean;
 }) {
   const id = useId();
-  return <div className={`ayni-robot ${className}`} data-state={state} role={decorative ? undefined : "img"}
+  return <div className={`ayni-robot ayni-owl ${className}`} data-state={state} data-mood={mood} data-animation={animation} role={decorative ? undefined : "img"}
     aria-label={decorative ? undefined : companionLabels[state]} aria-hidden={decorative || undefined}>
     <svg viewBox="0 0 260 250" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id={`${id}-shell`} x1="70" y1="45" x2="185" y2="202" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff"/><stop offset="1" stopColor="#c7e2d5"/>
+        <linearGradient id={`${id}-feathers`} x1="72" y1="44" x2="190" y2="200" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#397a98"/><stop offset="1" stopColor="#2c5f7c"/>
         </linearGradient>
-        <linearGradient id={`${id}-face`} x1="78" y1="95" x2="181" y2="154" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#294c43"/><stop offset="1" stopColor="#122e28"/>
+        <linearGradient id={`${id}-breast`} x1="90" y1="103" x2="175" y2="203" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fffdf8"/><stop offset="1" stopColor="#f3e8d6"/>
         </linearGradient>
       </defs>
-      <ellipse className="robot-shadow" cx="130" cy="225" rx="59" ry="10" fill="#1f5140" opacity=".12"/>
+      <ellipse className="robot-shadow" cx="130" cy="225" rx="60" ry="9" fill="#264653" opacity=".13"/>
       <g className="robot-body">
-        <path className="robot-antenna" d="M130 68V44" stroke="#2c5f7c" strokeWidth="7" strokeLinecap="round"/>
-        <circle className="robot-light" cx="130" cy="36" r="12" fill="#edab7c" stroke="#fff6dd" strokeWidth="4"/>
-        <rect x="36" y="108" width="24" height="45" rx="12" fill="#90baaa"/>
-        <rect x="200" y="108" width="24" height="45" rx="12" fill="#90baaa"/>
-        <path className="robot-hand robot-hand-left" d="M78 173Q34 169 39 191Q43 207 67 192" fill="#d9e9dd" stroke="#8eb7a4" strokeWidth="2"/>
-        <path className="robot-hand" d="M182 173Q226 169 221 191Q217 207 193 192" fill="#d9e9dd" stroke="#8eb7a4" strokeWidth="2"/>
-        <rect x="84" y="165" width="92" height="47" rx="23" fill={`url(#${id}-shell)`} stroke="#98bdab" strokeWidth="2"/>
-        <path d="M124 185C120 176 109 183 115 189L130 200L145 189C151 183 140 176 136 185L130 190Z" fill="#c56748"/>
-        <rect x="53" y="65" width="154" height="112" rx="44" fill={`url(#${id}-shell)`} stroke="#98bdab" strokeWidth="2"/>
-        <path d="M75 84Q89 73 106 77" stroke="white" strokeWidth="5" strokeLinecap="round"/>
-        <rect x="68" y="88" width="124" height="72" rx="29" fill={`url(#${id}-face)`}/>
-        <g className="robot-eyes" fill="#d6efbb">
-          <rect x="93" y="108" width="12" height="21" rx="6"/>
-          <rect x="155" y="108" width="12" height="21" rx="6"/>
+        <path className="owl-ear owl-ear-left" d="M77 87 67 43Q96 54 111 77" fill="#2c5f7c" stroke="#244f68" strokeWidth="4" strokeLinejoin="round"/>
+        <path className="owl-ear owl-ear-right" d="m183 87 10-44q-29 11-44 34" fill="#2c5f7c" stroke="#244f68" strokeWidth="4" strokeLinejoin="round"/>
+        <path className="owl-wing owl-wing-left" d="M71 135Q34 145 45 184Q52 208 91 193L106 169Z" fill="#244f68" stroke="#2c5f7c" strokeWidth="3"/>
+        <path className="owl-wing owl-wing-right" d="M189 135q37 10 26 49-7 24-46 9l-15-24Z" fill="#244f68" stroke="#2c5f7c" strokeWidth="3"/>
+        <path d="M79 94Q78 70 130 68Q182 70 181 94L193 151Q194 197 130 211Q66 197 67 151Z" fill={`url(#${id}-feathers)`} stroke="#244f68" strokeWidth="3"/>
+        <path d="M77 126Q84 95 111 95Q124 95 130 108Q136 95 149 95Q176 95 183 126L176 170Q166 197 130 201Q94 197 84 170Z" fill={`url(#${id}-breast)`}/>
+        <g className="robot-eyes">
+          <g className="owl-eye owl-eye-left">
+            <circle cx="105" cy="121" r="23" fill="#fffdf8"/>
+            <circle cx="106" cy="122" r="14" fill="#f4d58d"/>
+            <circle cx="108" cy="123" r="8" fill="#264653"/>
+            <circle cx="111" cy="119" r="3" fill="#fff"/>
+          </g>
+          <g className="owl-eye owl-eye-right">
+            <circle cx="155" cy="121" r="23" fill="#fffdf8"/>
+            <circle cx="154" cy="122" r="14" fill="#f4d58d"/>
+            <circle cx="152" cy="123" r="8" fill="#264653"/>
+            <circle cx="149" cy="119" r="3" fill="#fff"/>
+          </g>
         </g>
-        <ellipse cx="87" cy="135" rx="9" ry="4" fill="#f3c09b" opacity=".35"/>
-        <ellipse cx="173" cy="135" rx="9" ry="4" fill="#f3c09b" opacity=".35"/>
-        <path className="robot-smile" d="M119 136Q130 147 141 136" stroke="#d6efbb" strokeWidth="3" strokeLinecap="round"/>
-        <g className="robot-speech" stroke="#d6efbb" strokeWidth="4" strokeLinecap="round">
-          <path d="M117 134V140"/><path d="M125 130V144"/><path d="M133 132V142"/><path d="M141 134V140"/>
+        <g className="owl-eyes-closed" stroke="#264653" strokeWidth="4" strokeLinecap="round">
+          <path d="M87 122q18 12 36 0M137 122q18 12 36 0"/>
+        </g>
+        <path className="owl-brow owl-brow-left" d="M86 91q18-12 37 0" stroke="#244f68" strokeWidth="5" strokeLinecap="round"/>
+        <path className="owl-brow owl-brow-right" d="M137 91q19-12 37 0" stroke="#244f68" strokeWidth="5" strokeLinecap="round"/>
+        <ellipse className="owl-blush" cx="82" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".38"/>
+        <ellipse className="owl-blush" cx="178" cy="151" rx="9" ry="5" fill="#e76f51" opacity=".38"/>
+        <path className="robot-smile owl-beak" d="m121 143 9-9 9 9-9 13Z" fill="#e76f51" stroke="#bf583f" strokeWidth="2" strokeLinejoin="round"/>
+        <g className="robot-speech owl-speaking-beak">
+          <path d="m120 141 10-8 10 8-10 7Z" fill="#e76f51" stroke="#bf583f" strokeWidth="2" strokeLinejoin="round"/>
+          <path d="m123 150 7-2 7 2-7 8Z" fill="#f4a261" stroke="#bf583f" strokeWidth="2" strokeLinejoin="round"/>
+        </g>
+        <path d="M111 183q19 12 38 0" stroke="#e76f51" strokeWidth="4" strokeLinecap="round" opacity=".8"/>
+        <path className="robot-light owl-crest" d="M130 78q-11-11-2-23 4 8 3 13 6-7 13-6-3 11-14 16Z" fill="#f4d58d" stroke="#e9b85c" strokeWidth="2" strokeLinejoin="round"/>
+        <g className="owl-feet" fill="#e76f51">
+          <path d="M104 204q-8 12-16 12 2 7 18 4l8-11ZM156 204q8 12 16 12-2 7-18 4l-8-11Z"/>
         </g>
       </g>
     </svg>

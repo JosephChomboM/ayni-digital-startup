@@ -182,6 +182,20 @@ class SessionsService:
                     + (": " + active.text if active.text else "")
                 )[:1800]
             )
+            if active.type == "song" and all(
+                active.id != step.memory_id for step in self.get_session(actor_id, session_id).steps
+            ):
+                music = self.memories.get_song_context(actor_id, active.id)
+                if music.get("status") == "confirmed":
+                    context.append(
+                        "Datos de la grabación confirmada por la familia, fuente MusicBrainz: "
+                        + str(music)
+                    )
+                else:
+                    context.append(
+                        "No se han confirmado artista, año ni género de esta canción. "
+                        "No los inventes; ofrece consultarlos."
+                    )
         with self.session.begin():
             # Serializa turnos de la misma guía y evita duplicados al reintentar.
             self.repository.lock_generation(session_id)

@@ -6,8 +6,8 @@ export interface SessionFeedback {
   family_id: string;
   user_id: string;
   user_name: string;
-  feeling: SessionFeeling;
-  experience: SessionExperience;
+  feeling?: SessionFeeling;
+  experience?: SessionExperience;
   note: string;
   duration_seconds: number;
   created_at: string;
