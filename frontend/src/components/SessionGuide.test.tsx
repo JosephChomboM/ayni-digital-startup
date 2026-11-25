@@ -4,13 +4,13 @@ import { SessionGuide } from "./SessionGuide";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import { getElderProfile } from "../api/families";
-import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
+import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction, synthesizeSpeech } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
 vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
 vi.mock("../api/families", () => ({ getElderProfile: vi.fn() }));
-vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
+vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn(), synthesizeSpeech: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ captureRef, onCue, onAnalyzeFrame }: { captureRef?: { current: (() => Promise<string>) | null }; onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => { if (captureRef) captureRef.current = speech.capture; return <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></>; } }));
 const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
@@ -24,6 +24,7 @@ const guide = { id:"guide", elder_profile_id:"profile", created_at:"2026-11-12T0
 const answer = { id:"reply", role:"assistant" as const, text:"Me contaste que caminabas por el parque. ¿Qué te gustaba mirar allí?", suggestion:"continue" as const, observations:[] };
 const photo = { id:"photo", memory_id:"memory", created_by:"u", content_type:"image/jpeg", size_bytes:12, width:1, height:1, created_at:"", url:"https://photos.example.test/signed", url_expires_at:"2026-11-12T03:00:00Z" };
 beforeEach(() => {
+ vi.mocked(synthesizeSpeech).mockRejectedValue(new Error("Voz no disponible en esta prueba"));
  vi.mocked(clearScene).mockResolvedValue(undefined);
  speech.capture.mockResolvedValue("data:image/jpeg;base64,current");
  URL.createObjectURL=vi.fn(()=>"blob:test"); URL.revokeObjectURL=vi.fn();

@@ -20,6 +20,7 @@ from app.modules.sessions.schemas import (
 )
 from app.modules.sessions.service import SessionsService
 from app.modules.sessions.speech import AudioRequest, Transcript, transcribe_audio
+from app.modules.sessions.tts import VoiceRequest, synthesize_voice
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -110,3 +111,13 @@ def transcribe(
 ) -> Transcript:
     service.get_session(actor_id, session_id)
     return transcribe_audio(data)
+
+
+@router.post("/{session_id}/voice")
+def voice(session_id: UUID, data: VoiceRequest, actor_id: ActorId, service: Service) -> Response:
+    service.get_session(actor_id, session_id)
+    return Response(
+        content=synthesize_voice(data),
+        media_type="audio/wav",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )

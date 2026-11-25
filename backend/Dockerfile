@@ -16,6 +16,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
+COPY scripts/download_voice.py scripts/download_voice.py
+RUN python scripts/download_voice.py
 COPY . .
 
 # Non-root user. Photos live in Supabase Storage, so the container needs no writable disk.
