@@ -24,6 +24,8 @@ import { getFamilySessionFeedback, saveSessionFeedback } from "../api/sessionFee
 import type { SessionFeeling } from "../api/sessionFeedback";
 
 interface SessionGuideProps {
+  assistantActive?: boolean;
+  onAppInstruction?: (text: string) => void;
   currentUser: User;
   onOpenMemories: () => void;
   onOpenPlan?: () => void;
@@ -66,7 +68,7 @@ export function SessionGuide(props: SessionGuideProps) {
   return <PersistedSessionGuide key={`${props.currentUser.id}:${props.currentUser.family_id}`} {...props} />;
 }
 
-function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpenDashboard }: SessionGuideProps) {
+function PersistedSessionGuide({ currentUser, assistantActive = false, onAppInstruction, onOpenMemories, onOpenPlan, onOpenDashboard }: SessionGuideProps) {
   const [memoryChoice, setMemoryChoice] = useState("");
   const [chosenIds, setChosenIds] = useState<string[]>([]);
   const [catalog, setCatalog] = useState<Memory[]>([]);
@@ -434,6 +436,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
         onCancel={closeSelection}
       />}
       {started && guide && <GuidedConversation
+        assistantActive={assistantActive}
+        onAppInstruction={onAppInstruction}
         key={guide.id}
         onBack={() => { setEditingSelection(false); setStarted(false); refreshHistory(); }}
         onChangeMemories={() => void openSelection()}

@@ -26,6 +26,8 @@ const SESSION_STARTERS = [
 ];
 
 interface GuidedConversationProps {
+  assistantActive?: boolean;
+  onAppInstruction?: (text: string) => void;
   onBack?: () => void;
   sessionId: string;
   activeMemoryId?: string;
@@ -52,6 +54,8 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
+  assistantActive = false,
+  onAppInstruction,
   onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, onChangeMemories, selectionBusy, selectedMemoryCount, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
@@ -99,7 +103,7 @@ export function GuidedConversation({
   if (!voice.current) voice.current = new SessionVoice();
 
   function speak(text: string) {
-    if (!sound || document.hidden) return;
+    if (!sound || assistantActive || document.hidden) return;
     waitingForVoice.current = null;
     void voice.current!.speak(sessionId, text, setSpeaking, (unavailable) => {
       waitingForVoice.current = unavailable ? text : null;
@@ -205,6 +209,12 @@ export function GuidedConversation({
   function receive(raw: string) {
     const reply = raw.trim().slice(0, 500);
     if (!reply || paused || request.current) return;
+    const command = reply.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+    if (onAppInstruction && /\b(?:abre|abrir|ve a|ir a|busca|buscar|guarda|guardar|edita|editar|elimina|borrar|pulsa|haz clic|reproduce|reproducir|pausa la musica|pausar la musica|volumen|reinicia la cancion|siguiente foto|foto anterior)\b/.test(command)) {
+      dictation.cancel();
+      onAppInstruction(reply);
+      return;
+    }
     append("you", reply);
     const intent = interpretReply(reply);
     if (intent === "end") finish();
@@ -221,9 +231,13 @@ export function GuidedConversation({
       if (!reviewVoice || intent === "pause" || intent === "end") receive(reply);
       else setInput(reply);
     },
-    mic && !paused && !pending && !speaking && !input.trim(),
+    mic && !assistantActive && !paused && !pending && !speaking && !input.trim(),
     cloudVoice ? (recording, signal) => transcribeAudio(sessionId, recording, signal) : undefined,
   );
+
+  useEffect(() => {
+    if (assistantActive) voice.current?.cancel();
+  }, [assistantActive]);
 
   function pause(message: string) {
     cancelTurn();
@@ -294,7 +308,7 @@ export function GuidedConversation({
   const initialize = useEffectEvent(loadConversation);
   const refreshVoices = useEffectEvent(() => {
     const text = waitingForVoice.current;
-    if (!text || document.hidden || !speakLocally(text, setSpeaking)) return;
+    if (!text || assistantActive || document.hidden || !speakLocally(text, setSpeaking)) return;
     setSpeaking(true);
     waitingForVoice.current = null;
     setVoiceNotice("");
