@@ -58,6 +58,9 @@ export interface SessionResponse {
 
 const route = (id: string) => `/sessions/${encodeURIComponent(id)}`;
 
+export const synthesizeSpeech = (id: string, text: string, signal: AbortSignal) =>
+  apiFetch<Blob>(`${route(id)}/voice`, { method: "POST", body: JSON.stringify({ text }), signal }, "blob");
+
 export const generateSession = (memoryId?: string) => apiFetch<SavedSession>("/sessions/generate", { method: "POST", body: JSON.stringify(memoryId ? { memory_id: memoryId } : {}) });
 export const getSession = (id: string) => apiFetch<SavedSession>(route(id));
 export const listSessions = (limit = 20, offset = 0) =>
