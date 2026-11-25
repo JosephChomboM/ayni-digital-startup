@@ -31,6 +31,9 @@ interface GuidedConversationProps {
   activeMemoryId?: string;
   memoryOptions?: { id: string; title: string }[];
   onSelectMemory?: (id: string) => void;
+  onChangeMemories?: () => void;
+  selectionBusy?: boolean;
+  selectedMemoryCount?: number;
   photo?: Blob;
   withDevices: boolean;
   elapsed: string;
@@ -49,7 +52,7 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
+  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, onChangeMemories, selectionBusy, selectedMemoryCount, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
   const liveScene = true;
@@ -399,11 +402,11 @@ export function GuidedConversation({
           className="bar-icon" onClick={toggleSound}>
           {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
         </button>
-        <button type="button" className="bar-action" onClick={() => {
+        <button type="button" className="bar-action" disabled={selectionBusy} onClick={() => {
           if (paused) { onResume(); show("Seguimos a tu ritmo. ¿Qué te gustaría contar ahora?"); }
           else pause("Hagamos una pausa. Seguimos cuando quieras.");
         }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</button>
-        <button type="button" className="bar-action" onClick={finish}><Square className="size-4" />Terminar</button>
+        <button type="button" className="bar-action" disabled={selectionBusy} onClick={finish}><Square className="size-4" />Terminar</button>
       </div>
     </header>
 
@@ -499,6 +502,10 @@ export function GuidedConversation({
           <button type="button" className="session-tools-close" aria-label="Cerrar opciones de sesión" onClick={() => setToolsOpen(false)}><X size={18}/></button>
         </div>
         <h3>Para quien acompaña</h3>
+        {onChangeMemories && <div className="tool-block">
+          <p>{selectedMemoryCount ?? memoryOptions?.length ?? 0} {(selectedMemoryCount ?? memoryOptions?.length) === 1 ? "recuerdo" : "recuerdos"} en esta charla</p>
+          <button type="button" disabled={pending || selectionBusy} onClick={() => { dictation.cancel(); onChangeMemories(); }}>Cambiar recuerdos</button>
+        </div>}
         {Boolean(memoryOptions?.length) && <label className="tool-field">Recuerdo activo
           <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
             {!activeMemoryId && <option value="">Fotos de la sesión</option>}

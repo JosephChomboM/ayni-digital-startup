@@ -1,15 +1,16 @@
 import { AyniCompanion } from "./AyniCompanion";
 import { PageIntro } from "./PageIntro";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Play, RotateCcw, Camera, MessageCircle, ChevronRight, Clock3, Heart, ArrowRight } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import type { MemoryPhoto } from "../api/photos";
-import { getLook, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "../api/sessions";
-import type { LookSpec, Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
+import { getLook, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, recordReaction, updateSessionMemories } from "../api/sessions";
+import type { LookSpec, MemorySelection, Recommendation, Reaction, SavedSession, SessionSummary } from "../api/sessions";
 import { GuidedConversation } from "./GuidedConversation";
+import { MemoryChecklist } from "./MemoryChecklist";
 import type { StageScene } from "./CompanionScene";
 import { lookFor } from "./companionTheme";
 import { getElderProfile } from "../api/families";
@@ -45,12 +46,34 @@ function formatMemoryDate(value: string) {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("es-PE", { day: "numeric", month: "short" });
 }
 
+const eligibleMemory = (item: Memory) => item.is_positive && !item.is_sensitive && !item.deletion_pending;
+const collectionIds = (saved: SavedSession) => [...new Set(
+  (saved.selected_memories ?? saved.steps).filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!),
+)];
+
+async function loadMemoryCatalog(): Promise<Memory[]> {
+  const items: Memory[] = [];
+  let total = 0;
+  do {
+    const page = await listMemories({ include_sensitive: true, limit: 50, offset: items.length });
+    items.push(...page.items); total = page.total;
+    if (!page.items.length) break;
+  } while (items.length < total);
+  return items;
+}
+
 export function SessionGuide(props: SessionGuideProps) {
   return <PersistedSessionGuide key={`${props.currentUser.id}:${props.currentUser.family_id}`} {...props} />;
 }
 
 function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpenDashboard }: SessionGuideProps) {
   const [memoryChoice, setMemoryChoice] = useState("");
+  const [chosenIds, setChosenIds] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<Memory[]>([]);
+  const [editingSelection, setEditingSelection] = useState(false);
+  const [selectionWasPaused, setSelectionWasPaused] = useState(false);
+  const [selectionBusy, setSelectionBusy] = useState(false);
+  const [selectionError, setSelectionError] = useState("");
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recommending, setRecommending] = useState(false);
   const [guide, setGuide] = useState<SavedSession | null>(null);
@@ -113,26 +136,17 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
   useEffect(() => {
     let active = true;
     setLoading(true);
-    (async () => {
-      const items: Memory[] = [];
-      let total = 0;
-      do {
-        const page = await listMemories({ include_sensitive: true, limit: 50, offset: items.length });
-        if (!active) return { items };
-        items.push(...page.items); total = page.total;
-        if (!page.items.length) break;
-      } while (items.length < total);
-      return { items };
-    })().then(async (response) => {
+    loadMemoryCatalog().then(async (items) => {
       if (!active) return;
-      setMemories(response.items);
-      const eligible = response.items.filter((memory) => memory.is_positive && !memory.is_sensitive);
+      setCatalog(items);
+      setMemories(items);
+      const eligible = items.filter(eligibleMemory);
       const photoPages = await Promise.allSettled(eligible.map((memory) => listPhotos(memory.id)));
       if (!active) return;
       setPhotos(photoPages.flatMap((result) => result.status === "fulfilled" ? result.value : []));
-      const firstAnecdote = response.items.find((memory) => memory.type === "anecdote" && memory.is_positive && !memory.is_sensitive);
+      const firstAnecdote = items.find((memory) => memory.type === "anecdote" && eligibleMemory(memory));
       if (firstAnecdote) setAnecdoteId(firstAnecdote.id);
-      const firstSong = response.items.find((memory) => memory.type === "song" && memory.is_positive && !memory.is_sensitive);
+      const firstSong = items.find((memory) => memory.type === "song" && eligibleMemory(memory));
       if (firstSong) setSongId(firstSong.id);
       setLoadError("");
     }).catch((error: unknown) => {
@@ -182,25 +196,67 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
   if (photos.length) availableActivities.push("photo");
   if (selectedSong) availableActivities.push("song");
 
+  async function loadSessionCollection(saved: SavedSession) {
+    const results = await Promise.allSettled(collectionIds(saved).map(getMemory));
+    const allowed = results.flatMap((result) => result.status === "fulfilled" && eligibleMemory(result.value) && result.value.elder_profile_id === saved.elder_profile_id ? [result.value] : []);
+    // Preserve the family-photo behavior of older automatic guides. Explicit collections
+    // only expose photos attached to the memories selected for this conversation.
+    const family = (saved.selection_mode ?? "auto") === "auto" ? catalog : [];
+    const photoSources = [...new Map([...allowed, ...family]
+      .filter((memory) => eligibleMemory(memory) && memory.elder_profile_id === saved.elder_profile_id)
+      .map((memory) => [memory.id, memory])).values()];
+    const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
+    return { allowed, photoSources, sessionPhotos: photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []) };
+  }
+
+  async function openSelection() {
+    setSelectionWasPaused(paused);
+    setPaused(true);
+    setEditingSelection(true);
+    setSelectionBusy(true);
+    setSelectionError("");
+    try { setCatalog(await loadMemoryCatalog()); }
+    catch (cause) { setSelectionError(cause instanceof Error ? cause.message : "No pudimos cargar los recuerdos."); }
+    finally { setSelectionBusy(false); }
+  }
+
+  function closeSelection() {
+    setEditingSelection(false);
+    setPaused(selectionWasPaused);
+  }
+
+  async function saveSelection(selection: MemorySelection) {
+    if (!guide || selectionBusy) return;
+    setSelectionBusy(true);
+    setSelectionError("");
+    try {
+      const updated = await updateSessionMemories(guide.id, selection);
+      const { allowed, photoSources, sessionPhotos } = await loadSessionCollection(updated);
+      setGuide(updated);
+      setMemories(allowed);
+      setPhotos(sessionPhotos);
+      setPhotoSourceIds(photoSources.map((memory) => memory.id));
+      setAnecdoteId(allowed.find((item) => item.id === anecdoteId)?.id ?? allowed.find((item) => item.type === "anecdote")?.id ?? "");
+      setSongId(allowed.find((item) => item.id === songId)?.id ?? allowed.find((item) => item.type === "song")?.id ?? "");
+      setPhotoIndex(0);
+      setActivity(allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
+      closeSelection();
+    } catch (cause) { setSelectionError(cause instanceof Error ? cause.message : "No pudimos guardar la selección."); }
+    finally { setSelectionBusy(false); }
+  }
+
   async function begin(devices: boolean, id?: string) {
     if (busy) return;
     setBusy(true);
     setLoadError("");
     setQuotaBlocked(false);
     try {
-      const saved = id ? await getSession(id) : await generateSession(memoryChoice || undefined);
+      const selection = memoryChoice === "__all" ? { selection_mode: "all" as const } :
+        memoryChoice === "__selected" ? { selection_mode: "selected" as const, memory_ids: chosenIds } : memoryChoice || undefined;
+      const saved = id ? await getSession(id) : await generateSession(selection);
       setGuide(saved);
       refreshHistory(0);
-      const ids = [...new Set(saved.steps.filter((item) => item.memory_available && item.memory_id).map((item) => item.memory_id!))];
-      const results = await Promise.allSettled(ids.map(getMemory));
-      const allowed = results.flatMap((result) => result.status === "fulfilled" && result.value.is_positive && !result.value.is_sensitive && result.value.elder_profile_id === saved.elder_profile_id ? [result.value] : []);
-      // Las fotos vienen de todos los recuerdos positivos y no sensibles de la familia, no solo de la guía.
-      const family = await listMemories({ include_sensitive: false, limit: 50, offset: 0 }).then((page) => page.items).catch(() => allowed);
-      const photoSources = [...new Map([...allowed, ...family]
-        .filter((memory) => memory.is_positive && !memory.is_sensitive && memory.elder_profile_id === saved.elder_profile_id)
-        .map((memory) => [memory.id, memory])).values()];
-      const photoResults = await Promise.allSettled(photoSources.map((memory) => listPhotos(memory.id)));
-      const sessionPhotos = photoResults.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+      const { allowed, photoSources, sessionPhotos } = await loadSessionCollection(saved);
       const previousReaction = await getRecordedReaction(saved.id);
       const previousFeedback = getFamilySessionFeedback(currentUser.family_id).find((item) => item.id === saved.id);
       // Los gustos solo ambientan la sala: si la IA no responde, se usa un look por palabras clave
@@ -218,7 +274,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
       if (chosenPhoto >= 0) { setPhotoIndex(chosenPhoto); setActivity("photo"); }
       else setActivity(allowed.find((item) => item.id === memoryChoice)?.type ?? allowed[0]?.type ?? (sessionPhotos.length ? "photo" : undefined));
       setWithDevices(devices);
-      setPhotoIndex(0);
+      if (chosenPhoto < 0) setPhotoIndex(0);
+      setEditingSelection(false);
       setStarted(true);
       setPaused(false);
       setElapsed(0);
@@ -290,6 +347,9 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
   const scene: StageScene | undefined = activity === "anecdote" && selectedAnecdote ? { kind: "anecdote", title: selectedAnecdote.title, text: selectedAnecdote.text ?? "" } :
     activity === "photo" && photos.length ? { kind: "photo", photos, index: photoIndex, onChange: setPhotoIndex } :
       activity === "song" && selectedSong ? { kind: "song", memory: selectedSong } : undefined;
+  const cannotStart = busy || catalog.some((item) => item.id === memoryChoice && !eligibleMemory(item)) ||
+    (memoryChoice === "__selected" && !chosenIds.some((id) => catalog.some((item) => item.id === id && eligibleMemory(item)))) ||
+    (memoryChoice === "__all" && !catalog.some(eligibleMemory));
 
   return <Card className="session-page border-0 shadow-none">
     {!started && <PageIntro eyebrow="UN MOMENTO PARA CONECTAR" title="Guía de sesión">Conversen a su ritmo con la ayuda de Ayni.</PageIntro>}
@@ -305,7 +365,7 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
           <div className="session-welcome-copy">
             <span className="session-kicker">A TU RITMO</span>
             <h2 id="prepare-session" className="text-xl font-bold text-[#264653]">Un momento con Ayni</h2>
-            <p className="mt-1 text-base text-slate-700">Elige un recuerdo y empezamos a conversar.</p>
+            <p className="mt-1 text-base text-slate-700">Elige uno, varios o todos tus recuerdos bonitos y empezamos a conversar.</p>
           </div>
         </div>
         {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="session-setup-body">
@@ -317,14 +377,17 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
           <label className="session-memory-label">¿Con qué recuerdo quieres empezar?
             <select aria-label="Recuerdo para la sesión" className="mt-2 w-full rounded border bg-white p-3 font-normal" value={memoryChoice} onChange={(event) => setMemoryChoice(event.target.value)}>
               <option value="">Dejar que Ayni prepare una selección</option>
-              {memories.map((item) => <option key={item.id} value={item.id} disabled={item.is_sensitive || item.deletion_pending}>{item.title}{formatMemoryDate(item.created_at) ? ` · ${formatMemoryDate(item.created_at)}` : ""} · {item.is_sensitive ? "Tema delicado: no disponible" : item.deletion_pending ? "Eliminándose" : !item.is_positive ? "Confirma que es un recuerdo bonito" : item.type === "song" ? "Canción" : "Anécdota"}</option>)}
+              <option value="__selected">Elegir varios recuerdos</option>
+              <option value="__all">Todos los recuerdos disponibles</option>
+              {catalog.map((item) => <option key={item.id} value={item.id} disabled={item.is_sensitive || item.deletion_pending}>{item.title}{formatMemoryDate(item.created_at) ? ` · ${formatMemoryDate(item.created_at)}` : ""} · {item.is_sensitive ? "Tema delicado: no disponible" : item.deletion_pending ? "Eliminándose" : !item.is_positive ? "Confirma que es un recuerdo bonito" : item.type === "song" ? "Canción" : "Anécdota"}</option>)}
             </select>
           </label>
-          {memories.some((item) => item.id === memoryChoice && !item.is_positive && !item.is_sensitive) && <div className="rounded-xl border bg-amber-50 p-4 space-y-3">
+          {(memoryChoice === "__selected" || memoryChoice === "__all") && <MemoryChecklist memories={catalog} selected={chosenIds} all={memoryChoice === "__all"} disabled={busy} onChange={setChosenIds} />}
+          {catalog.some((item) => item.id === memoryChoice && !item.is_positive && !item.is_sensitive) && <div className="rounded-xl border bg-amber-50 p-4 space-y-3">
             <p>Este recuerdo todavía no está marcado como bonito. Para usarlo en una sesión, confirma que es un recuerdo positivo para tu familiar.</p>
             <Button disabled={busy} onClick={async () => {
               setBusy(true); setLoadError("");
-              try { const updated = await updateMemory(memoryChoice, { is_positive: true }); setMemories((items) => items.map((item) => item.id === updated.id ? updated : item)); }
+              try { const updated = await updateMemory(memoryChoice, { is_positive: true }); setMemories((items) => items.map((item) => item.id === updated.id ? updated : item)); setCatalog((items) => items.map((item) => item.id === updated.id ? updated : item)); }
               catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos confirmar el recuerdo."); }
               finally { setBusy(false); }
             }}>Confirmar que es un recuerdo bonito</Button>
@@ -342,8 +405,8 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
           <div className="session-start-block">
             <div className="session-start-heading"><span className="session-start-icon"><MessageCircle size={19}/></span><div><strong>¿Cómo quieren conversar?</strong><small>Elige la opción más cómoda para ustedes.</small></div></div>
             <div className="session-start-actions">
-              <Button type="button" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
-              <Button type="button" variant="outline" disabled={busy || memories.some((item) => item.id === memoryChoice && !item.is_positive)} onClick={() => void begin(false)} className="w-auto"><MessageCircle className="size-4"/>Empezar sin cámara ni micrófono</Button>
+              <Button type="button" disabled={cannotStart} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
+              <Button type="button" variant="outline" disabled={cannotStart} onClick={() => void begin(false)} className="w-auto"><MessageCircle className="size-4"/>Empezar sin cámara ni micrófono</Button>
             </div>
             <div className="session-device-note"><Camera size={16}/><span>Si eliges Ayni, el navegador pedirá permiso para cámara y micrófono. También puedes iniciar sin ellos.</span></div>
           </div>
@@ -361,9 +424,21 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
           {total > 10 && <nav aria-label="Páginas del historial" className="flex flex-wrap gap-3"><Button variant="outline" disabled={offset === 0 || busy} onClick={() => refreshHistory(Math.max(0, offset - 10))}>Página anterior</Button><Button variant="outline" disabled={offset + 10 >= total || busy} onClick={() => refreshHistory(offset + 10)}>Página siguiente</Button></nav>}
         </>}
       </section>}
+      {started && guide && editingSelection && <CollectionEditor
+        memories={catalog}
+        initialIds={collectionIds(guide)}
+        initialMode={guide.selection_mode ?? "selected"}
+        busy={selectionBusy}
+        error={selectionError}
+        onSave={saveSelection}
+        onCancel={closeSelection}
+      />}
       {started && guide && <GuidedConversation
         key={guide.id}
-        onBack={() => { setStarted(false); refreshHistory(); }}
+        onBack={() => { setEditingSelection(false); setStarted(false); refreshHistory(); }}
+        onChangeMemories={() => void openSelection()}
+        selectionBusy={editingSelection || selectionBusy}
+        selectedMemoryCount={collectionIds(guide).length}
         sessionId={guide.id}
         activeMemoryId={activity === "song" ? selectedSong?.id : activity === "anecdote" ? selectedAnecdote?.id :
           activity === "photo" ? photos[photoIndex % Math.max(photos.length, 1)]?.memory_id : undefined}
@@ -435,6 +510,39 @@ function PersistedSessionGuide({ currentUser, onOpenMemories, onOpenPlan, onOpen
       </section>}
     </CardContent>
   </Card>;
+}
+
+function CollectionEditor({ memories, initialIds, initialMode, busy, error, onSave, onCancel }: {
+  memories: Memory[];
+  initialIds: string[];
+  initialMode: MemorySelection["selection_mode"];
+  busy: boolean;
+  error: string;
+  onSave: (selection: MemorySelection) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [mode, setMode] = useState(initialMode);
+  const [ids, setIds] = useState(initialIds);
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => { panel.current?.focus(); }, []);
+  const selected = ids.filter((id) => memories.some((item) => item.id === id && eligibleMemory(item)));
+  return <section ref={panel} tabIndex={-1} aria-label="Cambiar recuerdos de la charla" className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+    <h2 className="text-xl font-semibold">Recuerdos de esta charla</h2>
+    <p className="text-sm">La charla queda en pausa mientras eliges. Lo que ya conversaron seguirá en el historial.</p>
+    <label className="block">¿Qué recuerdos podrá consultar Ayni?
+      <select aria-label="Selección de la charla" value={mode} disabled={busy} onChange={(event) => setMode(event.target.value as MemorySelection["selection_mode"])} className="mt-2 w-full rounded border p-3">
+        <option value="selected">Elegir recuerdos</option>
+        <option value="all">Todos los recuerdos disponibles</option>
+        <option value="auto">Dejar que Ayni prepare una selección</option>
+      </select>
+    </label>
+    {mode !== "auto" && <MemoryChecklist memories={memories} selected={selected} all={mode === "all"} disabled={busy} onChange={setIds} />}
+    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    <div className="flex flex-wrap gap-3">
+      <Button disabled={busy || (mode === "selected" && !selected.length) || (mode === "all" && !memories.some(eligibleMemory))} onClick={() => void onSave(mode === "selected" ? { selection_mode: mode, memory_ids: selected } : { selection_mode: mode })}>{busy ? "Cargando…" : "Guardar selección"}</Button>
+      <Button variant="outline" disabled={busy} onClick={onCancel}>Cancelar selección</Button>
+    </div>
+  </section>;
 }
 
 function Choice({ children, selected, onClick, tone = "receptivo" }: { children: string; selected: boolean; onClick: () => void; tone?: string }) {

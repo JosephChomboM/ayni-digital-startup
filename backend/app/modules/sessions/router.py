@@ -44,7 +44,14 @@ def generate_session(
     service: Service,
     data: GenerateSessionRequest | None = None,
 ) -> SessionDetail:
-    return service.generate_session(actor_id, data.memory_id if data else None)
+    return service.generate_session(actor_id, selection=data)
+
+
+@router.put("/{session_id}/memories", response_model=SessionDetail)
+def update_memory_selection(
+    session_id: UUID, data: GenerateSessionRequest, actor_id: ActorId, service: Service
+) -> SessionDetail:
+    return service.update_memory_selection(actor_id, session_id, data)
 
 
 @router.get("", response_model=SessionListResponse)

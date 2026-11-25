@@ -10,7 +10,7 @@ from app.modules.families.models import ElderProfile
 from app.modules.memories.models import Memory
 from app.modules.memories.schemas import AnecdoteCreateRequest
 from app.modules.memories.service import MemoriesService
-from app.modules.sessions.models import FamilySession, SessionItem
+from app.modules.sessions.models import FamilySession, SessionItem, SessionMemory
 
 pytestmark = pytest.mark.integration
 
@@ -80,3 +80,60 @@ def test_deleting_memory_clears_live_link_and_profile_deletion_removes_guide(
     with Session(engine) as session:
         assert session.get(FamilySession, session_id) is None
         assert session.scalar(select(SessionItem.id).where(SessionItem.id == item_id)) is None
+
+
+def test_selected_collection_survives_reload_independently_of_timed_steps(
+    caregiver_account: SimpleNamespace, memory_profile_id: UUID
+) -> None:
+    with Session(engine) as session:
+        memory = MemoriesService(session).create_memory(
+            caregiver_account.user_id,
+            AnecdoteCreateRequest(type="anecdote", title="Paseo", text="Un paseo familiar."),
+        )
+        with session.begin():
+            record = FamilySession(
+                elder_profile_id=memory_profile_id,
+                created_by=caregiver_account.user_id,
+                template_version="1.0",
+                duration_minutes=15,
+                selection_mode="selected",
+                memories=[
+                    SessionMemory(position=1, source_memory_id=memory.id, memory_id=memory.id)
+                ],
+            )
+            session.add(record)
+            session.flush()
+            session_id = record.id
+    with Session(engine) as session:
+        saved = session.get(FamilySession, session_id)
+        assert saved.selection_mode == "selected"
+        assert [item.memory_id for item in saved.memories] == [memory.id]
+        assert saved.items == []
+    with Session(engine) as session, session.begin():
+        session.execute(delete(Memory).where(Memory.id == memory.id))
+    with Session(engine) as session:
+        saved = session.get(FamilySession, session_id)
+        assert saved.memories[0].memory_id is None
+        assert saved.memories[0].source_memory_id == memory.id
+
+
+def test_deleting_session_removes_its_selected_collection(
+    caregiver_account: SimpleNamespace, memory_profile_id: UUID
+) -> None:
+    with Session(engine) as session, session.begin():
+        record = FamilySession(
+            elder_profile_id=memory_profile_id,
+            created_by=caregiver_account.user_id,
+            template_version="1.0",
+            duration_minutes=15,
+            memories=[SessionMemory(position=1, source_memory_id=caregiver_account.user_id)],
+        )
+        session.add(record)
+        session.flush()
+        session_id = record.id
+        session.execute(delete(FamilySession).where(FamilySession.id == session_id))
+    with Session(engine) as session:
+        assert (
+            session.scalar(select(SessionMemory.id).where(SessionMemory.session_id == session_id))
+            is None
+        )

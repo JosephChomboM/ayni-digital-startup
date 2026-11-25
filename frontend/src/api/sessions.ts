@@ -18,7 +18,20 @@ export interface SessionStep {
   memory_available: boolean;
 }
 
-export interface SavedSession extends SessionSummary { steps: SessionStep[] }
+export interface MemorySelection {
+  selection_mode: "auto" | "selected" | "all";
+  memory_ids?: string[];
+}
+export interface SelectedSessionMemory {
+  source_memory_id: string;
+  memory_id: string | null;
+  memory_available: boolean;
+}
+export interface SavedSession extends SessionSummary {
+  steps: SessionStep[];
+  selection_mode?: MemorySelection["selection_mode"];
+  selected_memories?: SelectedSessionMemory[];
+}
 export type SessionGuide = SavedSession;
 export interface SessionPage { items: SessionSummary[]; total: number; limit: number; offset: number }
 
@@ -61,7 +74,11 @@ const route = (id: string) => `/sessions/${encodeURIComponent(id)}`;
 export const synthesizeSpeech = (id: string, text: string, signal: AbortSignal) =>
   apiFetch<Blob>(`${route(id)}/voice`, { method: "POST", body: JSON.stringify({ text }), signal }, "blob");
 
-export const generateSession = (memoryId?: string) => apiFetch<SavedSession>("/sessions/generate", { method: "POST", body: JSON.stringify(memoryId ? { memory_id: memoryId } : {}) });
+export const generateSession = (selection?: string | MemorySelection) => apiFetch<SavedSession>("/sessions/generate", {
+  method: "POST", body: JSON.stringify(typeof selection === "string" ? { memory_id: selection } : selection ?? {}),
+});
+export const updateSessionMemories = (id: string, selection: MemorySelection) =>
+  apiFetch<SavedSession>(`${route(id)}/memories`, { method: "PUT", body: JSON.stringify(selection) });
 export const getSession = (id: string) => apiFetch<SavedSession>(route(id));
 export const listSessions = (limit = 20, offset = 0) =>
   apiFetch<SessionPage>(`/sessions?limit=${limit}&offset=${offset}`);

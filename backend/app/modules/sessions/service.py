@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ApplicationError
 from app.modules.billing.service import BillingService
 from app.modules.families.service import FamiliesService
-from app.modules.memories.service import MemoriesService
+from app.modules.memories.service import MemoriesService, SessionMemoryCandidate
 from app.modules.sessions.assistant import (
     ChatRequest,
     asks_about_previous_image,
@@ -23,6 +23,7 @@ from app.modules.sessions.look import LookSpec, generate_look
 from app.modules.sessions.models import FamilySession
 from app.modules.sessions.repository import SessionsRepository
 from app.modules.sessions.schemas import (
+    GenerateSessionRequest,
     GuideMemory,
     GuideStep,
     SceneResponse,
@@ -30,6 +31,7 @@ from app.modules.sessions.schemas import (
     SessionGuide,
     SessionListRequest,
     SessionListResponse,
+    SessionMemoryResponse,
     SessionMessageResponse,
     SessionStepResponse,
     SessionSummary,
@@ -113,9 +115,7 @@ class SessionsService:
     def _chat_context(self, actor_id: UUID, session_id: UUID) -> list[str]:
         guide = self.get_session(actor_id, session_id)
         context = []
-        for step in guide.steps:
-            if not step.source_memory_id:
-                continue
+        for step in guide.selected_memories:
             if not step.memory_available or not step.memory_id:
                 raise ApplicationError(
                     code="conversation_context_changed",
@@ -158,6 +158,15 @@ class SessionsService:
     def chat(self, actor_id: UUID, session_id: UUID, data: ChatRequest) -> SessionMessageResponse:
         context = self._chat_context(actor_id, session_id)
         if data.active_memory_id:
+            guide = self.get_session(actor_id, session_id)
+            if guide.selection_mode != "auto" and data.active_memory_id not in {
+                item.memory_id for item in guide.selected_memories if item.memory_available
+            }:
+                raise ApplicationError(
+                    code="conversation_memory_unavailable",
+                    status_code=409,
+                    message="Agrega ese recuerdo a la selección antes de conversar sobre él.",
+                )
             # get_memory ya limita el recuerdo al perfil de la familia autenticada; además
             # puede venir de una foto fuera de la guía, siempre que sea positivo y no sensible.
             try:
@@ -344,12 +353,23 @@ class SessionsService:
         return select_conversation_turn(memory.text, data)
 
     def _detail(self, record: FamilySession) -> SessionDetail:
+        collection = record.memories or [item for item in record.items if item.source_memory_id]
         available = self.memories.available_session_memory_ids(
-            record.elder_profile_id, [item.memory_id for item in record.items if item.memory_id]
+            record.elder_profile_id,
+            list({item.memory_id for item in [*record.items, *collection] if item.memory_id}),
         )
         summary = SessionSummary.model_validate(record)
         return SessionDetail(
             **summary.model_dump(),
+            selection_mode=record.selection_mode,
+            selected_memories=[
+                SessionMemoryResponse(
+                    source_memory_id=item.source_memory_id,
+                    memory_id=item.memory_id if item.memory_id in available else None,
+                    memory_available=item.memory_id in available,
+                )
+                for item in collection
+            ],
             steps=[
                 SessionStepResponse(
                     position=item.position,
@@ -363,7 +383,57 @@ class SessionsService:
             ],
         )
 
-    def generate_session(self, actor_id: UUID, memory_id: UUID | None = None) -> SessionDetail:
+    def _select_collection(
+        self, profile_id: UUID, data: GenerateSessionRequest
+    ) -> list[SessionMemoryCandidate]:
+        candidates = self.memories.select_session_memories(
+            profile_id,
+            data.memory_id,
+            memory_ids=data.memory_ids if data.selection_mode == "selected" else None,
+            all_memories=data.selection_mode == "all",
+        )
+        if data.selection_mode == "selected" and {item.id for item in candidates} != set(
+            data.memory_ids
+        ):
+            raise ApplicationError(
+                code="memory_selection_unavailable",
+                status_code=409,
+                message="Algún recuerdo elegido no está disponible. Revisa tu selección.",
+            )
+        if not candidates:
+            raise ApplicationError(
+                code="no_eligible_memories",
+                status_code=409,
+                message="Elige al menos un recuerdo bonito que no sea un tema delicado.",
+            )
+        return candidates
+
+    def update_memory_selection(
+        self, actor_id: UUID, session_id: UUID, data: GenerateSessionRequest
+    ) -> SessionDetail:
+        profile_id = self._profile(actor_id)
+        with self.session.begin():
+            self.repository.lock_generation(session_id)
+            record = self.repository.get_session(session_id, elder_profile_id=profile_id)
+            if record is None:
+                raise ApplicationError(
+                    code="session_not_found", status_code=404, message="No encontramos esta guía."
+                )
+            candidates = self._select_collection(profile_id, data)
+            self.repository.set_memory_collection(
+                record, [item.id for item in candidates], data.selection_mode
+            )
+            return self._detail(record)
+
+    def generate_session(
+        self,
+        actor_id: UUID,
+        memory_id: UUID | None = None,
+        *,
+        selection: GenerateSessionRequest | None = None,
+    ) -> SessionDetail:
+        data = selection or GenerateSessionRequest(memory_id=memory_id)
+        memory_id = data.memory_id
         if memory_id:
             chosen = self.memories.get_memory(actor_id, memory_id)
             if not chosen.is_positive or chosen.is_sensitive or chosen.deletion_pending:
@@ -380,7 +450,7 @@ class SessionsService:
             policy.require_capacity(
                 self.repository.count_since(profile_id, now - timedelta(days=policy.window_days))
             )
-            candidates = self.memories.select_session_memories(profile_id, memory_id)
+            candidates = self._select_collection(profile_id, data)
             guide = build_session_guide(
                 profile_id,
                 [
@@ -398,6 +468,9 @@ class SessionsService:
             )
             record = self.repository.create_session(
                 elder_profile_id=profile_id, created_by=actor_id, guide=guide
+            )
+            self.repository.set_memory_collection(
+                record, [item.id for item in candidates], data.selection_mode
             )
             return self._detail(record)
 
