@@ -21,6 +21,26 @@ describe("client.ts - apiFetch", () => {
     expect(result).toBeUndefined();
   });
 
+  it("recupera el WAV autenticado sin intentar interpretarlo como JSON", async () => {
+    const audio = new Blob(["RIFF"], { type: "audio/wav" });
+    const json = vi.fn();
+    localStorage.setItem("ayni_token", "token-prueba");
+    const request = vi.fn().mockResolvedValue({ status: 200, ok: true, blob: async () => audio, json });
+    vi.stubGlobal("fetch", request);
+    expect(await apiFetch<Blob>("/sessions/guide/voice", { method: "POST" }, "blob")).toBe(audio);
+    expect(request.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer token-prueba");
+    expect(json).not.toHaveBeenCalled();
+    localStorage.removeItem("ayni_token");
+  });
+
+  it("conserva los errores JSON cuando falla la solicitud de audio", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      status: 503, ok: false,
+      json: async () => ({ detail: { code: "voice_unavailable", message: "Puedes seguir leyendo." } }),
+    }));
+    await expect(apiFetch("/sessions/guide/voice", {}, "blob")).rejects.toMatchObject({ code: "voice_unavailable", status: 503 });
+  });
+
   it("conserva message, code y status en ApiError al recibir error HTTP", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       status: 401,
