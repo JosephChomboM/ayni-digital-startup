@@ -7,6 +7,7 @@ __pycache__/
 .coverage
 coverage.xml
 backend/requirements.txt
+backend/voices/
 
 # Node
 node_modules/
