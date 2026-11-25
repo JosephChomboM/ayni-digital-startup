@@ -15,6 +15,7 @@ import { interpretReply, requestsVisualContext, visualSource, speakLocally } fro
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
 import { Button } from "./ui/button";
+import { SessionVoice } from "./sessionVoice";
 
 export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
@@ -91,18 +92,16 @@ export function GuidedConversation({
   const lastExpressionAt = useRef(-Infinity);
   const waitingForVoice = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const voice = useRef<SessionVoice | null>(null);
+  if (!voice.current) voice.current = new SessionVoice();
 
   function speak(text: string) {
     if (!sound || document.hidden) return;
-    if (!speakLocally(text, setSpeaking)) {
-      setSpeaking(false);
-      waitingForVoice.current = text;
-      setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz en español latinoamericano.");
-    } else {
-      setSpeaking(true);
-      waitingForVoice.current = null;
-      setVoiceNotice("");
-    }
+    waitingForVoice.current = null;
+    void voice.current!.speak(sessionId, text, setSpeaking, (unavailable) => {
+      waitingForVoice.current = unavailable ? text : null;
+      setVoiceNotice(unavailable ? "Puedes leer mis mensajes aquí. Pulsa el botón de sonido para volver a escucharme." : "");
+    });
   }
 
   function show(text: string, local = true) {
@@ -241,7 +240,7 @@ export function GuidedConversation({
 
   function canFollowExpression() {
     const now = performance.now();
-    return !aiError && !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
+    return !aiError && !paused && !speaking && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
       now - lastTurnAt.current >= 5000 && now - lastExpressionAt.current >= 25_000;
   }
 
@@ -300,6 +299,7 @@ export function GuidedConversation({
     function updateVisibility() {
       setVisible(!document.hidden);
       if (document.hidden) {
+        voice.current?.cancel();
         window.speechSynthesis?.cancel();
         setSpeaking(false);
       }
@@ -314,10 +314,15 @@ export function GuidedConversation({
       request.current?.abort();
       request.current = null;
       waitingForVoice.current = null;
+      voice.current?.cancel();
       window.speechSynthesis?.removeEventListener("voiceschanged", onVoicesChanged);
       window.speechSynthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (paused) voice.current?.cancel();
+  }, [paused]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -330,16 +335,15 @@ export function GuidedConversation({
   function toggleSound() {
     if (sound) {
       waitingForVoice.current = null;
+      voice.current?.cancel();
       window.speechSynthesis?.cancel();
       setSpeaking(false);
       setSound(false);
     } else {
       setSound(true);
-      if (speakLocally(line, setSpeaking)) { setSpeaking(true); setVoiceNotice(""); }
-      else {
-        waitingForVoice.current = line;
-        setVoiceNotice("Este dispositivo no tiene una voz en español latinoamericano.");
-      }
+      void voice.current!.speak(sessionId, line, setSpeaking, (unavailable) => {
+        setVoiceNotice(unavailable ? "Puedes leer mis mensajes aquí. Pulsa el botón de sonido para volver a escucharme." : "");
+      });
     }
   }
 
