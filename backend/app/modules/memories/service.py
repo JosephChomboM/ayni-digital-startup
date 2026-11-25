@@ -384,7 +384,12 @@ class MemoriesService:
             self.repository.delete_photo(photo)
 
     def select_session_memories(
-        self, elder_profile_id: UUID, memory_id: UUID | None = None
+        self,
+        elder_profile_id: UUID,
+        memory_id: UUID | None = None,
+        *,
+        memory_ids: Sequence[UUID] | None = None,
+        all_memories: bool = False,
     ) -> list[SessionMemoryCandidate]:
         """Trusted module interface; caller derives the profile and owns the transaction.
 
@@ -403,7 +408,9 @@ class MemoriesService:
                 is_sensitive=memory.is_sensitive,
                 deletion_pending=memory.deletion_pending,
             )
-            for memory in self.repository.select_session_memories(elder_profile_id, memory_id)
+            for memory in self.repository.select_session_memories(
+                elder_profile_id, memory_id, memory_ids=memory_ids, all_memories=all_memories
+            )
         ]
 
     def available_session_memory_ids(
