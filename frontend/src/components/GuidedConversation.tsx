@@ -15,6 +15,7 @@ import { interpretReply, requestsVisualContext, visualSource, speakLocally } fro
 import type { FaceCue, SessionActivity } from "./sessionSignals";
 import { useSessionDictation } from "./useSessionDictation";
 import { Button } from "./ui/button";
+import { SessionVoice } from "./sessionVoice";
 
 export const SESSION_GREETING = "Hola, soy Ayni. Qué gusto acompañarte. ¿Qué recuerdo te gustaría compartir hoy?";
 
@@ -25,11 +26,16 @@ const SESSION_STARTERS = [
 ];
 
 interface GuidedConversationProps {
+  assistantActive?: boolean;
+  onAppInstruction?: (text: string) => void;
   onBack?: () => void;
   sessionId: string;
   activeMemoryId?: string;
   memoryOptions?: { id: string; title: string }[];
   onSelectMemory?: (id: string) => void;
+  onChangeMemories?: () => void;
+  selectionBusy?: boolean;
+  selectedMemoryCount?: number;
   photo?: Blob;
   withDevices: boolean;
   elapsed: string;
@@ -48,7 +54,9 @@ interface GuidedConversationProps {
 }
 
 export function GuidedConversation({
-  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
+  assistantActive = false,
+  onAppInstruction,
+  onBack, sessionId, activeMemoryId, memoryOptions, onSelectMemory, onChangeMemories, selectionBusy, selectedMemoryCount, photo, withDevices, elapsed, paused, scene, activities, songMemory, look, lookNotice, lookBusy, onNewLook, onPause, onResume, onNextActivity, onFinish,
 }: GuidedConversationProps) {
   // El contexto visual queda siempre activo: con la cámara encendida, «mira acá» comparte una captura.
   const liveScene = true;
@@ -91,18 +99,16 @@ export function GuidedConversation({
   const lastExpressionAt = useRef(-Infinity);
   const waitingForVoice = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const voice = useRef<SessionVoice | null>(null);
+  if (!voice.current) voice.current = new SessionVoice();
 
   function speak(text: string) {
-    if (!sound || document.hidden) return;
-    if (!speakLocally(text, setSpeaking)) {
-      setSpeaking(false);
-      waitingForVoice.current = text;
-      setVoiceNotice("Puedes leer mis mensajes aquí. Este dispositivo no tiene una voz en español latinoamericano.");
-    } else {
-      setSpeaking(true);
-      waitingForVoice.current = null;
-      setVoiceNotice("");
-    }
+    if (!sound || assistantActive || document.hidden) return;
+    waitingForVoice.current = null;
+    void voice.current!.speak(sessionId, text, setSpeaking, (unavailable) => {
+      waitingForVoice.current = unavailable ? text : null;
+      setVoiceNotice(unavailable ? "Puedes leer mis mensajes aquí. Pulsa el botón de sonido para volver a escucharme." : "");
+    });
   }
 
   function show(text: string, local = true) {
@@ -203,6 +209,12 @@ export function GuidedConversation({
   function receive(raw: string) {
     const reply = raw.trim().slice(0, 500);
     if (!reply || paused || request.current) return;
+    const command = reply.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+    if (onAppInstruction && /\b(?:abre|abrir|ve a|ir a|busca|buscar|guarda|guardar|edita|editar|elimina|borrar|pulsa|haz clic|reproduce|reproducir|pausa la musica|pausar la musica|volumen|reinicia la cancion|siguiente foto|foto anterior)\b/.test(command)) {
+      dictation.cancel();
+      onAppInstruction(reply);
+      return;
+    }
     append("you", reply);
     const intent = interpretReply(reply);
     if (intent === "end") finish();
@@ -219,9 +231,13 @@ export function GuidedConversation({
       if (!reviewVoice || intent === "pause" || intent === "end") receive(reply);
       else setInput(reply);
     },
-    mic && !paused && !pending && !speaking && !input.trim(),
+    mic && !assistantActive && !paused && !pending && !speaking && !input.trim(),
     cloudVoice ? (recording, signal) => transcribeAudio(sessionId, recording, signal) : undefined,
   );
+
+  useEffect(() => {
+    if (assistantActive) voice.current?.cancel();
+  }, [assistantActive]);
 
   function pause(message: string) {
     cancelTurn();
@@ -244,7 +260,7 @@ export function GuidedConversation({
 
   function canFollowExpression() {
     const now = performance.now();
-    return !aiError && !paused && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
+    return !aiError && !paused && !speaking && !input.trim() && (dictation.state === "idle" || dictation.state === "listening") && !request.current && !window.speechSynthesis?.speaking &&
       now - lastTurnAt.current >= 5000 && now - lastExpressionAt.current >= 25_000;
   }
 
@@ -292,7 +308,7 @@ export function GuidedConversation({
   const initialize = useEffectEvent(loadConversation);
   const refreshVoices = useEffectEvent(() => {
     const text = waitingForVoice.current;
-    if (!text || document.hidden || !speakLocally(text, setSpeaking)) return;
+    if (!text || assistantActive || document.hidden || !speakLocally(text, setSpeaking)) return;
     setSpeaking(true);
     waitingForVoice.current = null;
     setVoiceNotice("");
@@ -303,6 +319,7 @@ export function GuidedConversation({
     function updateVisibility() {
       setVisible(!document.hidden);
       if (document.hidden) {
+        voice.current?.cancel();
         window.speechSynthesis?.cancel();
         setSpeaking(false);
       }
@@ -317,10 +334,15 @@ export function GuidedConversation({
       request.current?.abort();
       request.current = null;
       waitingForVoice.current = null;
+      voice.current?.cancel();
       window.speechSynthesis?.removeEventListener("voiceschanged", onVoicesChanged);
       window.speechSynthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (paused) voice.current?.cancel();
+  }, [paused]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -333,16 +355,15 @@ export function GuidedConversation({
   function toggleSound() {
     if (sound) {
       waitingForVoice.current = null;
+      voice.current?.cancel();
       window.speechSynthesis?.cancel();
       setSpeaking(false);
       setSound(false);
     } else {
       setSound(true);
-      if (speakLocally(line, setSpeaking)) { setSpeaking(true); setVoiceNotice(""); }
-      else {
-        waitingForVoice.current = line;
-        setVoiceNotice("Este dispositivo no tiene una voz en español latinoamericano.");
-      }
+      void voice.current!.speak(sessionId, line, setSpeaking, (unavailable) => {
+        setVoiceNotice(unavailable ? "Puedes leer mis mensajes aquí. Pulsa el botón de sonido para volver a escucharme." : "");
+      });
     }
   }
 
@@ -395,11 +416,11 @@ export function GuidedConversation({
           className="bar-icon" onClick={toggleSound}>
           {sound ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
         </button>
-        <button type="button" className="bar-action" onClick={() => {
+        <button type="button" className="bar-action" disabled={selectionBusy} onClick={() => {
           if (paused) { onResume(); show("Seguimos a tu ritmo. ¿Qué te gustaría contar ahora?"); }
           else pause("Hagamos una pausa. Seguimos cuando quieras.");
         }}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}{paused ? "Continuar" : "Pausar"}</button>
-        <button type="button" className="bar-action" onClick={finish}><Square className="size-4" />Terminar</button>
+        <button type="button" className="bar-action" disabled={selectionBusy} onClick={finish}><Square className="size-4" />Terminar</button>
       </div>
     </header>
 
@@ -495,6 +516,10 @@ export function GuidedConversation({
           <button type="button" className="session-tools-close" aria-label="Cerrar opciones de sesión" onClick={() => setToolsOpen(false)}><X size={18}/></button>
         </div>
         <h3>Para quien acompaña</h3>
+        {onChangeMemories && <div className="tool-block">
+          <p>{selectedMemoryCount ?? memoryOptions?.length ?? 0} {(selectedMemoryCount ?? memoryOptions?.length) === 1 ? "recuerdo" : "recuerdos"} en esta charla</p>
+          <button type="button" disabled={pending || selectionBusy} onClick={() => { dictation.cancel(); onChangeMemories(); }}>Cambiar recuerdos</button>
+        </div>}
         {Boolean(memoryOptions?.length) && <label className="tool-field">Recuerdo activo
           <select aria-label="Recuerdo activo" value={activeMemoryId ?? ""} disabled={paused || pending} onChange={(event) => { dictation.cancel(); onSelectMemory?.(event.target.value); }}>
             {!activeMemoryId && <option value="">Fotos de la sesión</option>}

@@ -33,6 +33,7 @@ class FamilySession(Base):
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     template_version: Mapped[str] = mapped_column(String(30))
     duration_minutes: Mapped[int] = mapped_column(Integer)
+    selection_mode: Mapped[str] = mapped_column(String(10), server_default="auto", default="auto")
     scene_context: Mapped[dict | None] = mapped_column(JSON)
     scene_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -41,6 +42,36 @@ class FamilySession(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by=lambda: SessionItem.position,
+    )
+    memories: Mapped[list["SessionMemory"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: SessionMemory.position,
+    )
+
+
+class SessionMemory(Base):
+    """Authorized collection, independent of the timed activities in a guide."""
+
+    __tablename__ = "session_memories"
+    __table_args__ = (
+        UniqueConstraint("session_id", "source_memory_id", name="uq_session_memories_source"),
+        UniqueConstraint("session_id", "position", name="uq_session_memories_position"),
+        CheckConstraint("position >= 1", name="ck_session_memories_position"),
+        CheckConstraint(
+            "memory_id IS NULL OR memory_id = source_memory_id",
+            name="ck_session_memories_reference",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("sessions.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    source_memory_id: Mapped[UUID]
+    memory_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("memories.id", ondelete="SET NULL"), index=True
     )
 
 

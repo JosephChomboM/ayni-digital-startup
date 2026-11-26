@@ -114,9 +114,10 @@ La pantalla actual sigue siendo la experiencia anterior hasta que se conecte.
 
 El detector de voz cierra el turno tras una pausa sostenida o al llegar a 30
 segundos desde que empiezas a hablar. Si el dictado no entiende la frase, te
-pide repetirla y vuelve a escuchar. Ayni elige automáticamente una voz local
-en español latinoamericano, con prioridad para Perú. Si el dispositivo no
-ofrece una voz compatible, las respuestas se muestran por escrito. En
+pide repetirla y vuelve a escuchar. Ayni usa la voz carlfm de Piper en el
+servidor. Si no está disponible, intenta una voz local en español
+latinoamericano, con prioridad para Perú; si tampoco hay una voz compatible,
+las respuestas se muestran por escrito. En
 **Opciones de dictado** puedes revisar el texto antes de enviarlo o activar
 **Mejor precisión con Groq**. Esta última opción comparte grabaciones breves con Whisper Large
 V3. Si el servicio falla, la misma grabación se transcribe en el navegador.
@@ -130,3 +131,32 @@ familiar. El chat guarda el texto y las observaciones, sin guardar el audio,
 las capturas ni el video. Los turnos normales no incluyen las observaciones
 de capturas anteriores. Si falla la conexión, Ayni puede continuar con una
 pregunta de apoyo. Los mensajes locales de apoyo no se guardan en el historial.
+
+## Asistente durante la navegación
+
+Después de iniciar sesión, **Hablar con Ayni** abre un asistente disponible en
+las secciones de la aplicación. Acepta instrucciones escritas o dictadas, por
+ejemplo «Abre Recuerdos y busca Paseo», «Cambia el nombre del perfil a Elena y
+guarda» o «Pausa la música». Conserva la conversación al cambiar de sección.
+El dictado de este panel se procesa en el dispositivo. Las respuestas usan la
+voz del servidor, con una voz local en español como alternativa.
+
+Antes de empezar se informa que Groq recibirá las instrucciones y el texto y
+los controles visibles de la página. El modelo elige un paso cada vez y vuelve
+a observar el resultado. Solo puede activar controles actuales de la aplicación;
+no ejecuta código generado ni accede directamente a la base de datos. Los campos
+de contraseña quedan excluidos. Eliminar, comprar, aceptar consentimientos,
+adjuntar archivos y abrir enlaces externos requieren confirmación manual.
+Los permisos del navegador y la elección de archivos siguen siendo manuales.
+
+El reproductor ofrece reproducir, pausar y reiniciar para enlaces compatibles
+de YouTube y Spotify; YouTube también ofrece volumen. El navegador puede exigir
+un clic para autorizar la reproducción y Spotify puede limitarla según su servicio.
+El asistente lee el estado del reproductor antes de afirmar que una canción suena.
+No busca canciones nuevas fuera de los enlaces que ofrece la aplicación.
+
+**Detener petición** cancela los siguientes pasos. **Reintentar paso pendiente**
+conserva las acciones ya realizadas para no volver a guardar al recuperarse de un
+error temporal. Cada petición tiene un límite de diez pasos. La conversación de
+este panel vive en la pestaña; no se añade automáticamente al historial de sesión.
+Las preguntas sobre fotos y cámara siguen usando el contexto visual de la sesión.

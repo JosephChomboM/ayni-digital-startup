@@ -2,7 +2,7 @@ from datetime import UTC
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.sessions.assistant import Action
 
@@ -45,6 +45,20 @@ UTCDateTime = Annotated[AwareDatetime, AfterValidator(lambda value: value.astime
 class GenerateSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     memory_id: UUID | None = None
+    selection_mode: Literal["auto", "selected", "all"] = "auto"
+    memory_ids: list[UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_selection(self) -> "GenerateSessionRequest":
+        if self.memory_id is not None:
+            if self.selection_mode != "auto" or self.memory_ids:
+                raise ValueError("Elige una sola forma de seleccionar los recuerdos.")
+        elif self.selection_mode == "selected":
+            if not self.memory_ids or len(set(self.memory_ids)) != len(self.memory_ids):
+                raise ValueError("Elige al menos un recuerdo, sin repetirlo.")
+        elif self.memory_ids:
+            raise ValueError("Los recuerdos elegidos requieren el modo selected.")
+        return self
 
 
 class SessionListRequest(BaseModel):
@@ -72,8 +86,16 @@ class SessionStepResponse(BaseModel):
     memory_available: bool
 
 
+class SessionMemoryResponse(BaseModel):
+    source_memory_id: UUID
+    memory_id: UUID | None
+    memory_available: bool
+
+
 class SessionDetail(SessionSummary):
     steps: list[SessionStepResponse]
+    selection_mode: Literal["auto", "selected", "all"] = "auto"
+    selected_memories: list[SessionMemoryResponse] = Field(default_factory=list)
 
 
 class SessionListResponse(BaseModel):

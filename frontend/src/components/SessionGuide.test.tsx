@@ -4,13 +4,13 @@ import { SessionGuide } from "./SessionGuide";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import { listPhotos } from "../api/photos";
 import { getElderProfile } from "../api/families";
-import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction } from "../api/sessions";
+import { getLook, clearScene, recommendMemory, generateSession, getRecordedReaction, getSession, listSessions, getMessages, sendMessage, imageForConversation, recordReaction, synthesizeSpeech, updateSessionMemories } from "../api/sessions";
 import type { FaceCue } from "./sessionSignals";
 const speech = vi.hoisted(() => ({ receive: undefined as ((text: string) => void) | undefined, cancel: vi.fn(), enabled: false, capture: vi.fn() }));
 vi.mock("../api/memories", () => ({ listMemories: vi.fn(), getMemory: vi.fn(), updateMemory: vi.fn() }));
 vi.mock("../api/photos", () => ({ listPhotos: vi.fn() }));
 vi.mock("../api/families", () => ({ getElderProfile: vi.fn() }));
-vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn() }));
+vi.mock("../api/sessions", () => ({ getLook: vi.fn(), clearScene: vi.fn(), recommendMemory: vi.fn(), generateSession: vi.fn(), getRecordedReaction: vi.fn(), getSession: vi.fn(), listSessions: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(), imageForConversation: vi.fn(), recordReaction: vi.fn(), synthesizeSpeech: vi.fn(), updateSessionMemories: vi.fn() }));
 vi.mock("./useSessionDictation", () => ({ useSessionDictation: (receive: (text: string) => void, enabled: boolean) => { speech.receive=receive; speech.enabled=enabled; return { state:"idle", error:"", cancel:speech.cancel, retry:vi.fn() }; } }));
 vi.mock("./SessionCamera", () => ({ SessionCamera: ({ captureRef, onCue, onAnalyzeFrame }: { captureRef?: { current: (() => Promise<string>) | null }; onCue:(cue:FaceCue)=>void; onAnalyzeFrame?:(image:string)=>void }) => { if (captureRef) captureRef.current = speech.capture; return <><button onClick={() => onCue("away")}>Simular salida de cuadro</button><button onClick={() => onAnalyzeFrame?.("data:image/jpeg;base64,test")}>Conversar sobre esta imagen</button></>; } }));
 const user = { id: "u", name: "Ana", email: "ana@example.test", role: "familiar" as const, family_id: "f", created_at: "" };
@@ -24,6 +24,7 @@ const guide = { id:"guide", elder_profile_id:"profile", created_at:"2026-11-12T0
 const answer = { id:"reply", role:"assistant" as const, text:"Me contaste que caminabas por el parque. ¿Qué te gustaba mirar allí?", suggestion:"continue" as const, observations:[] };
 const photo = { id:"photo", memory_id:"memory", created_by:"u", content_type:"image/jpeg", size_bytes:12, width:1, height:1, created_at:"", url:"https://photos.example.test/signed", url_expires_at:"2026-11-12T03:00:00Z" };
 beforeEach(() => {
+ vi.mocked(synthesizeSpeech).mockRejectedValue(new Error("Voz no disponible en esta prueba"));
  vi.mocked(clearScene).mockResolvedValue(undefined);
  speech.capture.mockResolvedValue("data:image/jpeg;base64,current");
  URL.createObjectURL=vi.fn(()=>"blob:test"); URL.revokeObjectURL=vi.fn();
@@ -335,4 +336,91 @@ it("reúne las opciones en el panel y conserva la conversación al alternar", as
  expect(screen.getByRole("button",{name:"Ampliar panel de conversación"})).toHaveAttribute("aria-expanded","false");
  fireEvent.click(screen.getByRole("button",{name:"Volver al historial"}));
  await screen.findByRole("heading",{name:"Guía de sesión"});
+});
+
+const anotherMemory = { ...memory, id: "another", title: "Los domingos" };
+function useCollection(items = [memory, anotherMemory]) {
+ vi.mocked(listMemories).mockResolvedValue({ items, total:items.length, limit:50, offset:0 });
+ vi.mocked(getMemory).mockImplementation(async (id) => items.find((item) => item.id === id)!);
+ return { ...guide, selection_mode:"selected" as const, selected_memories:items.map((item) => ({ source_memory_id:item.id, memory_id:item.id, memory_available:true })) };
+}
+
+it("empieza con varios recuerdos y permite cambiar el activo entre todos los elegidos", async () => {
+ const saved = useCollection();
+ vi.mocked(generateSession).mockResolvedValue(saved);
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
+ fireEvent.change(await screen.findByRole("combobox", { name:"Recuerdo para la sesión" }), { target:{ value:"__selected" } });
+ expect(screen.getByRole("button", { name:"Empezar sin cámara ni micrófono" })).toBeDisabled();
+ fireEvent.click(screen.getByRole("checkbox", { name:/El paseo/ }));
+ fireEvent.click(screen.getByRole("checkbox", { name:/Los domingos/ }));
+ fireEvent.click(screen.getByRole("button", { name:"Empezar sin cámara ni micrófono" }));
+ await screen.findByText("Hola, ¿qué disfrutaban de sus paseos?");
+ expect(generateSession).toHaveBeenCalledWith({ selection_mode:"selected", memory_ids:["memory", "another"] });
+ expect(screen.getByText("2 recuerdos en esta charla")).toBeInTheDocument();
+ fireEvent.change(screen.getByRole("combobox", { name:"Recuerdo activo" }), { target:{ value:"another" } });
+ fireEvent.change(screen.getByRole("textbox", { name:"Tu respuesta" }), { target:{ value:"Los domingos paseábamos" } });
+ fireEvent.click(screen.getByRole("button", { name:"Enviar" }));
+ await screen.findByText(answer.text);
+ expect(sendMessage).toHaveBeenLastCalledWith("guide", expect.objectContaining({ active_memory_id:"another" }), expect.any(AbortSignal));
+});
+
+it("todos incluye los recuerdos de las otras páginas y excluye los delicados", async () => {
+ const saved = useCollection();
+ vi.mocked(listMemories).mockResolvedValueOnce({ items:[memory], total:3, limit:50, offset:0 }).mockResolvedValueOnce({ items:[anotherMemory, { ...memory, id:"sensitive", title:"Privado", is_sensitive:true }], total:3, limit:50, offset:1 });
+ vi.mocked(generateSession).mockResolvedValue({ ...saved, selection_mode:"all" });
+ render(<SessionGuide currentUser={user} onOpenMemories={vi.fn()} />);
+ await screen.findByRole("option", { name:/Los domingos/ });
+ fireEvent.change(screen.getByRole("combobox", { name:"Recuerdo para la sesión" }), { target:{ value:"__all" } });
+ expect(screen.getByText("2 recuerdos seleccionados")).toBeInTheDocument();
+ expect(screen.queryByRole("checkbox", { name:/Privado/ })).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button", { name:"Empezar sin cámara ni micrófono" }));
+ await screen.findByText("Hola, ¿qué disfrutaban de sus paseos?");
+ expect(generateSession).toHaveBeenCalledWith({ selection_mode:"all" });
+});
+
+it("cambia la colección con la charla en pausa y conserva mensajes sin crear otra guía", async () => {
+ const saved = useCollection();
+ vi.mocked(updateSessionMemories).mockResolvedValue({ ...saved, selection_mode:"all" });
+ await begin("Empezar con Ayni");
+ fireEvent.change(screen.getByRole("textbox", { name:"Tu respuesta" }), { target:{ value:"Me gustaba pasear los domingos" } });
+ fireEvent.click(screen.getByRole("button", { name:"Enviar" }));
+ await screen.findByText(answer.text);
+ fireEvent.click(screen.getByRole("button", { name:"Cambiar recuerdos" }));
+ await waitFor(() => expect(screen.getByRole("button", { name:"Guardar selección" })).toBeEnabled());
+ expect(speech.enabled).toBe(false);
+ expect(screen.getByRole("button", { name:"Continuar" })).toBeDisabled();
+ fireEvent.change(screen.getByRole("combobox", { name:"Selección de la charla" }), { target:{ value:"all" } });
+ fireEvent.click(screen.getByRole("button", { name:"Guardar selección" }));
+ await waitFor(() => expect(screen.queryByRole("region", { name:"Cambiar recuerdos de la charla" })).not.toBeInTheDocument());
+ expect(updateSessionMemories).toHaveBeenCalledWith("guide", { selection_mode:"all" });
+ expect(generateSession).toHaveBeenCalledTimes(1);
+ expect(getMessages).toHaveBeenCalledTimes(1);
+ expect(screen.getByRole("log")).toHaveTextContent("Me gustaba pasear los domingos");
+ expect(speech.enabled).toBe(true);
+ expect(screen.getByRole("combobox", { name:"Recuerdo activo" })).toHaveTextContent("Los domingos");
+});
+
+it("muestra el error al cambiar recuerdos y permite cancelar conservando la selección", async () => {
+ useCollection();
+ vi.mocked(updateSessionMemories).mockRejectedValue(new Error("Revisa tu selección."));
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name:"Cambiar recuerdos" }));
+ await waitFor(() => expect(screen.getByRole("combobox", { name:"Selección de la charla" })).toBeEnabled());
+ fireEvent.change(screen.getByRole("combobox", { name:"Selección de la charla" }), { target:{ value:"all" } });
+ fireEvent.click(screen.getByRole("button", { name:"Guardar selección" }));
+ expect(await screen.findByRole("alert")).toHaveTextContent("Revisa tu selección.");
+ expect(screen.getByRole("log")).toHaveTextContent("Hola, ¿qué disfrutaban de sus paseos?");
+ fireEvent.click(screen.getByRole("button", { name:"Cancelar selección" }));
+ expect(screen.getByText("1 recuerdo en esta charla")).toBeInTheDocument();
+ expect(screen.getByRole("button", { name:"Pausar" })).toBeEnabled();
+});
+
+it("cancelar la selección respeta una pausa que ya estaba activa", async () => {
+ await begin();
+ fireEvent.click(screen.getByRole("button", { name:"Pausar" }));
+ fireEvent.click(screen.getByRole("button", { name:"Cambiar recuerdos" }));
+ await waitFor(() => expect(screen.getByRole("button", { name:"Cancelar selección" })).toBeEnabled());
+ fireEvent.click(screen.getByRole("button", { name:"Cancelar selección" }));
+ expect(screen.getByRole("button", { name:"Continuar" })).toBeEnabled();
+ expect(updateSessionMemories).not.toHaveBeenCalled();
 });

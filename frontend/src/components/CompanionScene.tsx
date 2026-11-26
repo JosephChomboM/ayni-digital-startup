@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, Music2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Music2, X } from "lucide-react";
+import { MusicPlayer } from "./MusicPlayer";
 import type { Memory } from "../api/memories";
 import type { MemoryPhoto } from "../api/photos";
 import { AyniBuddy } from "./AyniBuddy";
@@ -20,22 +21,6 @@ const WALK_MS = 1500;
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-}
-
-function playerUrl(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    const youtubeId = url.hostname === "youtu.be"
-      ? url.pathname.slice(1)
-      : url.hostname === "youtube.com" || url.hostname === "www.youtube.com"
-        ? url.searchParams.get("v") ?? url.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]{11})/)?.[1]
-        : null;
-    if (youtubeId && /^[\w-]{11}$/.test(youtubeId)) return `https://www.youtube-nocookie.com/embed/${youtubeId}`;
-    const spotifyId = url.hostname === "open.spotify.com" ? url.pathname.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] : null;
-    if (spotifyId) return `https://open.spotify.com/embed/track/${spotifyId}`;
-  } catch { return null; }
-  return null;
 }
 
 /**
@@ -147,16 +132,12 @@ function PhotoFrame({ photos, index, onChange }: { photos: MemoryPhoto[]; index:
 }
 
 function RadioPlayer({ memory, paused }: { memory: Memory; paused: boolean }) {
-  const src = playerUrl(memory.url);
   return <div className="stage-radio">
     <span className="radio-handle" aria-hidden="true"/>
     <div className="radio-face">
       <span className="radio-grille" aria-hidden="true"/>
       <div className="radio-screen">
-        {paused ? <p>La música espera la pausa.</p> : src ?
-          <iframe title={`Reproducir ${memory.title}`} src={src} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /> :
-          memory.url ? <a href={memory.url} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />Abrir la canción</a> :
-            <p>Esta canción no tiene enlace.</p>}
+        {memory.url ? <MusicPlayer url={memory.url} title={memory.title} paused={paused} /> : <p>Esta canción no tiene enlace.</p>}
       </div>
     </div>
     <div className="radio-dial">

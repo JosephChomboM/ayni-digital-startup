@@ -14,7 +14,8 @@ export const SESSION_EXPIRED_EVENT = "ayni:session-expired";
 
 export async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  responseType: "json" | "blob" = "json"
 ): Promise<T> {
   const baseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
 
@@ -59,6 +60,8 @@ export async function apiFetch<T>(
   if (response.status === 204) {
     return undefined as unknown as T;
   }
+
+  if (response.ok && responseType === "blob") return await response.blob() as T;
 
   let data: unknown;
   try {

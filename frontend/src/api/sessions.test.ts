@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction } from "./sessions";
+import { generateSession, getRecordedReaction, getSession, listSessions, recordReaction, updateSessionMemories } from "./sessions";
 
 const fetchMock = vi.fn<typeof fetch>();
 beforeEach(() => {
@@ -41,4 +41,26 @@ it("clears the session when recording receives HTTP 401", async () => {
   fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ detail: { code: "unauthorized", message: "Vuelve a iniciar sesión." } }), { status: 401 }));
   await expect(recordReaction("guide", "receptivo")).rejects.toMatchObject({ status: 401 });
   expect(localStorage.getItem("ayni_token")).toBeNull();
+});
+
+it("sends multiple or all memories and preserves the single-memory contract", async () => {
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ id: "guide" })));
+  await generateSession({ selection_mode: "selected", memory_ids: ["one", "two"] });
+  await generateSession({ selection_mode: "all" });
+  await generateSession("one");
+  expect(fetchMock.mock.calls.map(([, options]) => JSON.parse(String(options!.body)))).toEqual([
+    { selection_mode: "selected", memory_ids: ["one", "two"] },
+    { selection_mode: "all" }, { memory_id: "one" },
+  ]);
+});
+
+it("updates the saved collection with Bearer and reads structured selection errors", async () => {
+  fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: "guide", selected_memories: [] })));
+  await updateSessionMemories("guide", { selection_mode: "all" });
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe("https://api.example.test/sessions/guide/memories");
+  expect(options!.method).toBe("PUT");
+  expect(new Headers(options!.headers).get("Authorization")).toMatch(/^Bearer /);
+  fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ detail: { code: "memory_selection_unavailable", message: "Revisa tu selección." } }), { status: 409 }));
+  await expect(updateSessionMemories("guide", { selection_mode: "selected", memory_ids: ["missing"] })).rejects.toMatchObject({ code: "memory_selection_unavailable", message: "Revisa tu selección." });
 });

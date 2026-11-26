@@ -292,20 +292,21 @@ class MemoriesRepository:
         ]
 
     def select_session_memories(
-        self, profile_id: UUID, memory_id: UUID | None = None
+        self,
+        profile_id: UUID,
+        memory_id: UUID | None = None,
+        *,
+        memory_ids: Sequence[UUID] | None = None,
+        all_memories: bool = False,
     ) -> list[Memory]:
-        return list(
-            self.session.scalars(
-                select(Memory)
-                .where(
-                    *self._session_eligible(profile_id),
-                    *([Memory.id == memory_id] if memory_id else []),
-                )
-                .order_by(Memory.id)
-                .limit(3)
-                .with_for_update()
-            )
-        )
+        query = select(Memory).where(*self._session_eligible(profile_id))
+        if memory_ids is not None:
+            query = query.where(Memory.id.in_(memory_ids))
+        elif memory_id:
+            query = query.where(Memory.id == memory_id)
+        elif not all_memories:
+            query = query.limit(3)
+        return list(self.session.scalars(query.order_by(Memory.id).with_for_update()))
 
     def available_session_memory_ids(
         self, profile_id: UUID, memory_ids: Sequence[UUID]

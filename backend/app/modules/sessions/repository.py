@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.sessions.models import FamilySession, SessionItem, SessionMessage
+from app.modules.sessions.models import FamilySession, SessionItem, SessionMemory, SessionMessage
 from app.modules.sessions.schemas import SessionGuide
 
 
@@ -80,8 +80,20 @@ class SessionsRepository:
             .where(
                 FamilySession.id == session_id, FamilySession.elder_profile_id == elder_profile_id
             )
-            .options(selectinload(FamilySession.items))
+            .options(selectinload(FamilySession.items), selectinload(FamilySession.memories))
         )
+
+    def set_memory_collection(
+        self, record: FamilySession, memory_ids: list[UUID], mode: str
+    ) -> None:
+        record.memories.clear()
+        self.session.flush()
+        record.selection_mode = mode
+        record.memories = [
+            SessionMemory(position=index, source_memory_id=value, memory_id=value)
+            for index, value in enumerate(memory_ids, start=1)
+        ]
+        self.session.flush()
 
     def list_sessions(
         self, *, elder_profile_id: UUID, limit: int = 20, offset: int = 0

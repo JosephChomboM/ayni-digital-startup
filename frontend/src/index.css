@@ -4653,3 +4653,53 @@
   .dashboard-photo-hero .dashboard-photo-controls>button:nth-of-type(2) { right:10px; }
   .dashboard-photo-hero .dashboard-photo-dots { bottom:12px; }
 }
+/* Asistente disponible durante la navegación familiar. */
+.page-assistant { position: fixed; right: 24px; bottom: 24px; z-index: 1200; color: #244d43; }
+.assistant-launch { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 20px 6px 8px; border: 1px solid #abc0b5; border-radius: 999px; background: #fffdf7; font-weight: 700; cursor: pointer; }
+.assistant-launch .ayni-robot { width: 42px; height: 42px; min-width: 42px; }
+.assistant-panel { width: min(380px, calc(100vw - 32px)); max-height: min(650px, calc(100dvh - 48px)); display: flex; flex-direction: column; background: #fffdf7; border: 1px solid #abc0b5; border-radius: 16px; overflow: hidden; }
+.assistant-panel header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #e9f0e7; }
+.assistant-panel header > div { display: flex; align-items: center; gap: 10px; }
+.assistant-panel header .ayni-robot { width: 40px; height: 40px; min-width: 40px; }
+.assistant-panel h2 { margin: 0; font: inherit; font-weight: 700; }
+.assistant-panel button { min-width: 44px; min-height: 44px; cursor: pointer; }
+.assistant-panel button:disabled { cursor: default; opacity: .5; }
+.assistant-panel button:focus-visible, .assistant-panel textarea:focus-visible, .assistant-launch:focus-visible { outline: 3px solid #a45d32; outline-offset: 3px; }
+.assistant-intro { padding: 20px; overflow-y: auto; }
+.assistant-intro p + p { margin-top: 16px; }
+.assistant-primary { padding: 10px 16px; border-radius: 8px; color: #fffdf7; background: #245b4c; font-weight: 700; }
+.assistant-intro .assistant-primary { width: 100%; margin-top: 24px; }
+.assistant-log { padding: 16px; overflow-y: auto; flex: 1; min-height: 120px; overscroll-behavior: contain; }
+.assistant-log > p { margin-bottom: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+.assistant-log > p[data-role="user"] { padding: 10px 12px; background: #e9f0e7; border-radius: 8px; margin-left: 24px; }
+.assistant-example, .assistant-status { color: #456558; font-size: .9rem; }
+.assistant-confirm { padding: 12px; background: #f7edda; border-radius: 8px; }
+.assistant-confirm p { margin-bottom: 12px; }
+.assistant-confirm button + button { margin-left: 8px; }
+.assistant-panel form { padding: 12px; border-top: 1px solid #d8e0d2; }
+.assistant-panel textarea { width: 100%; resize: vertical; min-height: 64px; max-height: 130px; padding: 10px; background: white; border: 1px solid #9eafa4; border-radius: 8px; font: inherit; font-size: 16px; color: #244d43; }
+.assistant-panel textarea::placeholder { color: #526b60; }
+.assistant-tools { display: flex; align-items: center; gap: 4px; }
+.assistant-tools span { flex: 1; font-size: .75rem; }
+.assistant-tools button { display: grid; place-items: center; }
+.assistant-tools button[aria-pressed="true"] { background: #e9f0e7; border-radius: 8px; }
+.assistant-error { color: #8b3328; font-size: .875rem; padding: 0 8px; }
+.music-embed { min-height: 240px; }
+.music-embed iframe { width: 100%; min-height: 232px; }
+.music-player > p { margin: 8px 0; font-size: .875rem; color: #244d43; }
+.music-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.music-controls button { display: flex; align-items: center; gap: 6px; padding: 8px; min-height: 44px; border: 1px solid #abc0b5; border-radius: 8px; background: #fffdf7; color: #244d43; cursor: pointer; }
+.music-controls button:disabled { opacity: .5; cursor: default; }
+.music-volume { display: grid; gap: 4px; margin-top: 10px; color: #244d43; }
+.music-volume input { width: 100%; min-height: 32px; accent-color: #245b4c; }
+.music-player > a { display: inline-block; margin-top: 12px; text-decoration: underline; }
+.radio-face:has(.music-player) { grid-template-columns: 1fr; }
+.radio-face:has(.music-player) .radio-grille { display: none; }
+.radio-screen:has(.music-player) { aspect-ratio: auto; background: #fffdf7; color: #244d43; }
+.radio-screen .music-player { width: 100%; padding: 12px; }
+.radio-screen .music-player > p { padding: 8px 0; text-align: left; font-size: .875rem; }
+@media (max-width: 640px) {
+  .page-assistant { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
+  .assistant-panel { max-height: calc(100dvh - 100px); }
+  .assistant-launch { padding-right: 14px; }
+}
