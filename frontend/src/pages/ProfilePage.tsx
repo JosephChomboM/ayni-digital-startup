@@ -237,10 +237,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser }) => {
           <p className="profile-banner-kicker">LA PERSONA QUE ACOMPAÑAMOS</p>
           <h2>{profile ? profile.name : loadingProfile ? "Cargando..." : profileNotFound ? "Perfil incompleto" : "Perfil del familiar"}</h2>
           <p>{profile ? `Década de ${profile.birth_decade}s` : "Un espacio para conocer sus gustos y compartir en familia."}</p>
-          {profile?.interests?.length ? <div className="profile-interest-chips">{profile.interests.slice(0, 4).map(interest => <span key={interest}>{interest}</span>)}</div> : null}
           {isCuidador && <div className="profile-photo-tools"><label htmlFor="family-profile-photo">{profilePhotoUrl ? "Cambiar foto" : "Agregar una foto"}</label>{profilePhotoUrl && <button type="button" onClick={handleRemoveProfilePhoto}><Trash2 size={14} aria-hidden="true"/> Quitar</button>}<small>La foto queda guardada en este navegador.</small></div>}
           <input id="family-profile-photo" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProfilePhoto} disabled={!isCuidador}/>
           {profilePhotoError && <p className="profile-photo-error" role="alert">{profilePhotoError}</p>}
+        </div>
+        <div className="profile-banner-aside" aria-label="Gustos para iniciar conversaciones">
+          <p>PISTAS PARA CONVERSAR</p>
+          <h3>Lo que disfruta también cuenta.</h3>
+          {profile?.interests?.length ? <div className="profile-interest-chips">{profile.interests.slice(0, 5).map(interest => <span key={interest}>{interest}</span>)}</div> : <span className="profile-banner-hint">Agrega sus gustos para inspirar preguntas más cercanas en la guía.</span>}
         </div>
       </div>
 

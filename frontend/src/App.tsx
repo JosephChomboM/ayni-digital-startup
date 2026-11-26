@@ -21,7 +21,7 @@ const PageAssistant = lazy(() => import("./components/PageAssistant").then(modul
 export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard" | "billing" | "account" | "settings">("welcome");
+  const [view, setView] = useState<"welcome" | "auth_login" | "auth_register" | "home" | "profile" | "session" | "memories" | "dashboard" | "billing" | "settings">("welcome");
 
   const [accountSection, setAccountSection] = useState<AccountSection>("overview");
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -114,24 +114,13 @@ export function App() {
             <button key={destination} onClick={() => setView(destination)} aria-current={view === destination ? "page" : undefined}><Icon aria-hidden="true" size={20}/><span>{label}</span>{view === destination && <i aria-hidden="true"/>}</button>)}
         </nav>
         <div className="sidebar-companion"><AyniCompanion decorative/><strong>Un recuerdo puede<br/>acercarnos mucho.</strong><span>Aquí, a su ritmo.</span></div>
-        <div className="sidebar-account"><button onClick={() => setView("account")} aria-label="Abrir mi cuenta" aria-current={view === "account" ? "page" : undefined}><span className="user-avatar"><UserRound size={20}/></span><span><strong>{currentUser?.name || "Mi cuenta"}</strong><small>{currentUser?.role === "cuidador_principal" ? "Cuidador principal" : "Familiar invitado"}</small></span></button>
+        <div className="sidebar-account"><button onClick={() => { setAccountSection("overview"); setView("settings"); }} aria-label={`Abrir la cuenta de ${currentUser?.name || "usuario"}`} aria-current={view === "settings" ? "page" : undefined}><span className="user-avatar"><UserRound size={20}/></span><span><strong>{currentUser?.name || "Mi cuenta"}</strong><small>{currentUser?.role === "cuidador_principal" ? "Cuidador principal" : "Familiar invitado"}</small></span></button>
         <button onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={18}/></button></div>
       </header>
 
       <main id="main-content" className="app-content" data-view={view}>
         <div className="workspace-caption"><span>AYNI / TU ESPACIO FAMILIAR</span><span><i/> Momentos que nos acercan</span></div>
-        {view === "account" && currentUser && <section className="account-overview space-y-6" aria-labelledby="account-title">
-          <div><h1 id="account-title" className="text-3xl font-bold text-[#2c5f7c]">Mi cuenta</h1><p className="mt-2 leading-relaxed">Esta es la cuenta con la que has iniciado sesión en Ayni.</p></div>
-          <dl className="divide-y divide-[#2c5f7c]/15 rounded-2xl bg-white px-6">
-            <div className="py-5"><dt className="text-sm text-gray-600">Nombre</dt><dd className="mt-1 break-words text-lg font-semibold">{currentUser.name || "Nombre no disponible"}</dd></div>
-            <div className="py-5"><dt className="text-sm text-gray-600">Correo electrónico</dt><dd className="mt-1 break-all">{currentUser.email}</dd></div>
-            <div className="py-5"><dt className="text-sm text-gray-600">Tu participación</dt><dd className="mt-1 font-semibold">{currentUser.role === "cuidador_principal" ? "Persona cuidadora principal" : "Familiar invitado"}</dd><dd className="mt-2 text-sm leading-relaxed">{currentUser.role === "cuidador_principal" ? "Puedes gestionar el perfil de la persona acompañada e invitar a tu familia." : "Puedes consultar el perfil de la persona acompañada y aportar recuerdos."}</dd></div>
-          </dl>
-          <p className="text-sm leading-relaxed text-gray-600">El perfil de la persona acompañada está en “Perfil familiar”. La edición del nombre y correo de tu cuenta aún no está disponible. Desde aquí puedes revisar el plan y la configuración familiar.</p>
-          <div className="flex flex-wrap gap-3"><button onClick={() => setView("profile")} className="min-h-12 rounded-lg bg-[#2c5f7c] px-5 font-semibold text-white">Ver persona y familia</button><button onClick={() => setView("billing")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Plan familiar</button><button onClick={() => setView("settings")} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold text-[#2c5f7c]">Configuración y privacidad</button><button onClick={() => { logout(); sessionStorage.removeItem("ayni_checkout_return"); setCurrentUser(null); setView("welcome"); }} className="min-h-12 rounded-lg border border-[#2c5f7c]/30 px-5 font-semibold">Cerrar sesión</button></div>
-        </section>}
-
-        {view === "settings" && currentUser && <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} onUserUpdated={setCurrentUser} />}
+        {view === "settings" && currentUser && <AccountPage currentUser={currentUser} initialSection={accountSection} onSectionChange={setAccountSection} onOpenFamilyProfile={() => setView("profile")} onUserUpdated={setCurrentUser} />}
         {view === "home" && (
           <HomePage
             onStartSession={() => setView("session")}
