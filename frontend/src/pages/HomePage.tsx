@@ -23,8 +23,7 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [exampleTab, setExampleTab] = useState<"anecdote" | "song">("song");
-  const [promptIndex, setPromptIndex] = useState(0);
+  const [promptIndex, setPromptIndex] = useState(1);
   const prompts = [
     { question: "¿Qué lugar recuerdas con cariño?", hint: "Puede ser una casa, una plaza o un viaje que disfrutaron juntos.", tone: "peach" },
     { question: "¿Qué canción te trae un recuerdo bonito?", hint: "Si quieren, pueden buscarla y escucharla en familia.", tone: "blue" },
@@ -64,8 +63,7 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
   return (
     <div className="home-page space-y-8">
       <header className="page-intro home-page-intro"><div><p className="eyebrow">QUÉ BUENO ESTAR AQUÍ</p>
-        <h1 className="text-3xl font-bold tracking-tight text-[#2c5f7c] sm:text-4xl">Tu espacio familiar</h1>
-        <p className="max-w-2xl text-base leading-relaxed text-[#264653]">Un lugar para reunir historias y preparar un momento con {profile?.name || "tu familiar"}. Una conversación, a su ritmo.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-[#2c5f7c] sm:text-4xl">Tu espacio familiar{profile?.name ? `: ${profile.name}` : ""}</h1>
       </div></header>
 
       {error && <div role="alert" className="rounded-xl border border-[#2c5f7c]/20 bg-white p-5 space-y-3">
@@ -77,9 +75,8 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
         <div className="flex flex-col items-start justify-center gap-5 p-6 sm:p-8">
           <p className="home-card-eyebrow">UN MOMENTO EN FAMILIA</p>
           <h2 id="next-step-title" className="text-2xl font-bold text-[#2c5f7c]">{error ? "Tus recuerdos siguen siendo el punto de partida" : needsProfile ? "Empecemos por conocer a tu familiar" : needsMemory ? "Toda historia empieza con un recuerdo" : "Un momento para estar cerca"}</h2>
-          <p className="max-w-lg text-base leading-relaxed">{error ? "Puedes abrir el perfil o los recuerdos para consultar su estado y volver a intentarlo desde allí." : needsProfile ? (canManageFamily ? "Añade su nombre y lo que le gusta. Así podrás organizar los recuerdos de la familia." : "La persona cuidadora principal puede completar el perfil. Mientras tanto, puedes consultar el espacio familiar.") : needsMemory ? "Una anécdota o una canción puede abrir una conversación. Comparte algo que les guste recordar." : "La guía usa sus recuerdos y propone preguntas sencillas. Puedes detenerte o cambiar de tema en cualquier momento."}</p>
+          <p className="max-w-lg text-base leading-relaxed">{error ? "Revisa el perfil o los recuerdos e inténtalo de nuevo." : needsProfile ? (canManageFamily ? "Añade su nombre y sus gustos para organizar los recuerdos familiares." : "La persona cuidadora principal puede completar este perfil.") : needsMemory ? "Comparte una anécdota o canción que les guste recordar." : "Ayni usa sus recuerdos para acompañar nuevas conversaciones."}</p>
           <Button onClick={error ? onViewProfile : nextAction} size="lg">{error ? "Revisar perfil familiar" : nextLabel}<ArrowRight aria-hidden="true" className="ml-2 size-4" /></Button>
-          {!needsProfile && !needsMemory && !error && <p className="home-gentle-note">Pueden conversar, cambiar de tema o hacer una pausa cuando lo necesiten.</p>}
         </div>
         <div className="home-companion-stage"><span className="orbit-decoration" aria-hidden="true"/><AyniCompanion decorative/><span className="companion-tag">Un ratito para compartir</span></div>
       </section>
@@ -100,54 +97,28 @@ export function HomePage({ onStartSession, onViewMemories, onViewProfile, canMan
         </div>
       </section>
 
-      <section aria-labelledby="home-memory-example" className="home-example space-y-6 pt-2">
-        <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
-          <h2 id="home-memory-example" className="max-w-xl text-2xl font-bold leading-tight text-[#2c5f7c]">Un recuerdo puede abrir una conversación</h2>
-          <p className="max-w-xl text-sm leading-relaxed text-slate-600 sm:justify-self-end">Mira un ejemplo de cómo una anécdota o una canción pueden dar inicio a un momento en familia.</p>
-        </div>
-        <div className="home-memory-demo">
-          <div className="home-demo-heading">
-            <p className="font-semibold text-[#264653]">Un ejemplo para conversar</p>
-            <span>Contenido ilustrativo</span>
+      <section className="home-prompt-section" aria-label="Una pregunta para empezar">
+        <aside className={`home-prompt-card home-prompt-${prompts[promptIndex].tone}`} aria-label="Preguntas para empezar" aria-roledescription="carrusel">
+          <div className="home-prompt-topline"><span>Una pregunta para empezar</span><span>{String(promptIndex + 1).padStart(2, "0")} / {String(prompts.length).padStart(2, "0")}</span></div>
+          <div className="home-prompt-content" key={promptIndex} aria-live="polite">
+            <p className="home-prompt-question">{prompts[promptIndex].question}</p>
+            <p className="home-prompt-hint">{prompts[promptIndex].hint}</p>
           </div>
-          <div className="home-demo-body">
-            <div role="tablist" aria-label="Tipo de recuerdo" className="home-demo-tabs">
-              <button type="button" role="tab" data-example="anecdote" aria-selected={exampleTab === "anecdote"} onClick={() => setExampleTab("anecdote")}>Anécdota</button>
-              <button type="button" role="tab" data-example="song" aria-selected={exampleTab === "song"} onClick={() => setExampleTab("song")}>Canción</button>
-            </div>
-            <div role="tabpanel" aria-live="polite" data-example={exampleTab} className="home-demo-copy">
-              <h3 className="text-xl font-bold text-[#264653]">{exampleTab === "song" ? "La canción de la sobremesa" : "Los domingos en casa"}</h3>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">Después del almuerzo, mi mamá ponía su canción favorita. Decía que le recordaba sus paseos de juventud y siempre la cantaba bajito.</p>
-              <p className="mt-5 font-semibold text-[#9a4f3c]">{exampleTab === "song" ? "¿Qué canción les gustaría volver a escuchar juntos?" : "¿Qué recuerdo de los domingos les gustaría compartir?"}</p>
-            </div>
-          </div>
-          <p className="home-demo-footnote">Este ejemplo no contiene datos de una familia real. Tus recuerdos se gestionan desde <button type="button" onClick={onViewMemories}>Recuerdos</button>.</p>
-        </div>
-        <div className="grid gap-6 pt-3 lg:grid-cols-2 lg:items-center lg:gap-12">
-          <div className="space-y-3">
-            <h3 className="text-2xl font-bold leading-tight text-[#2c5f7c]">Acompañar, a su propio ritmo</h3>
-            <p className="text-sm leading-7 text-slate-600">La guía ofrece una pregunta a la vez. Pueden conversar, cambiar de tema o hacer una pausa cuando lo necesiten.</p>
-            <button type="button" onClick={onStartSession} className="inline-flex min-h-10 items-center font-semibold text-[#2c5f7c] hover:text-[#e76f51]">Abrir guía de sesión <ArrowRight aria-hidden="true" className="ml-2 size-4" /></button>
-          </div>
-          <aside className={`home-prompt-card home-prompt-${prompts[promptIndex].tone}`} aria-label="Preguntas para empezar" aria-roledescription="carrusel">
-            <div className="home-prompt-topline"><span>Una pregunta para empezar</span><span>{String(promptIndex + 1).padStart(2, "0")} / {String(prompts.length).padStart(2, "0")}</span></div>
-            <div className="home-prompt-content" key={promptIndex} aria-live="polite">
-              <p className="home-prompt-question">{prompts[promptIndex].question}</p>
-              <p className="home-prompt-hint">{prompts[promptIndex].hint}</p>
-            </div>
-            <div className="home-prompt-controls">
+          <div className="home-prompt-controls">
+            <div className="home-prompt-main-controls">
+              <button type="button" onClick={onStartSession} className="home-prompt-session-link">Abrir guía de sesión <ArrowRight aria-hidden="true" size={16}/></button>
               <div className="home-prompt-dots" aria-label="Elegir pregunta">
                 {prompts.map((prompt, index) => <button key={prompt.question} type="button" aria-label={`Mostrar pregunta ${index + 1}`} aria-current={promptIndex === index ? "true" : undefined} onClick={() => setPromptIndex(index)} />)}
               </div>
-              <div className="home-prompt-arrows">
-                <button type="button" aria-label="Pregunta anterior" onClick={() => setPromptIndex(index => (index - 1 + prompts.length) % prompts.length)}><ArrowLeft aria-hidden="true" size={17}/></button>
-                <button type="button" aria-label="Pregunta siguiente" onClick={() => setPromptIndex(index => (index + 1) % prompts.length)}><ArrowRight aria-hidden="true" size={17}/></button>
-              </div>
             </div>
-          </aside>
-        </div>
+            <div className="home-prompt-arrows">
+              <button type="button" aria-label="Pregunta anterior" onClick={() => setPromptIndex(index => (index - 1 + prompts.length) % prompts.length)}><ArrowLeft aria-hidden="true" size={17}/></button>
+              <button type="button" aria-label="Pregunta siguiente" onClick={() => setPromptIndex(index => (index + 1) % prompts.length)}><ArrowRight aria-hidden="true" size={17}/></button>
+            </div>
+          </div>
+        </aside>
       </section>
-      <p className="max-w-2xl border-t border-[#2c5f7c]/15 pt-5 text-sm leading-relaxed text-[#264653]">Ayni acompaña conversaciones familiares. No es un servicio de salud ni realiza diagnósticos. El bienestar de la persona es lo primero: pueden pausar o terminar cuando quieran.</p>
+      <p className="max-w-2xl border-t border-[#2c5f7c]/15 pt-5 text-sm leading-relaxed text-[#264653]">Ayni acompaña conversaciones familiares; no realiza diagnósticos. Pueden pausar o terminar cuando quieran.</p>
     </div>
   );
 }

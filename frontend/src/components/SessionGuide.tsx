@@ -1,7 +1,7 @@
 import { AyniCompanion } from "./AyniCompanion";
 import { PageIntro } from "./PageIntro";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Play, RotateCcw, Camera, MessageCircle, ChevronRight, Clock3, Heart, ArrowRight } from "lucide-react";
+import { Check, Play, RotateCcw, MessageCircle, ChevronRight, Clock3, Heart, ArrowRight } from "lucide-react";
 import type { User } from "../api/auth";
 import { listMemories, getMemory, updateMemory } from "../api/memories";
 import type { Memory } from "../api/memories";
@@ -372,9 +372,9 @@ function PersistedSessionGuide({ currentUser, assistantActive = false, onAppInst
         </div>
         {loading ? <p role="status" className="mt-5 text-sm text-slate-600">Cargando recuerdos…</p> : <div className="session-setup-body">
           <div className="session-steps" aria-label="Antes de empezar">
-            <div className="session-step"><span>01</span><div><strong>Elige el recuerdo</strong><small>Una historia, canción o selección de Ayni</small></div></div>
+            <div className="session-step"><span>01</span><div><strong>Elige el recuerdo</strong></div></div>
             <ChevronRight aria-hidden="true" size={19}/>
-            <div className="session-step"><span>02</span><div><strong>Conversa a tu ritmo</strong><small>Puedes hablar, escribir o solo escuchar</small></div></div>
+            <div className="session-step"><span>02</span><div><strong>Conversa a tu ritmo</strong></div></div>
           </div>
           <label className="session-memory-label">¿Con qué recuerdo quieres empezar?
             <select aria-label="Recuerdo para la sesión" className="mt-2 w-full rounded border bg-white p-3 font-normal" value={memoryChoice} onChange={(event) => setMemoryChoice(event.target.value)}>
@@ -394,7 +394,7 @@ function PersistedSessionGuide({ currentUser, assistantActive = false, onAppInst
               finally { setBusy(false); }
             }}>Confirmar que es un recuerdo bonito</Button>
           </div>}
-          <div className="session-choice-actions"><span>Solo se incluyen recuerdos marcados como bonitos.</span><Button variant="outline" disabled={recommending || busy} onClick={async () => {
+          <div className="session-choice-actions"><Button variant="outline" disabled={recommending || busy} onClick={async () => {
             setRecommending(true); setLoadError("");
             try { const result = await recommendMemory(); setRecommendation(result); setMemoryChoice(result.memory_id); }
             catch (cause) { setLoadError(cause instanceof Error ? cause.message : "No pudimos recomendar un recuerdo."); }
@@ -410,7 +410,6 @@ function PersistedSessionGuide({ currentUser, assistantActive = false, onAppInst
               <Button type="button" disabled={cannotStart} onClick={() => void begin(true)} className="w-auto gap-2"><Play className="size-4" />Empezar con Ayni</Button>
               <Button type="button" variant="outline" disabled={cannotStart} onClick={() => void begin(false)} className="w-auto"><MessageCircle className="size-4"/>Empezar sin cámara ni micrófono</Button>
             </div>
-            <div className="session-device-note"><Camera size={16}/><span>Si eliges Ayni, el navegador pedirá permiso para cámara y micrófono. También puedes iniciar sin ellos.</span></div>
           </div>
           <details className="session-privacy"><summary>Privacidad y uso de cámara</summary><p>El dictado se procesa en este dispositivo, salvo que actives «Mejor precisión con Groq» para compartir el audio. Los mensajes y detalles compartidos se guardan en el historial familiar. La cámara solo comparte una captura cuando pides explícitamente mirar algo; no se guardan fotos ni video de la cámara. Ayni acompaña actividades familiares y no es un servicio de salud.</p></details>
         </div>}

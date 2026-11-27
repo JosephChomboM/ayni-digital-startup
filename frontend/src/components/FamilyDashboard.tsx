@@ -73,10 +73,8 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
   }, [dashboardPhotos.length]);
   useEffect(() => { setPhotoIndex(0); }, [selectedMember]);
   const visibleFeedback = selectedMember === "all" ? feedback : feedback.filter((item) => item.user_id === selectedMember);
-  const ownContributionCount = memories.filter((item) => item.created_by === currentUser.id).length + photos.filter((item) => item.created_by === currentUser.id).length;
   const recentWeek = visibleFeedback.filter((item) => Date.now() - new Date(item.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
   const recentNotes = recentWeek.filter((item) => item.note.trim());
-  const recentPauses = recentWeek.filter((item) => item.experience === "paused" || item.feeling === "tired").length;
   const weeklyFeelings = Object.entries(feelingLabels).map(([key, label]) => ({ key, label, count: recentWeek.filter((item) => item.feeling === key).length }));
   const maxFeelingCount = Math.max(1, ...weeklyFeelings.map((item) => item.count));
   const bucketCount = periodDays === 7 ? 7 : periodDays === 30 ? 5 : 13;
@@ -95,7 +93,6 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
     const x = 80 + index * (770 / Math.max(1, durationBuckets.length - 1));
     return `${x},${250 - item.minutes / maxMinutes * 180}`;
   }).join(" ");
-  const leaders = Object.entries(visibleFeedback.reduce<Record<string, number>>((counts, item) => { counts[item.user_id] = (counts[item.user_id] ?? 0) + 1; return counts; }, {})).sort((a, b) => b[1] - a[1]);
   const memberContributions = people.map((person) => ({ id: person.id, name: person.name, count: visibleMemories.filter((item) => item.created_by === person.id).length + visiblePhotos.filter((item) => item.created_by === person.id).length })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "es"));
   const maxContribution = Math.max(1, ...memberContributions.map((item) => item.count));
   const memoryMix = [
@@ -117,7 +114,7 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
         <div className="dashboard-intro-copy">
           <p className="text-sm font-semibold text-[#e76f51]">EL CAMINO DE SU FAMILIA</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#2c5f7c]">Pequeños momentos, vistos en conjunto</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">Revisa lo que han compartido, el tiempo de sus encuentros y cómo participa cada familiar. Las reseñas de duración y sensaciones se guardan en este navegador.</p>
+          <p className="mt-2 max-w-2xl text-slate-600">Recuerdos, encuentros y aportes de cada familiar, reunidos en un solo lugar.</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={onOpenMemories}>Recuerdos</Button>
             <Button onClick={onOpenSession} className="bg-[#e76f51] hover:bg-[#d95f43]">Abrir guía <ArrowRight className="ml-2 size-4" /></Button>
@@ -142,10 +139,9 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
 
       <ReactionHistory familyId={currentUser.family_id} />
 
-      <section aria-label="Panorama familiar" className="dashboard-metrics grid gap-5 sm:grid-cols-3">
-        <Metric icon={<Users/>} label="Tus aportes" value={loading ? "…" : ownContributionCount} detail="Recuerdos y fotos que sumaste" />
+      <section aria-label="Panorama familiar" className="dashboard-metrics grid gap-5 sm:grid-cols-2">
         <Metric icon={<BookOpen/>} label="Álbum familiar" value={loading ? "…" : visibleMemories.length + visiblePhotos.length} detail="Historias, canciones y fotografías" />
-        <Metric icon={<Clock3/>} label="Encuentros registrados" value={loading ? "…" : visibleFeedback.length} detail="Sesiones con reseña guardada" />
+        <Metric icon={<Users/>} label="Familiares en el espacio" value={loading ? "…" : people.length} detail="Personas que comparten este álbum" />
       </section>
 
       <section className="dashboard-memory-mix" aria-label="Contenido del álbum familiar">
@@ -199,20 +195,14 @@ export function FamilyDashboard({ currentUser, onOpenMemories, onOpenSession }: 
           </ul> : <p className="mt-5 text-sm text-slate-600">Aún no hay recuerdos para mostrar con este filtro. Invita a la familia a compartir una anécdota, una canción o una foto.</p>}
         </div>
 
-        <div className="space-y-8">
-          <section><p className="text-sm font-semibold text-[#e76f51]">Sesiones facilitadas</p><h2 className="mt-1 text-xl font-semibold">Participación en las sesiones</h2>{leaders.length ? <ul className="mt-4 space-y-3">{leaders.map(([userId, count]) => <li className="flex justify-between gap-3 text-sm" key={userId}><span>{nameFor(userId)}</span><span className="font-semibold">{count}</span></li>)}</ul> : <p className="mt-3 text-sm text-slate-600">Las sesiones registradas por cada familiar aparecerán aquí.</p>}</section>
+        <div>
           <section>
-            <p className="text-sm font-semibold text-[#e76f51]">Últimos 7 días</p><h2 className="mt-1 text-xl font-semibold">¿Cómo se sintieron?</h2>
-            <p className="mt-2 text-sm text-slate-600">Resumen de lo que cada familiar indicó al cerrar una sesión; no es una evaluación clínica.</p>
+            <p className="text-sm font-semibold text-[#e76f51]">RESEÑA DEL ACOMPAÑANTE · ÚLTIMOS 7 DÍAS</p><h2 className="mt-1 text-xl font-semibold">¿Cómo se sintió quien acompañó?</h2>
+            <p className="mt-2 text-sm text-slate-600">La sensación y las notas que la familia compartió al cerrar una sesión.</p>
             {recentWeek.length ? <div className="mt-5 space-y-3" aria-label="Reseñas de la semana">
               {weeklyFeelings.filter((item) => item.count > 0).map((item) => <div key={item.key} className="grid grid-cols-[110px_1fr_24px] items-center gap-3 text-sm"><span>{item.label}</span><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#2c5f7c]" style={{ width: `${Math.max(6, item.count / maxFeelingCount * 100)}%` }} /></div><span className="text-right text-slate-600">{item.count}</span></div>)}
             </div> : <p className="mt-5 text-sm text-slate-600">Todavía no hay reseñas esta semana. Al finalizar una guía, cualquier familiar puede compartir cómo vivió la actividad.</p>}
             {recentNotes.length > 0 && <ul className="mt-5 space-y-3" aria-label="Comentarios recientes de la familia">{recentNotes.slice(0, 3).map((item) => <li key={item.id} className="border-l-2 border-[#e76f51] bg-[#fff5ef] px-4 py-3"><p className="text-sm leading-relaxed text-slate-700">“{item.note}”</p><p className="mt-2 text-xs text-slate-500">{item.user_name} · {new Date(item.created_at).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}</p></li>)}</ul>}
-          </section>
-
-          <section className="border-l-2 border-[#f4a261] pl-4">
-            <h3 className="font-semibold">Pausas y comodidad</h3>
-            {recentPauses ? <p className="mt-2 text-sm text-slate-600">La familia registró {recentPauses} {recentPauses === 1 ? "actividad" : "actividades"} con cansancio o pausa. Consideren una actividad más breve o dejarla para otro momento.</p> : <p className="mt-2 text-sm text-slate-600">Si una actividad no resulta cómoda, pueden pausarla o cambiar de tema. Aquí aparecerán las pausas que la familia registre.</p>}
           </section>
         </div>
       </section>

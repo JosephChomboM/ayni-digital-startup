@@ -66,6 +66,6 @@ it("keeps a neutral heading even if the stored group name contains an accidental
   const accidentalValue = crypto.randomUUID();
   vi.mocked(getMyFamily).mockResolvedValue({ id: "f", name: accidentalValue, created_at: "" });
   render(<HomePage {...actions()} />);
-  expect(await screen.findByRole("heading", { name: "Tu espacio familiar" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Tu espacio familiar: Elena" })).toBeInTheDocument();
   expect(screen.queryByText(accidentalValue)).not.toBeInTheDocument();
 });
