@@ -73,16 +73,20 @@ it.each(["success", "cancel"])("returns Stripe %s redirects to the plan screen",
 it("shows the signed-in identity and distinguishes the account from the accompanied person's profile", async () => {
   fetchMock.mockResolvedValue(new Response(JSON.stringify({ user, consent: {} })));
   render(<App />);
-  const accountButton = await screen.findByRole("button", { name: "Abrir mi cuenta" });
+  const accountButton = await screen.findByRole("button", { name: "Abrir la cuenta de Ana Prueba" });
   expect(accountButton).toHaveTextContent("Ana Prueba");
   expect(accountButton).toHaveTextContent("Familiar invitado");
   fireEvent.click(accountButton);
-  expect(screen.getByRole("heading", { name: "Mi cuenta" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Encuentra lo que necesitas" })).toBeInTheDocument();
+  expect(screen.getByText("Mi cuenta")).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /Información del perfil/ })[0]).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /Perfil de la familia/ })[0]).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole("button", { name: /Información del perfil/ })[0]);
+  expect(screen.getByRole("heading", { name: "Mis datos" })).toBeInTheDocument();
   expect(screen.getByText("ana@example.test")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Ver persona y familia" })).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole("button", { name: "Cerrar sesión" }).at(-1)!);
   expect(localStorage.getItem("ayni_token")).toBeNull();
-  expect(screen.queryByRole("button", { name: "Abrir mi cuenta" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Abrir la cuenta de Ana Prueba" })).not.toBeInTheDocument();
 });
 
 it("restores the plan after checkout using the session return marker", async () => {
